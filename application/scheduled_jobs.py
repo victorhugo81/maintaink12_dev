@@ -25,6 +25,24 @@ def run_pm_schedule_generation():
             logger.error(f'PM schedule generation failed: {e}', exc_info=True)
 
 
+def run_notification_sweep():
+    """Scheduled job (Phase 11): PM due/overdue, inspection due, vendor
+    contract/asset warranty expiration, and SLA warning/breach — everything
+    except inspection_failed, which fires immediately at record time
+    instead (application/notifications.notify_inspection_failed(), called
+    from routes.record_inspection_results()). Runs daily."""
+    from main import scheduler
+    with scheduler.app.app_context():
+        from application.notifications import run_notification_sweep as sweep
+        try:
+            summary = sweep()
+            total = sum(summary.values())
+            if total:
+                logger.info(f'Notification sweep sent {total} notification(s): {summary}')
+        except Exception as e:
+            logger.error(f'Notification sweep failed: {e}', exc_info=True)
+
+
 def run_org_ftp_schedule():
     """Scheduled FTP import: downloads sites.csv then users CSV using credentials from Organization."""
     from main import db, scheduler

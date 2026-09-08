@@ -18,6 +18,12 @@
           </a>
         </li>
         <li class="nav-item">
+          <a class="nav-link{% if request.endpoint == 'routes.search' %} active{% endif %}" href="{{ url_for('routes.search') }}">
+            <i class="material-symbols-rounded">search</i>
+            <span class="nav-link-text ms-1">Search</span>
+          </a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link{% if request.endpoint in ['routes.tickets', 'routes.add_ticket', 'routes.edit_ticket'] %} active{% endif %}" href="{{ url_for('routes.tickets') }}">
             <i class="material-symbols-rounded">confirmation_number</i>
             <span class="nav-link-text ms-1">Tickets</span>
@@ -87,6 +93,26 @@
             <span class="nav-link-text ms-1">Capital Replacement</span>
           </a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link{% if request.endpoint in ['routes.reports_index', 'routes.view_report'] %} active{% endif %}" href="{{ url_for('routes.reports_index') }}">
+            <i class="material-symbols-rounded">summarize</i>
+            <span class="nav-link-text ms-1">Reports</span>
+          </a>
+        </li>
+        {% if current_user.is_admin %}
+        <li class="nav-item">
+          <a class="nav-link{% if request.endpoint == 'routes.sla_rules' or request.endpoint == 'routes.edit_sla_rule' %} active{% endif %}" href="{{ url_for('routes.sla_rules') }}">
+            <i class="material-symbols-rounded">rule</i>
+            <span class="nav-link-text ms-1">SLA Rules</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link{% if request.endpoint in ['routes.csv_import_index', 'routes.csv_import_upload'] %} active{% endif %}" href="{{ url_for('routes.csv_import_index') }}">
+            <i class="material-symbols-rounded">upload_file</i>
+            <span class="nav-link-text ms-1">CSV Import</span>
+          </a>
+        </li>
+        {% endif %}
         {% endif %}
         <li class="nav-item nav-cat-list">
           <h6 class="ps-3 ms-2 text-uppercase text-xxs font-weight-bolder">Facilities</h6>
@@ -113,6 +139,12 @@
           <a class="nav-link{% if request.endpoint in ['routes.profile'] %} active{% endif %}" href="{{ url_for('routes.profile') }}">
             <i class="material-symbols-rounded">badge</i>
             <span class="nav-link-text ms-1">Profile</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link{% if request.endpoint == 'routes.notification_preferences' %} active{% endif %}" href="{{ url_for('routes.notification_preferences') }}">
+            <i class="material-symbols-rounded">notifications</i>
+            <span class="nav-link-text ms-1">Notification Preferences</span>
           </a>
         </li>
 
@@ -263,6 +295,9 @@
                     <a class="{% if current_page_name == 'Dashboard' %} active{% else %}text-dark{% endif %}" href="{{ url_for('routes.index') }}">Dashboard</a>
                   </li>
                   <li class="list-group-item">
+                    <a class="{% if request.path == '/search' %}active{% else %}text-dark{% endif %}" href="{{ url_for('routes.search') }}">Search</a>
+                  </li>
+                  <li class="list-group-item">
                     <a class="{% if current_page_name == 'Manage Tickets' or current_page_name == 'New Tickets' %}active{% else %}text-dark{% endif %}" href="{{ url_for('routes.tickets') }}">Tickets</a>
                   </li>
                   <li class="list-group-item nav-cat-list">
@@ -299,6 +334,17 @@
                   <li class="list-group-item">
                     <a class="{% if current_path == '/capital_replacement' %}active{% else %}text-dark{% endif %}" href="{{ url_for('routes.capital_replacement') }}">Capital Replacement</a>
                   </li>
+                  <li class="list-group-item">
+                    <a class="{% if request.path.startswith('/reports') %}active{% else %}text-dark{% endif %}" href="{{ url_for('routes.reports_index') }}">Reports</a>
+                  </li>
+                  {% if current_user.is_admin %}
+                  <li class="list-group-item">
+                    <a class="{% if current_path == '/sla_rules' %}active{% else %}text-dark{% endif %}" href="{{ url_for('routes.sla_rules') }}">SLA Rules</a>
+                  </li>
+                  <li class="list-group-item">
+                    <a class="{% if request.path.startswith('/csv_import') %}active{% else %}text-dark{% endif %}" href="{{ url_for('routes.csv_import_index') }}">CSV Import</a>
+                  </li>
+                  {% endif %}
                   {% endif %}
                   <li class="list-group-item nav-cat-list">
                     <h6 class="ms-2 text-uppercase text-xxs text-dark font-weight-bolder opacity-5">Facilities</h6>
@@ -314,6 +360,9 @@
                   </li>
                   <li class="list-group-item">
                     <a class="{% if current_path == '/profile' %}active{% else %}text-dark{% endif %}" href="{{ url_for('routes.profile') }}">Profile</a>
+                  </li>
+                  <li class="list-group-item">
+                    <a class="{% if current_path == '/notification_preferences' %}active{% else %}text-dark{% endif %}" href="{{ url_for('routes.notification_preferences') }}">Notification Preferences</a>
                   </li>
 
                   <!-- tech and specialist Only Items -->

@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+  <div class="col-12">
+    <div class="main-card-box card my-4">
+      <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+        <div class="bg-gradient-main custom-title-card d-flex justify-content-between align-items-center pe-3">
+          <h2 class="text-white text-capitalize ps-3 mb-0"><i class="material-symbols-rounded opacity-5">description</i> {{ current_page_name }}</h2>
+          <a class="btn btn-sm btn-light mb-0" href="{{ url_for('routes.reports_index') }}"><i class="material-symbols-rounded text-sm align-middle">arrow_back</i> All Reports</a>
+        </div>
+      </div>
+      <div class="card-body px-4 pb-4">
+        <br>
+
+        <form method="GET" action="{{ url_for('routes.view_report', report_key=report_key) }}" class="filter-container mb-4">
+          <div class="row g-2">
+            <div class="col-md-2 col-6">
+              <label class="filter-labels text-sm mb-0">Date Range</label>
+              <select class="form-select-box form-select" name="preset" onchange="this.form.submit()">
+                {% for p in presets %}<option value="{{ p }}" {% if filters.preset == p %}selected{% endif %}>{{ preset_labels[p] }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4 col-12" {% if filters.preset != 'custom' %}hidden{% endif %} id="custom-range">
+              <label class="filter-labels text-sm mb-0">Custom range</label>
+              <div class="input-group input-group-sm">
+                <input type="date" class="form-control" name="start" value="{{ filters.start or '' }}">
+                <span class="input-group-text">to</span>
+                <input type="date" class="form-control" name="end" value="{{ filters.end or '' }}">
+                <button class="btn btn-sm btn-outline-secondary mb-0" type="submit">Apply</button>
+              </div>
+            </div>
+            {% if options.sites %}
+            <div class="col-md-2 col-6">
+              <label class="filter-labels text-sm mb-0">Site</label>
+              <select class="form-select-box form-select" name="site_id" onchange="this.form.submit()">
+                <option value="">All Sites</option>
+                {% for s in options.sites %}<option value="{{ s.id }}" {% if filters.site_id == s.id %}selected{% endif %}>{{ s.site_name }}</option>{% endfor %}
+              </select>
+            </div>
+            {% endif %}
+            {% if options.facilities %}
+            <div class="col-md-2 col-6">
+              <label class="filter-labels text-sm mb-0">Facility</label>
+              <select class="form-select-box form-select" name="facility_id" onchange="this.form.submit()">
+                <option value="">All Facilities</option>
+                {% for fac in options.facilities %}<option value="{{ fac.id }}" {% if filters.facility_id == fac.id %}selected{% endif %}>{{ fac.name }}</option>{% endfor %}
+              </select>
+            </div>
+            {% endif %}
+            {% if options.assets %}
+            <div class="col-md-2 col-6">
+              <label class="filter-labels text-sm mb-0">Asset</label>
+              <select class="form-select-box form-select" name="asset_id" onchange="this.form.submit()">
+                <option value="">All Assets</option>
+                {% for a in options.assets %}<option value="{{ a.id }}" {% if filters.asset_id == a.id %}selected{% endif %}>{{ a.asset_tag }} &mdash; {{ a.name }}</option>{% endfor %}
+              </select>
+            </div>
+            {% endif %}
+            {% if options.technicians %}
+            <div class="col-md-2 col-6">
+              <label class="filter-labels text-sm mb-0">Technician</label>
+              <select class="form-select-box form-select" name="technician_id" onchange="this.form.submit()">
+                <option value="">All Technicians</option>
+                {% for t in options.technicians %}<option value="{{ t.id }}" {% if filters.technician_id == t.id %}selected{% endif %}>{{ t.get_full_name() }}</option>{% endfor %}
+              </select>
+            </div>
+            {% endif %}
+            {% if options.vendors %}
+            <div class="col-md-2 col-6">
+              <label class="filter-labels text-sm mb-0">Vendor</label>
+              <select class="form-select-box form-select" name="vendor_id" onchange="this.form.submit()">
+                <option value="">All Vendors</option>
+                {% for v in options.vendors %}<option value="{{ v.id }}" {% if filters.vendor_id == v.id %}selected{% endif %}>{{ v.name }}</option>{% endfor %}
+              </select>
+            </div>
+            {% endif %}
+            {% if 'category' in entry.filters %}
+            <div class="col-md-2 col-6">
+              <label class="filter-labels text-sm mb-0">Category</label>
+              <select class="form-select-box form-select" name="category_id" onchange="this.form.submit()">
+                <option value="">All Categories</option>
+                {% for c in options.categories %}<option value="{{ c.id }}" {% if filters.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+              </select>
+            </div>
+            {% endif %}
+            {% if 'priority' in entry.filters %}
+            <div class="col-md-2 col-6">
+              <label class="filter-labels text-sm mb-0">Priority</label>
+              <select class="form-select-box form-select" name="priority_id" onchange="this.form.submit()">
+                <option value="">All Priorities</option>
+                {% for p in options.priorities %}<option value="{{ p.id }}" {% if filters.priority_id == p.id %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
+              </select>
+            </div>
+            {% endif %}
+            {% if 'dimension' in entry.filters %}
+            <div class="col-md-2 col-6">
+              <label class="filter-labels text-sm mb-0">Group By</label>
+              <select class="form-select-box form-select" name="dimension" onchange="this.form.submit()">
+                {% for d in options.dimensions %}<option value="{{ d }}" {% if filters.dimension == d %}selected{% endif %}>{{ options.dimension_labels[d] }}</option>{% endfor %}
+              </select>
+            </div>
+            {% endif %}
+          </div>
+          <p class="text-xs text-secondary mt-2 mb-0">Date range applies to: {{ entry.date_column }}. {% if filters.start and filters.end %}{{ filters.start.strftime('%b %d, %Y') }} &ndash; {{ filters.end.strftime('%b %d, %Y') }}{% else %}All time{% endif %}.</p>
+        </form>
+
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <p class="text-sm text-secondary mb-0">{{ total_rows }} row{{ 's' if total_rows != 1 }}{% if truncated %} (capped at {{ total_rows }} for export safety){% endif %}{% if total_rows > display_cap %} &mdash; showing first {{ display_cap }} on screen, download the CSV for the rest{% endif %}.</p>
+          <a class="btn btn-sm bg-gradient-main mb-0" href="{{ url_for('routes.view_report', report_key=report_key, **export_args) }}">
+            <i class="material-symbols-rounded text-sm align-middle">download</i> Export CSV
+          </a>
+        </div>
+
+        <div class="table-responsive p-0">
+          <table class="table align-items-left mb-0 table-striped">
+            <thead><tr>{% for h in headers %}<th class="text-uppercase text-xxs font-weight-bolder">{{ h }}</th>{% endfor %}</tr></thead>
+            <tbody>
+              {% for row in rows %}
+              <tr class="table-highlight-row">{% for cell in row %}<td class="text-xs">{{ cell }}</td>{% endfor %}</tr>
+              {% else %}
+              <tr><td colspan="{{ headers|length }}" class="text-center text-secondary text-sm py-4">No data for this filter combination.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script nonce="{{ g.csp_nonce }}">
+document.addEventListener('DOMContentLoaded', function () {
+  var preset = document.querySelector('select[name="preset"]');
+  var custom = document.getElementById('custom-range');
+  if (preset && custom) {
+    preset.addEventListener('change', function () { custom.hidden = preset.value !== 'custom'; });
+  }
+});
+</script>
+
+{% endblock %}

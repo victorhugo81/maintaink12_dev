@@ -9,6 +9,71 @@ Maintaink12 started as a copy of the [AssistItK12](https://github.com/victorhugo
 codebase (see docs/PROJECT_PLAN.md) — this changelog covers Maintaink12's own history from
 that point forward, not AssistItK12's.
 
+## [0.11.0] - 2026-09-08
+
+### Added
+- Configurable SLA rules (`SLARule`, one per Priority — response/resolution hour targets),
+  `application/sla.py`'s breach/warning state machine, and a new SLA Breaches & Warnings
+  panel on the M&O Dashboard (Executive/Manager views). `analytics.work_order_kpis()`'s SLA
+  Compliance % now uses real SLARule targets when at least one is configured, falling back
+  to the original due-date approximation otherwise — fully backward compatible.
+- Notification sweep (`application/notifications.py`, `NotificationPreference`,
+  `NotificationLog`) covering PM due/overdue, inspection due/failed, vendor contract
+  expiration, asset warranty expiration, and SLA warning/breach. Every user can turn any of
+  the 8 categories on or off (`/notification_preferences`); a persistent condition (overdue,
+  expiring, breached) reminds on a weekly cadence rather than every day, a transient one
+  (due today) reminds once. Runs daily via APScheduler, one hour after PM generation;
+  `inspection_failed` fires immediately when a failed result is recorded, not on the sweep.
+- Global search (`/search`) across work orders, facilities, rooms, assets, vendors, projects,
+  and users (Admins only for the Users group — everyone else is name-only, email is
+  encrypted at rest and can't support partial matching).
+- A generalized CSV import tool (`/csv_import`) for Facilities, Rooms, Assets, Vendors, and
+  Users — separate from the legacy Users/Sites bulk-upload flow. Downloadable per-type
+  template, full pre-commit validation with a success/duplicate/error report per row, and a
+  guarantee that a batch failing during the commit step rolls back entirely rather than
+  partially writing.
+
+### Fixed
+- `notifications._notify_sla()` passed an already-resolved `{priority_id: rule}` dict into
+  `sla.scan()`, whose `rules` parameter expects raw SLARule objects (it resolves the dict
+  itself) — iterating the dict yielded priority-id ints, raising `AttributeError` on the
+  first real-data smoke test. Fixed by checking rule existence directly and letting `scan()`
+  resolve rules internally.
+- A reordered test run (`tests/test_search_and_csv_import.py` and
+  `tests/test_sla_and_notifications.py` before `tests/test_dashboard.py`) surfaced that a
+  persistent, active SLARule for a Priority used as every other test file's default (`High`)
+  silently changes those files' SLA Compliance % expectations, since the new dual-mode
+  calculation checks for ANY configured rule globally. Fixed by moving every persistent-rule
+  test to an unclaimed priority (`Critical`); documented as a hard rule in
+  `application/CLAUDE.md` for any future admin-configurable global state.
+
+## [0.10.0] - 2026-09-08
+
+### Added
+- Reports & Exports (`/reports`, `application/reports.py`) — all 13 reports named in
+  PROJECT_PLAN.md's Canonical KPI List: Work Order, Open Work Order, Overdue Work Order,
+  Preventive Maintenance, Asset Condition, Facility Condition, Maintenance Cost, Technician
+  Productivity, Vendor Performance, Asset Maintenance History, Capital Replacement, SLA
+  Performance, Recurring Problems. Every report reuses an existing module's metric
+  (Phase 6-9's `vendors.py`/`costs.py`/`risk.py`/`analytics.py`) rather than redefining one,
+  and adds date filtering, site/facility (and report-specific) filtering, and CSV export.
+  No new models, no new migration.
+- SLA Performance report breaks out due-date compliance per priority — the same
+  due-date-based definition Phase 9 introduced as a placeholder for Phase 11's real SLA
+  model, now shown per priority instead of only aggregated.
+- Every report's CSV export uses the identical row values the on-screen table renders
+  (one formatting rule, `reports._fmt()`), capped at 20,000 rows with a `truncated` flag
+  rather than silently dropping data or loading an unbounded set; verified with
+  `EXPLAIN QUERY PLAN` that every report's `work_order` queries hit an index.
+
+### Fixed
+- The new "Reports" nav link's active-state check (`current_path.startswith(...)`) raised
+  `UndefinedError` on the many routes that don't pass `current_path` to their template
+  (most `add_X`/`edit_X` forms only pass `current_page_name`) — Jinja's `Undefined` only
+  tolerates `==` comparisons silently, not method calls. Fixed to use the
+  always-present `request.path` instead; broke roughly a third of the full test suite
+  until caught by a full-suite run (every page rendering the shared nav include).
+
 ## [0.9.0] - 2026-09-08
 
 ### Added

@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                <div class="bg-gradient-main shadow-dark border-radius-lg pt-4 pb-3">
+                    <h2 class="text-white text-capitalize ps-3">Import {{ spec.label }}</h2>
+                </div>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <a class="btn btn-sm btn-outline-secondary mb-3" href="{{ url_for('routes.csv_import_template', entity_type=entity_type) }}">
+                    <i class="material-symbols-rounded text-sm align-middle">download</i> Download Template
+                </a>
+                <p class="text-xs text-secondary">Required columns: {{ spec.required|join(', ') }}. Optional: {{ spec.optional|join(', ') }}.</p>
+                <form method="POST" enctype="multipart/form-data" action="{{ url_for('routes.csv_import_upload', entity_type=entity_type) }}">
+                    {{ form.hidden_tag() }}
+                    <div class="input-group-outline my-3">
+                        {{ form.csv_file(class="form-control") }}
+                    </div>
+                    <div class="d-flex gap-2">
+                        {{ form.submit(class="btn bg-gradient-main") }}
+                        <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.csv_import_index') }}">Back</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

@@ -902,6 +902,104 @@ class ProjectDocument(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
 
+# ---------------------------------------------------------------------------
+# Maintaink12 M&O models — SLA, Notifications, CSV Import (Phase 11)
+#
+# SLARule is one-to-one with Priority (unique priority_id) — a priority with
+# no row simply has no SLA target, never a fabricated default. Response and
+# resolution deadlines are computed from WorkOrder.created_at at read time
+# (application/sla.py), not stored on WorkOrder: a rule change should apply
+# to a work order's remaining lifetime, not freeze in a stale snapshot.
+#
+# NotificationPreference is one-to-one with User; a user with no row is
+# treated as "everything on" by application/notifications.py, so newly
+# created users don't silently miss alerts before ever visiting the
+# preferences page. NotificationLog is the de-duplication ledger: one row
+# per (event_type, entity_type, entity_id, bucket, user_id) — "bucket" is a
+# day or ISO week string (application/notifications.EVENT_CADENCE) so a
+# transient condition (due today) reminds once, and a persistent one
+# (overdue, expiring) reminds on a cadence instead of every single day.
+# ---------------------------------------------------------------------------
+
+class SLARule(db.Model):
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    priority_id = db.Column(db.Integer, db.ForeignKey('priority.id', ondelete='CASCADE'), nullable=False, unique=True)
+    response_hours = db.Column(db.Integer, nullable=False)
+    resolution_hours = db.Column(db.Integer, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, onupdate=_utcnow, nullable=True)
+
+    priority = db.relationship('Priority', backref=db.backref('sla_rule', uselist=False))
+
+    __table_args__ = (
+        db.CheckConstraint('response_hours > 0 AND resolution_hours > 0', name='ck_sla_rule_positive_hours'),
+    )
+
+
+NOTIFICATION_EVENTS = ('pm_due', 'pm_overdue', 'inspection_due', 'inspection_failed',
+                       'vendor_contract_expiring', 'asset_warranty_expiring', 'sla_warning', 'sla_breach')
+
+NOTIFICATION_EVENT_LABELS = {
+    'pm_due': 'Preventive maintenance due today',
+    'pm_overdue': 'Preventive maintenance overdue',
+    'inspection_due': 'Inspection due today',
+    'inspection_failed': 'Inspection failed an item',
+    'vendor_contract_expiring': 'Vendor contract expiring/expired',
+    'asset_warranty_expiring': 'Asset warranty expiring/expired',
+    'sla_warning': 'Work order approaching its SLA deadline',
+    'sla_breach': 'Work order missed its SLA deadline',
+}
+
+
+class NotificationPreference(db.Model):
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False, unique=True)
+    pm_due = db.Column(db.Boolean, default=True, nullable=False)
+    pm_overdue = db.Column(db.Boolean, default=True, nullable=False)
+    inspection_due = db.Column(db.Boolean, default=True, nullable=False)
+    inspection_failed = db.Column(db.Boolean, default=True, nullable=False)
+    vendor_contract_expiring = db.Column(db.Boolean, default=True, nullable=False)
+    asset_warranty_expiring = db.Column(db.Boolean, default=True, nullable=False)
+    sla_warning = db.Column(db.Boolean, default=True, nullable=False)
+    sla_breach = db.Column(db.Boolean, default=True, nullable=False)
+    updated_at = db.Column(db.DateTime, onupdate=_utcnow, nullable=True)
+
+    user = db.relationship('User', backref=db.backref('notification_preference', uselist=False))
+
+
+class NotificationLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    event_type = db.Column(db.String(40), nullable=False, index=True)
+    entity_type = db.Column(db.String(40), nullable=False)
+    entity_id = db.Column(db.Integer, nullable=False)
+    bucket = db.Column(db.String(20), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    sent_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+    user = db.relationship('User')
+
+    __table_args__ = (
+        db.UniqueConstraint('event_type', 'entity_type', 'entity_id', 'bucket', 'user_id', name='uq_notification_dedup'),
+    )
+
+
+class CsvImportLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    entity_type = db.Column(db.String(20), nullable=False)
+    filename = db.Column(db.String(255), nullable=False)
+    uploaded_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    uploaded_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+    total_rows = db.Column(db.Integer, default=0)
+    success_count = db.Column(db.Integer, default=0)
+    duplicate_count = db.Column(db.Integer, default=0)
+    error_count = db.Column(db.Integer, default=0)
+    status = db.Column(db.String(20), default='success')
+    error_message = db.Column(db.Text, nullable=True)
+
+    uploader = db.relationship('User', foreign_keys=[uploaded_by_id])
+
+
 class ConditionHistoryImmutableError(Exception):
     """Raised when code tries to update or delete an AssetConditionHistory row."""
 

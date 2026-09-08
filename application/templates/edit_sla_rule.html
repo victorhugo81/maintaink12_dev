@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                <div class="bg-gradient-main shadow-dark border-radius-lg pt-4 pb-3">
+                    <h2 class="text-white text-capitalize ps-3">SLA Rule &mdash; {{ priority.name }}</h2>
+                </div>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <form method="POST" action="{{ url_for('routes.edit_sla_rule', priority_id=priority.id) }}">
+                    {{ form.hidden_tag() }}
+                    <div class="col-12 d-flex justify-content-end align-items-center sticky-top bg-white py-2 mb-4 border-bottom">
+                        <div class="d-flex gap-2 mt-3">
+                            {{ form.submit(class="btn bg-gradient-main") }}
+                            <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.sla_rules') }}">Back</a>
+                        </div>
+                    </div>
+                    <p class="text-xs text-secondary">Both targets are measured from the work order's creation time. Response is considered met when work starts (status moves to In Progress) by the response deadline; resolution is met when the work order is completed by the resolution deadline.</p>
+                    <div class="row g-3">
+                        <div class="col-12 col-sm-6">
+                            <span aria-hidden="true" class="text-danger ms-1">*</span>
+                            {{ form.response_hours.label(class="form-label") }}
+                            {{ form.response_hours(class="form-control") }}
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            <span aria-hidden="true" class="text-danger ms-1">*</span>
+                            {{ form.resolution_hours.label(class="form-label") }}
+                            {{ form.resolution_hours(class="form-control") }}
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                {{ form.is_active(class="form-check-input") }}
+                                {{ form.is_active.label(class="form-check-label") }}
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

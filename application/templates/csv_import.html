@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                <div class="bg-gradient-main custom-title-card">
+                    <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">upload_file</i> {{ current_page_name }}</h2>
+                </div>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <br>
+                <p class="text-sm text-secondary">Download a template, fill it in, then upload it below. Every row is validated before anything is saved — rows with missing/invalid data or that already exist are skipped and reported, never fatal to the rest of the file. This is a separate tool from the legacy Users/Sites bulk upload page.</p>
+                <div class="row">
+                  {% for key in entity_order %}
+                  {% set spec = entities[key] %}
+                  <div class="col-xl-4 col-md-6 mb-4">
+                    <div class="card">
+                      <div class="card-body">
+                        <h6 class="mb-1">{{ spec.label }}</h6>
+                        <p class="text-xs text-secondary mb-2">Required: {{ spec.required|join(', ') }}</p>
+                        <div class="d-flex gap-2">
+                          <a class="btn btn-sm btn-outline-secondary mb-0" href="{{ url_for('routes.csv_import_template', entity_type=key) }}">
+                            <i class="material-symbols-rounded text-sm align-middle">download</i> Template
+                          </a>
+                          <a class="btn btn-sm bg-gradient-main mb-0" href="{{ url_for('routes.csv_import_upload', entity_type=key) }}">
+                            <i class="material-symbols-rounded text-sm align-middle">upload</i> Import
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
+
+                <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mt-3 mb-2">Recent Imports</h6>
+                <div class="table-responsive p-0">
+                  <table class="table align-items-left mb-0 table-striped">
+                    <thead><tr>
+                      <th class="text-uppercase text-xxs font-weight-bolder">When</th>
+                      <th class="text-uppercase text-xxs font-weight-bolder">Type</th>
+                      <th class="text-uppercase text-xxs font-weight-bolder">File</th>
+                      <th class="text-uppercase text-xxs font-weight-bolder">By</th>
+                      <th class="text-uppercase text-xxs font-weight-bolder">Total</th>
+                      <th class="text-uppercase text-xxs font-weight-bolder">Imported</th>
+                      <th class="text-uppercase text-xxs font-weight-bolder">Duplicates</th>
+                      <th class="text-uppercase text-xxs font-weight-bolder">Errors</th>
+                      <th class="text-uppercase text-xxs font-weight-bolder">Status</th>
+                    </tr></thead>
+                    <tbody>
+                      {% for log in recent %}
+                      <tr>
+                        <td class="text-xs">{{ log.uploaded_at | localtime }}</td>
+                        <td class="text-xs">{{ entities[log.entity_type].label if log.entity_type in entities else log.entity_type }}</td>
+                        <td class="text-xs">{{ log.filename }}</td>
+                        <td class="text-xs">{{ log.uploader.get_full_name() if log.uploader else '' }}</td>
+                        <td class="text-xs">{{ log.total_rows }}</td>
+                        <td class="text-xs">{{ log.success_count }}</td>
+                        <td class="text-xs">{{ log.duplicate_count }}</td>
+                        <td class="text-xs">{{ log.error_count }}</td>
+                        <td><span class="badge {% if log.status == 'success' %}bg-success{% else %}bg-danger{% endif %}">{{ log.status }}</span></td>
+                      </tr>
+                      {% else %}
+                      <tr><td colspan="9" class="text-center text-secondary text-sm py-4">No imports yet.</td></tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

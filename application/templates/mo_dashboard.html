@@ -180,6 +180,10 @@
           {{ kpi_card('Cost per Work Order', money(cost.cost_per_work_order), 'receipt_long') }}
           {{ kpi_card('Labor / Material / Vendor', money(cost.labor_cost) ~ ' / ' ~ money(cost.material_cost) ~ ' / ' ~ money(cost.vendor_cost), 'stacked_bar_chart') }}
           {{ kpi_card('Recurring Issues', data.recurring|length, 'repeat', None, 'text-warning' if data.recurring else '') }}
+          {% if data.sla.available %}
+          {{ kpi_card('SLA Breaches', data.sla.breach_count, 'gpp_bad', None, 'text-danger' if data.sla.breach_count else '') }}
+          {{ kpi_card('SLA Warnings', data.sla.warning_count, 'warning', None, 'text-warning' if data.sla.warning_count else '') }}
+          {% endif %}
           {% endif %}
         </div>
 
@@ -243,6 +247,42 @@
               </tbody>
             </table>
           </div>
+        </div>
+
+        <!-- SLA Breaches / Warnings -->
+        <div class="ticket-content-box mb-4" id="sla">
+          <h3>SLA Breaches &amp; Warnings</h3>
+          {% if not data.sla.available %}
+          <p class="text-sm text-secondary mb-0">No SLA rules configured yet. <a href="{{ url_for('routes.sla_rules') }}">Set response/resolution targets per priority</a> to enable breach/warning tracking here.</p>
+          {% else %}
+          <p class="text-xs text-secondary">Open work orders past (or approaching) their response/resolution deadline, plus anything completed late in the last two weeks.</p>
+          {% if data.sla.breaches or data.sla.warnings %}
+          <div class="table-responsive p-0">
+            <table class="table align-items-left mb-0 table-striped">
+              <thead><tr>
+                <th class="text-uppercase text-xxs font-weight-bolder">Work Order</th>
+                <th class="text-uppercase text-xxs font-weight-bolder">Facility</th>
+                <th class="text-uppercase text-xxs font-weight-bolder">Metric</th>
+                <th class="text-uppercase text-xxs font-weight-bolder">Deadline</th>
+                <th class="text-uppercase text-xxs font-weight-bolder">State</th>
+              </tr></thead>
+              <tbody>
+              {% for item in data.sla.breaches + data.sla.warnings %}
+              <tr class="table-highlight-row">
+                <td><a href="{{ url_for('routes.edit_work_order', work_order_id=item.work_order.id) }}"><span class="text-sm font-weight-bold">{{ item.work_order.wo_number }}</span></a></td>
+                <td class="text-xs">{{ item.work_order.facility.name if item.work_order.facility else '' }}</td>
+                <td class="text-xs text-capitalize">{{ item.metric }}</td>
+                <td class="text-xs">{{ item.due_at | localtime }}</td>
+                <td><span class="badge {% if loop.index0 < data.sla.breaches|length %}bg-danger{% else %}bg-warning{% endif %}">{{ 'Breached' if loop.index0 < data.sla.breaches|length else 'Warning' }}</span></td>
+              </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="text-sm text-secondary mb-0">No SLA breaches or warnings right now.</p>
+          {% endif %}
+          {% endif %}
         </div>
 
         <!-- Recurring Issues -->

@@ -202,6 +202,18 @@ def create_app(config_name=None):
         replace_existing=True,
     )
 
+    # Notification sweep (Phase 11) — PM/inspection/vendor/asset/SLA alerts.
+    # Runs after PM generation so a schedule advanced past "today" by that
+    # job doesn't also fire a same-day "PM due" notification.
+    from application.scheduled_jobs import run_notification_sweep
+    scheduler.add_job(
+        id='notification_sweep',
+        func=run_notification_sweep,
+        trigger='cron',
+        hour=2, minute=0,
+        replace_existing=True,
+    )
+
     if not scheduler.running:
         scheduler.start()
 

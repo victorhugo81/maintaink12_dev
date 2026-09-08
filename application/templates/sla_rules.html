@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+        <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+        <div class="bg-gradient-main custom-title-card">
+          <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">schedule</i> {{ current_page_name }}</h2>
+          </div>
+          <div class="card-body px-0 pb-2">
+            <br>
+            <p class="text-xs text-secondary px-3">One response/resolution target per priority. A priority with no rule configured has no SLA tracking — never a fabricated deadline. Configured rules drive the M&amp;O Dashboard's SLA breach/warning panel and the SLA warning/breach notifications.</p>
+          <div class="table-responsive p-0">
+            <table class="table align-items-left mb-0 table-striped">
+              <thead>
+                <tr>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Priority</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Response Target</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Resolution Target</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Status</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in priorities %}
+                <tr class="table-highlight-row">
+                  <td><span class="badge bg-{{ p.color }}">{{ p.name }}</span></td>
+                  {% if p.sla_rule %}
+                  <td><span class="text-sm">{{ p.sla_rule.response_hours }} hours</span></td>
+                  <td><span class="text-sm">{{ p.sla_rule.resolution_hours }} hours</span></td>
+                  <td><span class="badge {% if p.sla_rule.is_active %}bg-success{% else %}bg-secondary{% endif %}">{{ 'Active' if p.sla_rule.is_active else 'Inactive' }}</span></td>
+                  {% else %}
+                  <td colspan="3"><span class="text-secondary text-xs">No rule configured</span></td>
+                  {% endif %}
+                  <td class="align-middle">
+                    <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ url_for('routes.edit_sla_rule', priority_id=p.id) }}" class="btn table-button-edit font-weight-bold" aria-label="Configure SLA for: {{ p.name }}">
+                      <i class="material-symbols-rounded position-relative text-lg">edit</i>
+                    </a>
+                    {% if p.sla_rule %}
+                    <form id="delete-sla-{{ p.sla_rule.id }}" action="{{ url_for('routes.delete_sla_rule', rule_id=p.sla_rule.id) }}" method="POST">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="button" class="btn table-button-delete font-weight-bold" aria-label="Delete SLA rule for: {{ p.name }}"
+                              data-bs-toggle="modal" data-bs-target="#deleteConfirmModal"
+                              data-confirm-message="Remove the SLA rule for &quot;{{ p.name }}&quot;?"
+                              data-form-id="delete-sla-{{ p.sla_rule.id }}">
+                        <i class="material-symbols-rounded position-relative text-lg">delete</i>
+                      </button>
+                    </form>
+                    {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-center text-secondary text-sm py-4">No priorities defined.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+  </div>
+</div>
+</div>
+</div>
+
+{% endblock %}

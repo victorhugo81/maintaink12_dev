@@ -47,6 +47,7 @@ RECURRING_SCAN_LIMIT = 5000   # newest N work orders in the filter window are sc
 CHART_TOP_N = 10
 LIST_LIMIT = 20
 BACKLOG_AGE_DAYS = 30
+SLA_LOOKBACK_DAYS = 14  # how far back a completed work order is still scanned for a resolution breach
 
 CONDITION_LABELS = ('Excellent', 'Good', 'Fair', 'Poor', 'Critical')
 HEALTH_FACTORS = ('Asset Condition', 'Open/Overdue Work Orders', 'Recurring Problems',
@@ -83,7 +84,7 @@ def date_range(preset, today=None, start=None, end=None):
     return date(today.year, today.month, 1), today, 'month'
 
 
-def _parse_date(raw):
+def parse_date(raw):
     try:
         return date.fromisoformat(raw) if raw else None
     except ValueError:
@@ -100,7 +101,7 @@ def parse_filters(args, visible_site_ids, today=None):
     preset = args.get('preset', 'month')
     if preset not in PRESETS:
         preset = 'month'
-    start, end, preset = date_range(preset, today, _parse_date(args.get('start')), _parse_date(args.get('end')))
+    start, end, preset = date_range(preset, today, parse_date(args.get('start')), parse_date(args.get('end')))
 
     def _int(name):
         value = args.get(name, type=int)
@@ -172,7 +173,7 @@ def _asset_clauses(f):
     return clauses
 
 
-def _days_between(later, earlier):
+def days_between(later, earlier):
     """Fractional days between two DateTime columns, per dialect (SQLAlchemy
     has no portable datetime subtraction)."""
     from main import db
@@ -185,13 +186,13 @@ def _days_between(later, earlier):
     return func.extract('epoch', later - earlier) / 86400.0
 
 
-def _num(value, digits=2):
+def num(value, digits=2):
     if value is None:
         return None
     return round(float(value), digits)
 
 
-def _pct(part, whole):
+def pct(part, whole):
     return round(100.0 * part / whole, 1) if whole else None
 
 
@@ -213,9 +214,14 @@ def work_order_kpis(f, today=None):
       Avg Response     = mean days from created_at to started_at (In Progress).
       Avg Resolution   = mean days from created_at to completed_at, over work
                          orders completed in the period.
-      SLA Compliance % = of work orders completed in the period that had a due
-                         date, % completed on or before it. (Placeholder until
-                         Phase 11's per-priority SLA targets exist.)
+      SLA Compliance % = when at least one Phase 11 SLARule is configured, the
+                         real per-priority resolution-deadline compliance
+                         (application/sla.aggregate_compliance) over work
+                         orders completed in the period whose priority has a
+                         rule. Falls back to the original due-date-based
+                         approximation (completed on or before WorkOrder.due_date)
+                         when no SLARule exists yet, or none of the period's
+                         completions match a configured priority.
       Repeat Work %    = of work orders created in the period, % belonging to a
                          detected recurring-issue group (filled in by
                          build_dashboard from the detector's output).
@@ -249,12 +255,12 @@ def work_order_kpis(f, today=None):
     created_row = db.session.query(
         func.count(WorkOrder.id),
         flag(WorkOrder.status.in_((workflow.COMPLETED, workflow.CLOSED))),
-        func.avg(_days_between(WorkOrder.started_at, WorkOrder.created_at)),
+        func.avg(days_between(WorkOrder.started_at, WorkOrder.created_at)),
     ).filter(*_wo_clauses(f, dated=True)).one()
 
     completed_row = db.session.query(
         func.count(WorkOrder.id),
-        func.avg(_days_between(WorkOrder.completed_at, WorkOrder.created_at)),
+        func.avg(days_between(WorkOrder.completed_at, WorkOrder.created_at)),
         flag(WorkOrder.due_date.isnot(None)),
         flag(db.and_(WorkOrder.due_date.isnot(None), func.date(WorkOrder.completed_at) <= WorkOrder.due_date)),
     ).filter(*_wo_clauses(f, dated=True, column=WorkOrder.completed_at),
@@ -265,6 +271,10 @@ def work_order_kpis(f, today=None):
     completed = int(completed_row[0] or 0)
     with_due = int(completed_row[2] or 0)
     met_due = int(completed_row[3] or 0)
+
+    sla_met, sla_sample = _rule_based_sla_compliance(f)
+    if sla_sample:
+        with_due, met_due = sla_sample, sla_met
 
     return {
         'total_open': int(open_row[0] or 0),
@@ -280,13 +290,31 @@ def work_order_kpis(f, today=None):
         'backlog': int(open_row[10]),
         'created_in_period': created,
         'completed': completed,
-        'completion_rate': _pct(done_of_created, created),
-        'avg_response_days': _num(created_row[2], 1),
-        'avg_resolution_days': _num(completed_row[1], 1),
-        'sla_compliance': _pct(met_due, with_due),
+        'completion_rate': pct(done_of_created, created),
+        'avg_response_days': num(created_row[2], 1),
+        'avg_resolution_days': num(completed_row[1], 1),
+        'sla_compliance': pct(met_due, with_due),
         'sla_sample': with_due,
         'repeat_work_pct': None,
     }
+
+
+def _rule_based_sla_compliance(f):
+    """
+    (met, total) using Phase 11's real SLARule targets, or (0, 0) when no
+    active rule exists — the cheap, common case (no rules configured yet)
+    costs one COUNT query and nothing else, so work_order_kpis() stays
+    SQL-aggregate-only until a district actually turns SLA rules on.
+    """
+    from application.models import SLARule, WorkOrder
+    if not SLARule.query.filter_by(is_active=True).limit(1).first():
+        return 0, 0
+    from application import sla as sla_module
+    completed = WorkOrder.query.filter(
+        *_wo_clauses(f, dated=True, column=WorkOrder.completed_at),
+        WorkOrder.status.in_((workflow.COMPLETED, workflow.CLOSED)),
+    ).all()
+    return sla_module.aggregate_compliance(completed)
 
 
 # ---------------------------------------------------------------------------
@@ -402,9 +430,9 @@ def maintenance_kpis(f, today=None):
         'pm_overdue': int(pm_row[0]), 'pm_due': int(pm_row[1]),
         'inspections_overdue': int(insp_row[0]), 'inspections_due': int(insp_row[1]),
         'preventive': preventive, 'corrective': corrective,
-        'preventive_pct': _pct(preventive, preventive + corrective),
+        'preventive_pct': pct(preventive, preventive + corrective),
         'by_source': by_source,
-        'labor_hours': _num(labor_hours, 1) or 0.0,
+        'labor_hours': num(labor_hours, 1) or 0.0,
     }
 
 
@@ -516,20 +544,20 @@ def chart_data(f, maintenance=None, facility=None):
                                  .filter(*dated).group_by(year_col, month_col).all():
         idx = month_index.get((int(y), int(m)))
         if idx is not None:
-            cost_by_month[idx] = _num(total) or 0.0
+            cost_by_month[idx] = num(total) or 0.0
     charts['cost_over_time'] = {'labels': month_labels, 'datasets': [{'label': 'Actual Cost', 'data': cost_by_month}]}
 
     response = [None] * len(months)
     resolution = [None] * len(months)
     for y, m, avg_resp, avg_res in db.session.query(
             year_col, month_col,
-            func.avg(_days_between(WorkOrder.started_at, WorkOrder.created_at)),
-            func.avg(_days_between(WorkOrder.completed_at, WorkOrder.created_at))) \
+            func.avg(days_between(WorkOrder.started_at, WorkOrder.created_at)),
+            func.avg(days_between(WorkOrder.completed_at, WorkOrder.created_at))) \
             .filter(*dated).group_by(year_col, month_col).all():
         idx = month_index.get((int(y), int(m)))
         if idx is not None:
-            response[idx] = _num(avg_resp, 1)
-            resolution[idx] = _num(avg_res, 1)
+            response[idx] = num(avg_resp, 1)
+            resolution[idx] = num(avg_res, 1)
     charts['trends'] = {'labels': month_labels, 'datasets': [
         {'label': 'Avg Response (days)', 'data': response},
         {'label': 'Avg Resolution (days)', 'data': resolution},
@@ -861,7 +889,8 @@ def build_insights(data, period_label):
     data keys (all optional): wo (work_order_kpis), prior_created, prior_avg_resolution_days,
     top_category (name, count), total_in_period, facility_vs_avg {facility, category,
     count, avg, facility_count}, overdue_by_facility [(name, n)], maintenance
-    (maintenance_kpis), facility (facility_kpis), recurring (groups), cost (cost_kpis).
+    (maintenance_kpis), facility (facility_kpis), recurring (groups), cost (cost_kpis),
+    sla (sla_summary() — only emits when SLARule(s) are configured).
     Returns [{'level': 'danger'|'warning'|'info', 'text'}] ordered by severity.
     """
     out = []
@@ -878,10 +907,10 @@ def build_insights(data, period_label):
 
     fva = data.get('facility_vs_avg')
     if fva and fva.get('facility_count', 0) >= 2 and fva['count'] >= 3 and fva['avg']:
-        pct = round(100.0 * (fva['count'] - fva['avg']) / fva['avg'])
-        if pct >= 25:
+        fva_pct = round(100.0 * (fva['count'] - fva['avg']) / fva['avg'])
+        if fva_pct >= 25:
             out.append({'level': 'warning',
-                        'text': f"{fva['facility']} has {pct}% more {fva['category']} work orders than the average facility {period_label} ({fva['count']} vs {fva['avg']:.1f})."})
+                        'text': f"{fva['facility']} has {fva_pct}% more {fva['category']} work orders than the average facility {period_label} ({fva['count']} vs {fva['avg']:.1f})."})
 
     overdue = wo.get('overdue', 0)
     if overdue:
@@ -889,9 +918,15 @@ def build_insights(data, period_label):
         tail = f'; {by_fac[0][0]} has the most ({by_fac[0][1]})' if by_fac else ''
         out.append({'level': 'danger', 'text': f'{overdue} open work order{"s are" if overdue != 1 else " is"} past due{tail}.'})
 
+    sla = data.get('sla')
+    if sla and sla.get('breach_count'):
+        warn_tail = f'; {sla["warning_count"]} more approaching their deadline' if sla.get('warning_count') else ''
+        out.append({'level': 'danger',
+                    'text': f'{sla["breach_count"]} work order SLA{"s are" if sla["breach_count"] != 1 else " is"} breached{warn_tail}.'})
+
     unassigned, total_open = wo.get('unassigned', 0), wo.get('total_open', 0)
     if unassigned and total_open:
-        out.append({'level': 'warning', 'text': f'{unassigned} of {total_open} open work orders are unassigned ({_pct(unassigned, total_open)}%).'})
+        out.append({'level': 'warning', 'text': f'{unassigned} of {total_open} open work orders are unassigned ({pct(unassigned, total_open)}%).'})
 
     m = data.get('maintenance') or {}
     if (m.get('preventive', 0) + m.get('corrective', 0)) >= 10 and m.get('preventive_pct') is not None:
@@ -901,7 +936,7 @@ def build_insights(data, period_label):
 
     top = data.get('top_category')
     if top and total >= 5:
-        share = _pct(top[1], total)
+        share = pct(top[1], total)
         if share >= 30:
             out.append({'level': 'info', 'text': f'{top[0]} accounts for {share}% of work orders opened {period_label} ({top[1]} of {total}).'})
 
@@ -957,7 +992,7 @@ def _insight_queries(f, top_category, today):
 
     prior = _prior_period(f)
     prior_created = db.session.query(func.count(WorkOrder.id)).filter(*_wo_clauses(prior, dated=True)).scalar() or 0
-    prior_res = db.session.query(func.avg(_days_between(WorkOrder.completed_at, WorkOrder.created_at))) \
+    prior_res = db.session.query(func.avg(days_between(WorkOrder.completed_at, WorkOrder.created_at))) \
         .filter(*_wo_clauses(prior, dated=True, column=WorkOrder.completed_at),
                 WorkOrder.status.in_((workflow.COMPLETED, workflow.CLOSED))).scalar()
 
@@ -983,13 +1018,42 @@ def _insight_queries(f, top_category, today):
                 facility_vs_avg = {'facility': rows[0][0], 'category': cat.name, 'count': int(rows[0][1]),
                                    'avg': total_cat / facility_count, 'facility_count': facility_count}
 
-    return {'prior_created': int(prior_created), 'prior_avg_resolution_days': _num(prior_res, 1),
+    return {'prior_created': int(prior_created), 'prior_avg_resolution_days': num(prior_res, 1),
             'overdue_by_facility': [(n, int(c)) for n, c in overdue_by_facility], 'facility_vs_avg': facility_vs_avg}
 
 
 # ---------------------------------------------------------------------------
 # Dashboard assembly
 # ---------------------------------------------------------------------------
+
+def sla_summary(f, today=None):
+    """
+    SLA breach/warning panel for the executive/manager dashboard. Only scans
+    when at least one active SLARule exists (one COUNT query otherwise) —
+    candidates are open work orders in scope plus ones completed in the last
+    SLA_LOOKBACK_DAYS, capped at sla.SLA_SCAN_LIMIT, the same bounded-scan
+    tradeoff Recurring Issue Detection already accepts.
+    """
+    from main import db
+    from application.models import SLARule, WorkOrder
+    from application import sla as sla_module
+
+    today = today or _today()
+    if not SLARule.query.filter_by(is_active=True).limit(1).first():
+        return {'available': False, 'breaches': [], 'warnings': [], 'breach_count': 0, 'warning_count': 0}
+
+    lookback = datetime.combine(today - timedelta(days=SLA_LOOKBACK_DAYS), datetime.min.time())
+    clauses = _wo_clauses(f, dated=False)
+    query = WorkOrder.query.filter(*clauses).filter(
+        db.or_(WorkOrder.status.in_(workflow.OPEN_STATUSES),
+              db.and_(WorkOrder.status.in_((workflow.COMPLETED, workflow.CLOSED)), WorkOrder.completed_at >= lookback)),
+    ).options(db.joinedload(WorkOrder.priority), db.joinedload(WorkOrder.facility)) \
+     .order_by(WorkOrder.created_at.desc()).limit(sla_module.SLA_SCAN_LIMIT)
+
+    result = sla_module.scan(query.all())
+    return {'available': True, 'breaches': result['breaches'], 'warnings': result['warnings'],
+            'breach_count': len(result['breaches']), 'warning_count': len(result['warnings'])}
+
 
 def default_view(user):
     if user.role_id == 1:
@@ -1047,17 +1111,18 @@ def build_dashboard(view, f, user, today=None):
         charts = chart_data(f, maintenance=maintenance, facility=facility)
         groups = label_recurring_groups(detect_recurring_issues(recurring_rows(f)))
         recurring_ids = set().union(*(g['work_order_ids'] for g in groups)) if groups else set()
-        wo['repeat_work_pct'] = _pct(len(recurring_ids), wo['created_in_period']) if wo['created_in_period'] else None
+        wo['repeat_work_pct'] = pct(len(recurring_ids), wo['created_in_period']) if wo['created_in_period'] else None
         health = facility_health_scores(f, groups, today)
+        sla = sla_summary(f, today)
         by_cat = charts['by_category']
         top_category = (by_cat['labels'][0], by_cat['datasets'][0]['data'][0]) if by_cat['labels'] else None
         extra = _insight_queries(f, top_category, today)
         insights = build_insights({
             'wo': wo, 'top_category': top_category, 'total_in_period': wo['created_in_period'],
-            'maintenance': maintenance, 'facility': facility, 'recurring': groups, 'cost': cost, **extra,
+            'maintenance': maintenance, 'facility': facility, 'recurring': groups, 'cost': cost, 'sla': sla, **extra,
         }, f['period_label'])
         data.update({'facility': facility, 'maintenance': maintenance, 'cost': cost, 'charts': charts,
-                     'recurring': groups, 'health': health, 'insights': insights})
+                     'recurring': groups, 'health': health, 'sla': sla, 'insights': insights})
     elif view == 'technician':
         maintenance = maintenance_kpis({'site_ids': f['site_ids'], 'facility_id': f.get('facility_id'),
                                         'start': f['start'], 'end': f['end']}, today)

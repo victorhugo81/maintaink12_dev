@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+  <div class="col-12">
+    <div class="main-card-box card my-4">
+      <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+        <div class="bg-gradient-main custom-title-card">
+          <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">summarize</i> {{ current_page_name }}</h2>
+        </div>
+      </div>
+      <div class="card-body px-4 pb-4">
+        <br>
+        <p class="text-sm text-secondary">Every report supports date and site filtering plus CSV export. Figures come straight from the same modules the M&amp;O Dashboard uses &mdash; nothing here redefines a metric.</p>
+        {% for group, items in groups.items() %}
+        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mt-4 mb-2">{{ group }}</h6>
+        <div class="row">
+          {% for key, title in items %}
+          <div class="col-xl-3 col-md-4 col-sm-6 mb-4">
+            <a href="{{ url_for('routes.view_report', report_key=key) }}">
+              <div class="small-cards-dashboard card">
+                <div class="card-header p-2 ps-3">
+                  <div class="d-flex justify-content-between">
+                    <div><p class="text-sm mb-0">{{ title }}</p></div>
+                    <div class="icon icon-md icon-shape text-center"><i class="material-symbols-rounded opacity-10">description</i></div>
+                  </div>
+                </div>
+              </div>
+            </a>
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -386,3 +386,27 @@ class AssetConditionForm(FlaskForm):
     notes = TextAreaField('Notes:', validators=[Optional()])
     photo = FileField('Photo')
     submit = SubmitField('Record Assessment')
+
+
+class SLARuleForm(FlaskForm):
+    response_hours = IntegerField('Response Target (hours):', validators=[DataRequired(), NumberRange(min=1)])
+    resolution_hours = IntegerField('Resolution Target (hours):', validators=[DataRequired(), NumberRange(min=1)])
+    is_active = BooleanField('Active', default=True)
+    submit = SubmitField('Save SLA Rule')
+
+
+class NotificationPreferenceForm(FlaskForm):
+    pm_due = BooleanField('Preventive maintenance due today')
+    pm_overdue = BooleanField('Preventive maintenance overdue')
+    inspection_due = BooleanField('Inspection due today')
+    inspection_failed = BooleanField('Inspection failed an item')
+    vendor_contract_expiring = BooleanField('Vendor contract expiring/expired')
+    asset_warranty_expiring = BooleanField('Asset warranty expiring/expired')
+    sla_warning = BooleanField('Work order approaching its SLA deadline')
+    sla_breach = BooleanField('Work order missed its SLA deadline')
+    submit = SubmitField('Save Notification Preferences')
+
+
+class CsvImportUploadForm(FlaskForm):
+    csv_file = FileField('CSV File:', validators=[FileRequired(), FileAllowed(['csv'], 'CSV files only.')])
+    submit = SubmitField('Validate & Import')

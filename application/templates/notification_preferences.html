@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                <div class="bg-gradient-main custom-title-card">
+                    <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">notifications</i> {{ current_page_name }}</h2>
+                </div>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <br>
+                <p class="text-sm text-secondary">Choose which email alerts you receive. Everything is on by default for a new account.</p>
+                <form method="POST" action="{{ url_for('routes.notification_preferences') }}">
+                    {{ form.hidden_tag() }}
+                    <div class="row g-3">
+                        {% for event in events %}
+                        <div class="col-12 col-md-6">
+                            <div class="form-check">
+                                {{ form[event](class="form-check-input") }}
+                                <label class="form-check-label" for="{{ event }}">{{ event_labels[event] }}</label>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="mt-4">
+                        {{ form.submit(class="btn bg-gradient-main") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

@@ -4,8 +4,8 @@ from flask_login import login_user, login_required, logout_user, current_user
 from flask_paginate import Pagination, get_page_args
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from .models import User, Role, Site, Notification, Organization, Ticket, Title, Ticket_content, Ticket_attachment, BulkUploadLog, Facility, Floor, Room, FacilityAttachment, RoomAttachment, AssetType, Asset, AssetConditionHistory, AssetAttachment, condition_label_for_score, CONDITION_SCALE, Priority, Category, Subcategory, WorkOrder, WorkOrderComment, WorkOrderAttachment, WorkOrderStatusHistory, MaintenancePlan, MaintenanceSchedule, InspectionTemplate, InspectionItem, Inspection, InspectionResult, INSPECTION_RESULTS, Vendor, WorkOrderMaterial, WorkOrderLabor, CostRecord, Project, ProjectTask, ProjectCost, ProjectDocument, PROJECT_STATUSES
-from .forms import LoginForm, UserForm, RoleForm, SiteForm, NotificationForm, OrganizationForm, EmailConfigForm, TicketForm, TitleForm, TicketContentForm, FacilityForm, FloorForm, RoomForm, AssetTypeForm, AssetForm, AssetConditionForm, PriorityForm, CategoryForm, SubcategoryForm, WorkOrderRequestForm, WorkOrderForm, WorkOrderStatusForm, WorkOrderCommentForm, MaintenancePlanForm, InspectionTemplateForm, InspectionItemForm, InspectionForm, InspectionResultsForm, InspectionResultItemForm, VendorForm, WorkOrderLaborForm, WorkOrderMaterialForm, CostRecordForm, ProjectForm, ProjectTaskForm, ProjectCostForm, ProjectVendorForm, AssetRiskFieldsForm
+from .models import User, Role, Site, Notification, Organization, Ticket, Title, Ticket_content, Ticket_attachment, BulkUploadLog, Facility, Floor, Room, FacilityAttachment, RoomAttachment, AssetType, Asset, AssetConditionHistory, AssetAttachment, condition_label_for_score, CONDITION_SCALE, Priority, Category, Subcategory, WorkOrder, WorkOrderComment, WorkOrderAttachment, WorkOrderStatusHistory, MaintenancePlan, MaintenanceSchedule, InspectionTemplate, InspectionItem, Inspection, InspectionResult, INSPECTION_RESULTS, Vendor, WorkOrderMaterial, WorkOrderLabor, CostRecord, Project, ProjectTask, ProjectCost, ProjectDocument, PROJECT_STATUSES, SLARule, NotificationPreference, NotificationLog, NOTIFICATION_EVENTS, NOTIFICATION_EVENT_LABELS, CsvImportLog
+from .forms import LoginForm, UserForm, RoleForm, SiteForm, NotificationForm, OrganizationForm, EmailConfigForm, TicketForm, TitleForm, TicketContentForm, FacilityForm, FloorForm, RoomForm, AssetTypeForm, AssetForm, AssetConditionForm, PriorityForm, CategoryForm, SubcategoryForm, WorkOrderRequestForm, WorkOrderForm, WorkOrderStatusForm, WorkOrderCommentForm, MaintenancePlanForm, InspectionTemplateForm, InspectionItemForm, InspectionForm, InspectionResultsForm, InspectionResultItemForm, VendorForm, WorkOrderLaborForm, WorkOrderMaterialForm, CostRecordForm, ProjectForm, ProjectTaskForm, ProjectCostForm, ProjectVendorForm, AssetRiskFieldsForm, SLARuleForm, NotificationPreferenceForm, CsvImportUploadForm
 from .utils import validate_password, validate_file_upload, encrypt_mail_password, decrypt_mail_password, hash_email, get_app_version
 from .email_utils import send_ticket_notification, send_temp_password_email, send_password_updated_email, send_work_order_notification
 from . import workflow
@@ -17,6 +17,11 @@ from . import costs as costs_module
 from . import risk
 from . import projects as projects_module
 from . import analytics
+from . import reports as reports_module
+from . import sla as sla_module
+from . import notifications as notifications_module
+from . import search as search_module
+from . import csv_import as csv_import_module
 from main import db, login_manager, mail, limiter, scheduler
 from flask_mail import Message
 from datetime import datetime, timedelta, timezone
@@ -4614,6 +4619,10 @@ def record_inspection_results(inspection_id):
         wo = inspections_module.generate_work_order_for_failures(inspection, current_user)
     db.session.commit()
 
+    if inspection.failed_item_count:
+        notifications_module.notify_inspection_failed(inspection)
+        db.session.commit()
+
     if wo:
         flash(f'Inspection completed. Work order {wo.wo_number} generated for the failed item(s).', 'success')
     elif inspection.failed_item_count:
@@ -5089,6 +5098,251 @@ def mo_dashboard():
         view_labels=analytics.VIEW_LABELS, filters=filters, presets=analytics.PRESETS,
         preset_labels=analytics.PRESET_LABELS, options=options, health_factors=analytics.HEALTH_FACTORS,
         status_badge=workflow.STATUS_BADGE, current_path=request.path, current_page_name=current_page_name)
+
+
+# *********************************************************************
+# ****************** Reports & Exports (Phase 10) ************************
+# *********************************************************************
+# Every report reuses an existing module's already-defined metric (risk.py,
+# costs.py, vendors.py, analytics.py) — this section only adds a tabular,
+# CSV-exportable view over them. Staff-viewable (Admin/Specialist/
+# Technician), site-scoped for Technicians, matching every other M&O
+# reporting/dashboard view. "?format=csv" on the same URL downloads the
+# same rows the page just rendered (minus the on-screen DISPLAY_ROWS cap).
+@routes_blueprint.route('/reports')
+@login_required
+def reports_index():
+    current_page_name = 'Reports'
+    is_staff()
+    groups = {}
+    for key in reports_module.REPORT_ORDER:
+        entry = reports_module.REPORTS[key]
+        groups.setdefault(entry['group'], []).append((key, entry['title']))
+    return render_template('reports.html', groups=groups, current_path=request.path, current_page_name=current_page_name)
+
+
+@routes_blueprint.route('/reports/<report_key>')
+@login_required
+def view_report(report_key):
+    is_staff()
+    entry = reports_module.REPORTS.get(report_key)
+    if entry is None:
+        abort(404)
+    current_page_name = entry['title']
+
+    site_ids = _visible_site_ids()
+    filters = reports_module.parse_filters(request.args, site_ids, default_preset=entry['default_preset'])
+    headers, rows, truncated = entry['rows'](filters)
+
+    if request.args.get('format') == 'csv':
+        csv_body = reports_module.to_csv(headers, rows)
+        return current_app.response_class(
+            csv_body, mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename="{report_key}.csv"'})
+
+    options = {'facilities': [], 'technicians': [], 'vendors': [], 'assets': []}
+    needed = entry['filters']
+    if 'facility' in needed:
+        fac_query = Facility.query.filter_by(is_active=True)
+        if filters['site_ids']:
+            fac_query = fac_query.filter(Facility.site_id.in_(filters['site_ids']))
+        options['facilities'] = fac_query.order_by(Facility.name).all()
+    if 'technician' in needed:
+        options['technicians'] = User.query.filter(User.role_id.in_((2, 3)), User.status == 'Active') \
+                                           .order_by(User.first_name, User.last_name).all()
+    if 'vendor' in needed:
+        options['vendors'] = Vendor.query.filter_by(is_active=True).order_by(Vendor.name).all()
+    if 'asset' in needed:
+        asset_query = Asset.query.filter_by(is_active=True)
+        if filters['site_ids']:
+            asset_query = asset_query.filter(Asset.site_id.in_(filters['site_ids']))
+        if filters['facility_id']:
+            asset_query = asset_query.filter(Asset.facility_id == filters['facility_id'])
+        options['assets'] = asset_query.order_by(Asset.asset_tag).all()
+    options['sites'] = Site.query.order_by(Site.site_name).all() if site_ids is None else []
+    options['categories'] = Category.query.filter_by(is_active=True).order_by(Category.sort_order, Category.name).all()
+    options['priorities'] = Priority.query.filter_by(is_active=True).order_by(Priority.sort_order).all()
+    options['dimensions'] = costs_module.ROLLUP_DIMENSIONS
+    options['dimension_labels'] = costs_module.ROLLUP_LABELS
+
+    export_args = request.args.to_dict()
+    export_args['format'] = 'csv'
+
+    return render_template('report_view.html', report_key=report_key, entry=entry, headers=headers,
+        rows=rows[:reports_module.DISPLAY_ROWS], total_rows=len(rows), truncated=truncated,
+        display_cap=reports_module.DISPLAY_ROWS, filters=filters, presets=reports_module.PRESETS,
+        preset_labels=reports_module.PRESET_LABELS, options=options, export_args=export_args,
+        current_path=request.path, current_page_name=current_page_name)
+
+
+# *********************************************************************
+# ****************** SLA Rules (Phase 11) ********************************
+# *********************************************************************
+# One rule per Priority (get-or-create on edit — there's no separate "add"
+# flow since the full set of priorities is small and fixed). Admin-only,
+# matching every other reference-data CRUD (Priority/Category/Vendor/
+# MaintenancePlan/InspectionTemplate).
+@routes_blueprint.route('/sla_rules')
+@login_required
+def sla_rules():
+    current_page_name = 'SLA Rules'
+    is_admin()
+    priorities = Priority.query.order_by(Priority.sort_order, Priority.name).all()
+    return render_template('sla_rules.html', priorities=priorities,
+        current_path=request.path, current_page_name=current_page_name)
+
+
+@routes_blueprint.route('/edit_sla_rule/<int:priority_id>', methods=['GET', 'POST'])
+@login_required
+def edit_sla_rule(priority_id):
+    current_page_name = 'SLA Rule'
+    is_admin()
+    priority = Priority.query.get_or_404(priority_id)
+    rule = SLARule.query.filter_by(priority_id=priority_id).first()
+    form = SLARuleForm(obj=rule)
+    if form.validate_on_submit():
+        if rule is None:
+            rule = SLARule(priority_id=priority_id)
+            db.session.add(rule)
+        rule.response_hours = form.response_hours.data
+        rule.resolution_hours = form.resolution_hours.data
+        rule.is_active = form.is_active.data
+        db.session.commit()
+        flash(f'SLA rule for "{priority.name}" saved.', 'success')
+        return redirect(url_for('routes.sla_rules'))
+    return render_template('edit_sla_rule.html', form=form, priority=priority, rule=rule,
+        current_path=request.path, current_page_name=current_page_name)
+
+
+@routes_blueprint.route('/delete_sla_rule/<int:rule_id>', methods=['POST'])
+@login_required
+def delete_sla_rule(rule_id):
+    is_admin()
+    rule = SLARule.query.get_or_404(rule_id)
+    db.session.delete(rule)
+    db.session.commit()
+    flash('SLA rule removed.', 'warning')
+    return redirect(url_for('routes.sla_rules'))
+
+
+# *********************************************************************
+# ****************** Notification Preferences (Phase 11) *****************
+# *********************************************************************
+# Any authenticated user manages their own preferences — there's nothing
+# admin-only about which alerts you personally receive.
+@routes_blueprint.route('/notification_preferences', methods=['GET', 'POST'])
+@login_required
+def notification_preferences():
+    current_page_name = 'Notification Preferences'
+    pref = current_user.notification_preference
+    form = NotificationPreferenceForm(obj=pref) if pref else NotificationPreferenceForm(
+        **{event: True for event in NOTIFICATION_EVENTS})
+    if form.validate_on_submit():
+        if pref is None:
+            pref = NotificationPreference(user_id=current_user.id)
+            db.session.add(pref)
+        for event in NOTIFICATION_EVENTS:
+            setattr(pref, event, getattr(form, event).data)
+        db.session.commit()
+        flash('Notification preferences saved.', 'success')
+        return redirect(url_for('routes.notification_preferences'))
+    return render_template('notification_preferences.html', form=form, event_labels=NOTIFICATION_EVENT_LABELS,
+        events=NOTIFICATION_EVENTS, current_path=request.path, current_page_name=current_page_name)
+
+
+# *********************************************************************
+# ****************** Global Search (Phase 11) *****************************
+# *********************************************************************
+@routes_blueprint.route('/search')
+@login_required
+def search():
+    current_page_name = 'Search'
+    query_text = request.args.get('q', '').strip()
+    site_ids = _visible_site_ids()
+    include_users = is_admin_bool()
+    results = search_module.global_search(query_text, site_ids, include_users) if query_text else []
+    return render_template('search.html', query_text=query_text, results=results,
+        too_short=bool(query_text) and len(query_text) < search_module.MIN_QUERY_LENGTH,
+        current_path=request.path, current_page_name=current_page_name)
+
+
+def is_admin_bool():
+    """Non-aborting admin check for places (like search scope) that need a
+    plain True/False rather than is_admin()'s 403-on-failure behavior."""
+    return current_user.is_authenticated and current_user.role_id == 1
+
+
+# *********************************************************************
+# ****************** CSV Import (Phase 11) ********************************
+# *********************************************************************
+# A separate, self-contained tool from the legacy /bulk-data-upload flow
+# (Users+Sites, FTP-schedulable) — this one covers Facilities/Rooms/Assets/
+# Vendors/Users with a downloadable per-type template, full pre-commit
+# validation, and a row-by-row success/duplicate/error report. Admin-only,
+# like every other data-management tool in this project.
+@routes_blueprint.route('/csv_import')
+@login_required
+def csv_import_index():
+    current_page_name = 'CSV Import'
+    is_admin()
+    recent = CsvImportLog.query.order_by(CsvImportLog.uploaded_at.desc()).limit(20).all()
+    return render_template('csv_import.html', entities=csv_import_module.ENTITY_SPECS,
+        entity_order=csv_import_module.ENTITY_ORDER, recent=recent,
+        current_path=request.path, current_page_name=current_page_name)
+
+
+@routes_blueprint.route('/csv_import/<entity_type>/template')
+@login_required
+def csv_import_template(entity_type):
+    is_admin()
+    if entity_type not in csv_import_module.ENTITY_SPECS:
+        abort(404)
+    text = csv_import_module.template_csv(entity_type)
+    return current_app.response_class(text, mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename="{entity_type}_import_template.csv"'})
+
+
+@routes_blueprint.route('/csv_import/<entity_type>', methods=['GET', 'POST'])
+@login_required
+def csv_import_upload(entity_type):
+    current_page_name = 'CSV Import'
+    is_admin()
+    if entity_type not in csv_import_module.ENTITY_SPECS:
+        abort(404)
+    spec = csv_import_module.ENTITY_SPECS[entity_type]
+    form = CsvImportUploadForm()
+
+    if form.validate_on_submit():
+        file = form.csv_file.data
+        try:
+            rows = list(csv.DictReader(file.stream.read().decode('utf-8-sig').splitlines()))
+        except (UnicodeDecodeError, csv.Error):
+            flash('Could not read that file as CSV.', 'danger')
+            return redirect(url_for('routes.csv_import_upload', entity_type=entity_type))
+
+        report, valid_data = csv_import_module.validate_rows(entity_type, rows)
+        imported, commit_error = csv_import_module.commit_rows(entity_type, valid_data)
+        duplicate_count = sum(1 for r in report if r['status'] == 'duplicate')
+        error_count = sum(1 for r in report if r['status'] == 'error') + (len(valid_data) if commit_error else 0)
+
+        db.session.add(CsvImportLog(
+            entity_type=entity_type, filename=secure_filename(file.filename), uploaded_by_id=current_user.id,
+            total_rows=len(rows), success_count=imported, duplicate_count=duplicate_count,
+            error_count=error_count, status='error' if commit_error else 'success', error_message=commit_error,
+        ))
+        db.session.commit()
+
+        if commit_error:
+            flash(f'Import failed while saving — no rows were written: {commit_error}', 'danger')
+        else:
+            flash(f'Imported {imported} of {len(rows)} row(s). {duplicate_count} duplicate(s), '
+                 f'{error_count} error(s) skipped.', 'success' if imported else 'warning')
+        return render_template('csv_import_report.html', entity_type=entity_type, spec=spec, report=report,
+            total_rows=len(rows), imported=imported, duplicate_count=duplicate_count, error_count=error_count,
+            commit_error=commit_error, current_path=request.path, current_page_name=current_page_name)
+
+    return render_template('csv_import_upload.html', entity_type=entity_type, spec=spec, form=form,
+        current_path=request.path, current_page_name=current_page_name)
 
 
 

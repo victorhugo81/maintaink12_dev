@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                <div class="bg-gradient-main custom-title-card">
+                    <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">fact_check</i> Import Report &mdash; {{ spec.label }}</h2>
+                </div>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <br>
+                {% if commit_error %}
+                <div class="alert alert-danger text-white text-sm">Import failed while saving — <strong>no rows were written</strong>: {{ commit_error }}</div>
+                {% endif %}
+
+                <div class="row mb-3">
+                  <div class="col-md-3 col-6 mb-2"><div class="card p-2"><p class="text-xs mb-0">Total Rows</p><h5 class="mb-0">{{ total_rows }}</h5></div></div>
+                  <div class="col-md-3 col-6 mb-2"><div class="card p-2"><p class="text-xs mb-0">Imported</p><h5 class="mb-0 text-success">{{ imported }}</h5></div></div>
+                  <div class="col-md-3 col-6 mb-2"><div class="card p-2"><p class="text-xs mb-0">Duplicates</p><h5 class="mb-0 text-warning">{{ duplicate_count }}</h5></div></div>
+                  <div class="col-md-3 col-6 mb-2"><div class="card p-2"><p class="text-xs mb-0">Errors</p><h5 class="mb-0 text-danger">{{ error_count }}</h5></div></div>
+                </div>
+
+                <div class="table-responsive p-0">
+                  <table class="table align-items-left mb-0 table-striped">
+                    <thead><tr>
+                      <th class="text-uppercase text-xxs font-weight-bolder">Row</th>
+                      <th class="text-uppercase text-xxs font-weight-bolder">Status</th>
+                      <th class="text-uppercase text-xxs font-weight-bolder">Message</th>
+                    </tr></thead>
+                    <tbody>
+                      {% for r in report %}
+                      <tr>
+                        <td class="text-xs">{{ r.row }}</td>
+                        <td>
+                          <span class="badge {% if r.status == 'valid' %}bg-success{% elif r.status == 'duplicate' %}bg-warning{% else %}bg-danger{% endif %}">
+                            {{ 'imported' if r.status == 'valid' and not commit_error else r.status }}
+                          </span>
+                        </td>
+                        <td class="text-xs">{{ r.message }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+
+                <a class="btn bg-gradient-main mt-4" href="{{ url_for('routes.csv_import_upload', entity_type=entity_type) }}">Import Another File</a>
+                <a class="btn reset-button-box shadow-dark mt-4" href="{{ url_for('routes.csv_import_index') }}">Back to CSV Import</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

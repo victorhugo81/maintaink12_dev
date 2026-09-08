@@ -239,3 +239,19 @@ def send_password_updated_email(user):
         current_app.logger.info(f"Password updated notification sent to {user.email}")
     except Exception as e:
         current_app.logger.error(f"Failed to send password updated email to {user.email}: {type(e).__name__}: {e}", exc_info=True)
+
+
+def send_generic_notification(user, subject, body):
+    """
+    One reusable sender for application/notifications.py's eight alert
+    categories (PM/inspection/vendor/asset/SLA) — mirrors the gate/log/catch
+    shape of every function above rather than duplicating it eight times.
+    """
+    if not _is_mail_configured():
+        return
+    try:
+        mail.send(Message(subject=subject, recipients=[user.email],
+                          body=f"Hi {user.first_name},\n\n{body}\n\n— Maintaink12"))
+        current_app.logger.info(f"Notification email sent to {user.email}: {subject}")
+    except Exception as e:
+        current_app.logger.error(f"Failed to send notification email to {user.email}: {type(e).__name__}: {e}", exc_info=True)

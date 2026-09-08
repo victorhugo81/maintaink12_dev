@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                <div class="bg-gradient-main custom-title-card">
+                    <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">search</i> {{ current_page_name }}</h2>
+                </div>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <br>
+                <form method="GET" action="{{ url_for('routes.search') }}" class="mb-4">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="q" value="{{ query_text }}"
+                               placeholder="Work order #, asset tag, serial number, room, facility, description..." autofocus>
+                        <button class="btn bg-gradient-main mb-0" type="submit">
+                            <i class="material-symbols-rounded text-sm align-middle">search</i> Search
+                        </button>
+                    </div>
+                </form>
+
+                {% if too_short %}
+                <p class="text-sm text-secondary">Type at least 2 characters to search.</p>
+                {% elif query_text and not results %}
+                <p class="text-sm text-secondary">No results for "{{ query_text }}".</p>
+                {% endif %}
+
+                {% for label, rows in results %}
+                <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mt-3 mb-2">{{ label }} <span class="badge bg-secondary">{{ rows|length }}</span></h6>
+                <div class="table-responsive p-0 mb-3">
+                  <table class="table align-items-left mb-0 table-striped">
+                    <tbody>
+                      {% for row in rows %}
+                      <tr class="table-highlight-row">
+                        <td>
+                          <a href="{{ url_for(row.endpoint, **row.params) }}">
+                            <span class="text-sm font-weight-bold">{{ row.title }}</span>
+                          </a>
+                          {% if row.subtitle %}<br><span class="text-xs text-secondary">{{ row.subtitle }}</span>{% endif %}
+                        </td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+                {% endfor %}
+
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
