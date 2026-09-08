@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+        <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+        <div class="bg-gradient-main custom-title-card">
+          <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">category</i> {{ current_page_name }}</h2>
+          </div>
+          <div class="card-body px-0 pb-2">
+            <br>
+            <div class="table-per-page-section">
+            <div class="row row justify-content-between">
+              <div class="col-4">
+                <form method="get" class="d-flex">
+                  <label for="per_page">Items per page: </label>
+                  <select name="per_page" id="per_page" class="per-page-drop"  onchange="this.form.submit()">
+                    <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                    <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+                    <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                  </select>
+                </form>
+              </div>
+              <div class="col-2 text-end">
+              <a href="{{ url_for('routes.add_asset_type') }}" type="button" class="btn bg-gradient-main add-table-button shadow-dark">Add Asset Type</a>
+            </div>
+          </div>
+        </div>
+
+          <div class="table-responsive p-0">
+            <table class="table align-items-left mb-0 table-striped">
+              <thead>
+                <tr>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Type Name</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Category</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Expected Life</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Assets</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Status</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for asset_type in asset_types %}
+                <tr class="table-highlight-row">
+                  <td>
+                    <div class="d-flex px-2 py-1">
+                      <div class="d-flex flex-column justify-content-center">
+                        <h6 class="mb-0 text-sm">{{ asset_type.name }}</h6>
+                      </div>
+                    </div>
+                  </td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ asset_type.category or 'N/A' }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ asset_type.expected_life_years ~ ' yrs' if asset_type.expected_life_years is not none else 'N/A' }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ asset_type.assets|length }}</span></td>
+                  <td>
+                    <span class="badge {% if asset_type.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                      {{ 'Active' if asset_type.is_active else 'Inactive' }}
+                    </span>
+                  </td>
+                  <td class="align-middle">
+                    <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ url_for('routes.edit_asset_type', asset_type_id=asset_type.id) }}" type="button" class="btn table-button-edit font-weight-bold" aria-label="Edit asset type: {{ asset_type.name }}">
+                      <i class="material-symbols-rounded position-relative text-lg">edit</i>
+                    </a>
+                    <form id="delete-asset-type-{{ asset_type.id }}" action="{{ url_for('routes.delete_asset_type', asset_type_id=asset_type.id) }}" method="POST">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="button" class="btn table-button-delete font-weight-bold"
+                              aria-label="Delete asset type: {{ asset_type.name }}"
+                              data-bs-toggle="modal"
+                              data-bs-target="#deleteConfirmModal"
+                              data-confirm-message="Are you sure you want to delete the asset type &quot;{{ asset_type.name }}&quot;?"
+                              data-form-id="delete-asset-type-{{ asset_type.id }}">
+                        <i class="material-symbols-rounded position-relative text-lg">delete</i>
+                      </button>
+                    </form>
+                    </div>
+                  </td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="6" class="text-center text-secondary text-sm py-4">No asset types yet.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <nav aria-label="Page navigation">
+            <ul class="pagination">
+              {{ pagination.links }}
+            </ul>
+  </div>
+</div>
+</div>
+</div>
+
+{% endblock %}

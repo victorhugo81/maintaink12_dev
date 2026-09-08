@@ -1,0 +1,365 @@
+{% extends 'base.html' %}
+{% block content %}
+{% set can_assess = current_user.role_id in [1, 2, 3] %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                <div class="bg-gradient-main custom-title-card">
+                    <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">precision_manufacturing</i> {{ asset.asset_tag }} — {{ asset.name }}</h2>
+                </div>
+                <div class="card-body px-0 pb-2">
+                    <br>
+                    <div class="container-fluid my-3 py-3">
+
+                        <div class="row mb-5">
+                            <!-- Sticky sidebar: in-page nav, current condition, QR -->
+                            <div class="col-lg-3">
+                                <div class="card position-sticky top-1">
+                                    <ul class="nav flex-column bg-white border-radius-lg p-3">
+                                        <li class="nav-item">
+                                            <a class="nav-link text-dark d-flex" data-scroll="" href="#assetdetails">
+                                                <i class="material-symbols-rounded text-lg me-2">info</i>
+                                                <span class="text-sm">Asset Details</span>
+                                            </a>
+                                        </li>
+                                        <li class="nav-item pt-2">
+                                            <a class="nav-link text-dark d-flex" data-scroll="" href="#assetcondition">
+                                                <i class="material-symbols-rounded text-lg me-2">monitor_heart</i>
+                                                <span class="text-sm">Condition History</span>
+                                            </a>
+                                        </li>
+                                        <li class="nav-item pt-2">
+                                            <a class="nav-link text-dark d-flex" data-scroll="" href="#assetattachments">
+                                                <i class="material-symbols-rounded text-lg me-2">attach_file</i>
+                                                <span class="text-sm">Attachments</span>
+                                            </a>
+                                        </li>
+                                        <li class="nav-item pt-2">
+                                            <a class="nav-link text-dark d-flex" data-scroll="" href="#assetqr">
+                                                <i class="material-symbols-rounded text-lg me-2">qr_code_2</i>
+                                                <span class="text-sm">QR Code</span>
+                                            </a>
+                                        </li>
+                                        <li class="nav-item pt-2">
+                                            <a class="nav-link text-dark d-flex" data-scroll="" href="#assetrisk">
+                                                <i class="material-symbols-rounded text-lg me-2">warning</i>
+                                                <span class="text-sm">Risk Score</span>
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <hr>
+                                            <p class="text-xs text-uppercase text-muted mb-1">Current Condition</p>
+                                            {% include 'includes/condition_badge.html' %}
+                                            {% if asset.condition_history %}
+                                            <p class="text-xs text-secondary mt-1 mb-0">Assessed {{ asset.condition_history[0].assessed_at.strftime('%m-%d-%Y') }}</p>
+                                            {% endif %}
+                                            <p class="text-xs text-uppercase text-muted mb-1 mt-3">Risk Score</p>
+                                            {% if risk.score is not none %}
+                                            <span class="badge {% if risk.score >= 75 %}bg-danger{% elif risk.score >= 50 %}bg-warning{% else %}bg-success{% endif %}">{{ risk.score }} ({{ risk.factor_count }}/7 factors)</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">No data</span>
+                                            {% endif %}
+                                            {% if asset.project %}
+                                            <p class="text-xs text-uppercase text-muted mb-1 mt-3">Capital Project</p>
+                                            <a href="{{ url_for('routes.edit_project', project_id=asset.project.id) }}" class="text-sm">{{ asset.project.name }}</a>
+                                            {% endif %}
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="col-lg-9 mt-lg-0 mt-4">
+                                <!-- Main edit/detail form -->
+                                <form id="asset-form" method="POST" action="{{ url_for('routes.edit_asset', asset_id=asset.id) }}" enctype="multipart/form-data">
+                                    {{ form.hidden_tag() }}
+                                    <div class="ticket-content-box" id="assetdetails">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <h3>Asset Details</h3>
+                                            {% if current_user.is_admin %}
+                                            <div class="form-check">
+                                                {{ form.is_active(class="form-check-input") }}
+                                                {{ form.is_active.label(class="form-check-label") }}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        <br>
+                                        <div class="row g-3">
+                                            <div class="col-12 col-sm-6 col-lg-4">
+                                                {{ form.asset_tag.label(class="form-label") }}
+                                                {{ form.asset_tag(class="form-control", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-4">
+                                                {{ form.name.label(class="form-label") }}
+                                                {{ form.name(class="form-control", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-4">
+                                                {{ form.asset_type_id.label(class="form-label") }}
+                                                {{ form.asset_type_id(class="form-select-box form-select", disabled=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-4">
+                                                {{ form.facility_id.label(class="form-label") }}
+                                                {{ form.facility_id(class="form-select-box form-select", disabled=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-4">
+                                                {{ form.room_id.label(class="form-label") }}
+                                                {{ form.room_id(class="form-select-box form-select", disabled=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-4">
+                                                {{ form.serial_number.label(class="form-label") }}
+                                                {{ form.serial_number(class="form-control", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-4">
+                                                {{ form.manufacturer.label(class="form-label") }}
+                                                {{ form.manufacturer(class="form-control", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-4">
+                                                {{ form.model_number.label(class="form-label") }}
+                                                {{ form.model_number(class="form-control", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-4">
+                                                {{ form.expected_life_years.label(class="form-label") }}
+                                                {{ form.expected_life_years(class="form-control", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-4">
+                                                {{ form.project_id.label(class="form-label") }}
+                                                {{ form.project_id(class="form-select-box form-select", disabled=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-3">
+                                                {{ form.install_date.label(class="form-label") }}
+                                                {{ form.install_date(class="form-control", type="date", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-3">
+                                                {{ form.purchase_date.label(class="form-label") }}
+                                                {{ form.purchase_date(class="form-control", type="date", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-3">
+                                                {{ form.purchase_cost.label(class="form-label") }}
+                                                {{ form.purchase_cost(class="form-control", step="0.01", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-3">
+                                                {{ form.warranty_expiration.label(class="form-label") }}
+                                                {{ form.warranty_expiration(class="form-control", type="date", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12">
+                                                {{ form.notes.label(class="form-label") }}
+                                                {{ form.notes(class="form-control", rows=3, readonly=not current_user.is_admin) }}
+                                            </div>
+                                            {% if current_user.is_admin %}
+                                            <div class="col-12 col-sm-6">
+                                                <label for="attachment" class="form-label">Attach Photo/Document:</label>
+                                                <input type="file" name="attachment" id="attachment" class="form-control" accept="image/jpeg,image/png,application/pdf">
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="input-group input-group-outline justify-content-end gap-2 mt-4">
+                                            {% if current_user.is_admin %}{{ form.submit(class="btn bg-gradient-main") }}{% endif %}
+                                            <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.assets') }}">Back</a>
+                                        </div>
+                                    </div>
+                                </form>
+
+                                <!-- Condition history (append-only) + record form: its own <form>, outside the main one -->
+                                <div class="ticket-content-box" id="assetcondition">
+                                    <h3>Condition History</h3>
+                                    <p class="text-xs text-secondary">Assessments are permanent — a new one is added on top, earlier ones are never edited.</p>
+                                    {% if asset.condition_history %}
+                                    <div class="table-responsive">
+                                        <table class="table table-sm align-items-left mb-3">
+                                            <thead>
+                                                <tr>
+                                                    <th class="text-uppercase text-xxs font-weight-bolder">Date</th>
+                                                    <th class="text-uppercase text-xxs font-weight-bolder">Condition</th>
+                                                    <th class="text-uppercase text-xxs font-weight-bolder">Inspector</th>
+                                                    <th class="text-uppercase text-xxs font-weight-bolder">Reason</th>
+                                                    <th class="text-uppercase text-xxs font-weight-bolder">Recommended Action</th>
+                                                    <th class="text-uppercase text-xxs font-weight-bolder">Notes</th>
+                                                    <th class="text-uppercase text-xxs font-weight-bolder">Photos</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for entry in asset.condition_history %}
+                                                <tr>
+                                                    <td class="text-xs">{{ entry.assessed_at.strftime('%m-%d-%Y') }}</td>
+                                                    <td>
+                                                        <span class="badge
+                                                          {% if entry.condition in ['Excellent', 'Good'] %}bg-success
+                                                          {% elif entry.condition == 'Fair' %}bg-info
+                                                          {% elif entry.condition == 'Poor' %}bg-warning
+                                                          {% else %}bg-danger{% endif %}">{{ entry.condition }} ({{ entry.score }})</span>
+                                                    </td>
+                                                    <td class="text-xs">{{ entry.inspector.get_full_name() if entry.inspector else 'N/A' }}</td>
+                                                    <td class="text-xs">{{ entry.reason or '' }}</td>
+                                                    <td class="text-xs">{{ entry.recommended_action or '' }}</td>
+                                                    <td class="text-xs">{{ entry.notes or '' }}</td>
+                                                    <td class="text-xs">
+                                                        {% for photo in entry.photos %}
+                                                        <a href="{{ url_for('routes.download_asset_attachment', attachment_id=photo.id) }}">{{ photo.attach_file }}</a>{% if not loop.last %}, {% endif %}
+                                                        {% endfor %}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {% else %}
+                                    <p class="text-secondary text-sm">No condition assessments recorded yet.</p>
+                                    {% endif %}
+
+                                    {% if can_assess %}
+                                    <h5 class="mt-4">Record New Assessment</h5>
+                                    <form method="POST" action="{{ url_for('routes.add_asset_condition', asset_id=asset.id) }}" enctype="multipart/form-data">
+                                        {{ condition_form.hidden_tag() }}
+                                        <div class="row g-3">
+                                            <div class="col-12 col-sm-6 col-lg-3">
+                                                <span aria-hidden="true" class="text-danger ms-1">*</span>
+                                                {{ condition_form.assessed_at.label(class="form-label") }}
+                                                {{ condition_form.assessed_at(class="form-control", type="date") }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-3">
+                                                <span aria-hidden="true" class="text-danger ms-1">*</span>
+                                                {{ condition_form.score.label(class="form-label") }}
+                                                {{ condition_form.score(class="form-control", min=0, max=100) }}
+                                                <small class="text-secondary text-xs">90+ Excellent · 75+ Good · 50+ Fair · 25+ Poor · below 25 Critical</small>
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-3">
+                                                {{ condition_form.reason.label(class="form-label") }}
+                                                {{ condition_form.reason(class="form-control", placeholder="e.g. Annual inspection") }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-3">
+                                                {{ condition_form.recommended_action.label(class="form-label") }}
+                                                {{ condition_form.recommended_action(class="form-control") }}
+                                            </div>
+                                            <div class="col-12 col-lg-8">
+                                                {{ condition_form.notes.label(class="form-label") }}
+                                                {{ condition_form.notes(class="form-control", rows=2) }}
+                                            </div>
+                                            <div class="col-12 col-lg-4">
+                                                {{ condition_form.photo.label(class="form-label") }}
+                                                {{ condition_form.photo(class="form-control", accept="image/jpeg,image/png", capture="environment") }}
+                                            </div>
+                                        </div>
+                                        <div class="d-flex justify-content-end mt-3">
+                                            {{ condition_form.submit(class="btn bg-gradient-main") }}
+                                        </div>
+                                    </form>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Attachments -->
+                                <div class="ticket-content-box" id="assetattachments">
+                                    <h3>Attachment Files</h3><br>
+                                    {% for attachment in asset.attachments %}
+                                    <div class="input-group-outline my-3" id="asset-attachment-container-{{ attachment.id }}">
+                                        <span class="me-2">{{ attachment.attach_file }}</span>
+                                        {% if attachment.condition_history_id %}<span class="badge bg-info me-2">assessment photo</span>{% endif %}
+                                        <a href="{{ url_for('routes.download_asset_attachment', attachment_id=attachment.id) }}" class="btn btn-dark btn-sm me-2">
+                                            <i class="material-symbols-rounded">download</i> Download
+                                        </a>
+                                        {% if current_user.is_admin %}
+                                        <button type="button" class="btn btn-sm btn-danger delete-asset-attachment-btn" data-attachment-id="{{ attachment.id }}">
+                                            <i class="fas fa-trash"></i> Delete
+                                        </button>
+                                        {% endif %}
+                                        <hr>
+                                    </div>
+                                    {% else %}
+                                    <p class="text-secondary text-sm">No attachments yet.</p>
+                                    {% endfor %}
+                                </div>
+
+                                <!-- QR code -->
+                                <div class="ticket-content-box" id="assetqr">
+                                    <h3>QR Code</h3>
+                                    <p class="text-xs text-secondary">Scanning this code with any phone camera opens this asset's page.</p>
+                                    <div class="d-flex align-items-center gap-4 flex-wrap">
+                                        <img src="{{ url_for('routes.asset_qr', asset_id=asset.id) }}" alt="QR code for asset {{ asset.asset_tag }}" width="180" height="180">
+                                        <div>
+                                            <p class="text-sm mb-2"><strong>{{ asset.asset_tag }}</strong><br>{{ asset.name }}<br>{{ asset.facility.name }}{% if asset.room %} · Rm {{ asset.room.room_number }}{% endif %}</p>
+                                            <a href="{{ url_for('routes.asset_qr', asset_id=asset.id) }}" download="asset_{{ asset.asset_tag }}_qr.png" class="btn btn-dark btn-sm">
+                                                <i class="material-symbols-rounded">download</i> Download PNG
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Risk Score: full factor breakdown, never just a number -->
+                                <div class="ticket-content-box" id="assetrisk">
+                                    <h3>Asset Risk Score</h3>
+                                    <p class="text-xs text-secondary">Every factor below is shown so the score is never a black box. "No data" factors are excluded from the average, not counted as zero.</p>
+                                    <table class="table table-sm align-items-left mb-3">
+                                        <thead><tr>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Factor</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Risk Contribution (0-100)</th>
+                                        </tr></thead>
+                                        <tbody>
+                                        {% for name, factor in risk.factors.items() %}
+                                        <tr>
+                                            <td class="text-xs">{{ name }}</td>
+                                            <td class="text-xs">
+                                                {% if factor.available %}{{ factor.value }}{% else %}<span class="text-secondary">No data</span>{% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                    <p class="text-sm"><strong>Overall Risk Score: {{ risk.score if risk.score is not none else 'No data' }}</strong>
+                                        {% if risk.score is not none %} (average of {{ risk.factor_count }} of 7 available factors){% endif %}</p>
+
+                                    {% if current_user.is_admin %}
+                                    <h5 class="mt-4">Set Safety / Operational Factors</h5>
+                                    <p class="text-xs text-secondary">These two factors can't be derived from any other data — they require judgment.</p>
+                                    <form method="POST" action="{{ url_for('routes.update_asset_risk_fields', asset_id=asset.id) }}" class="row g-2 align-items-end">
+                                        {{ risk_form.hidden_tag() }}
+                                        <div class="col-auto">
+                                            {{ risk_form.safety_impact.label(class="form-label") }}
+                                            {{ risk_form.safety_impact(class="form-select-box form-select") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ risk_form.operational_importance.label(class="form-label") }}
+                                            {{ risk_form.operational_importance(class="form-select-box form-select") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ risk_form.submit(class="btn bg-gradient-main") }}
+                                        </div>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if current_user.is_admin %}
+<script nonce="{{ g.csp_nonce }}">
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.delete-asset-attachment-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const attachmentId = this.getAttribute('data-attachment-id');
+            window.showDeleteConfirm(
+                'Are you sure you want to permanently delete this attachment?',
+                function () {
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = `/delete_asset_attachment/${attachmentId}`;
+                    const csrfInput = document.createElement('input');
+                    csrfInput.type = 'hidden';
+                    csrfInput.name = 'csrf_token';
+                    csrfInput.value = document.querySelector('input[name="csrf_token"]').value;
+                    form.appendChild(csrfInput);
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            );
+        });
+    });
+});
+</script>
+{% endif %}
+
+{% endblock %}

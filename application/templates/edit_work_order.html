@@ -1,0 +1,378 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                <div class="bg-gradient-main custom-title-card">
+                    <h2 class="text-white ps-3"><i class="material-symbols-rounded opacity-5">build</i> {{ wo.wo_number }} <span class="badge bg-{{ status_badge.get(wo.status, 'secondary') }} ms-2">{{ wo.status }}</span></h2>
+                    <p class="text-white ps-3 mb-0">{{ wo.title }}</p>
+                </div>
+                <div class="card-body px-0 pb-2">
+                    <br>
+                    <div class="container-fluid my-3 py-3">
+                        <div class="row mb-5">
+
+                            <!-- Sidebar: status + facts -->
+                            <div class="col-lg-3">
+                                <div class="card position-sticky top-1">
+                                    <div class="bg-white border-radius-lg p-3">
+                                        <ul class="nav flex-column mb-3">
+                                            <li class="nav-item"><a class="nav-link text-dark d-flex" data-scroll="" href="#wodetails"><i class="material-symbols-rounded text-lg me-2">info</i><span class="text-sm">Details</span></a></li>
+                                            <li class="nav-item pt-2"><a class="nav-link text-dark d-flex" data-scroll="" href="#wocomments"><i class="material-symbols-rounded text-lg me-2">chat</i><span class="text-sm">Comments</span></a></li>
+                                            <li class="nav-item pt-2"><a class="nav-link text-dark d-flex" data-scroll="" href="#woattachments"><i class="material-symbols-rounded text-lg me-2">attach_file</i><span class="text-sm">Attachments</span></a></li>
+                                            <li class="nav-item pt-2"><a class="nav-link text-dark d-flex" data-scroll="" href="#wolabor"><i class="material-symbols-rounded text-lg me-2">engineering</i><span class="text-sm">Labor</span></a></li>
+                                            <li class="nav-item pt-2"><a class="nav-link text-dark d-flex" data-scroll="" href="#womaterials"><i class="material-symbols-rounded text-lg me-2">inventory_2</i><span class="text-sm">Materials</span></a></li>
+                                            <li class="nav-item pt-2"><a class="nav-link text-dark d-flex" data-scroll="" href="#wocost"><i class="material-symbols-rounded text-lg me-2">payments</i><span class="text-sm">Cost Summary</span></a></li>
+                                            <li class="nav-item pt-2"><a class="nav-link text-dark d-flex" data-scroll="" href="#wohistory"><i class="material-symbols-rounded text-lg me-2">history</i><span class="text-sm">Status History</span></a></li>
+                                            {% if recurring_groups %}<li class="nav-item pt-2"><a class="nav-link text-dark d-flex" data-scroll="" href="#worecurring"><i class="material-symbols-rounded text-lg me-2">repeat</i><span class="text-sm">Recurring Issue</span></a></li>{% endif %}
+                                        </ul>
+                                        <hr>
+                                        <p class="text-xs text-uppercase text-muted mb-1">Priority</p>
+                                        <span class="badge bg-{{ wo.priority.color }}">{{ wo.priority.name }}</span>
+                                        <p class="text-xs text-uppercase text-muted mb-1 mt-3">Source</p>
+                                        <p class="text-sm mb-0">{{ wo.source }}</p>
+                                        <p class="text-xs text-uppercase text-muted mb-1 mt-3">Requested by</p>
+                                        <p class="text-sm mb-0">{{ wo.requester.get_full_name() if wo.requester else '— (no requester)' }}</p>
+                                        <p class="text-xs text-uppercase text-muted mb-1 mt-3">Assigned to</p>
+                                        <p class="text-sm mb-0">{{ wo.assigned_to.get_full_name() if wo.assigned_to else (wo.assigned_team or 'Unassigned') }}</p>
+                                        <p class="text-xs text-uppercase text-muted mb-1 mt-3">Location</p>
+                                        <p class="text-sm mb-0">{{ wo.location_label }}{% if wo.asset %}<br>Asset: <a href="{{ url_for('routes.edit_asset', asset_id=wo.asset.id) }}">{{ wo.asset.asset_tag }}</a>{% endif %}</p>
+                                        <p class="text-xs text-uppercase text-muted mb-1 mt-3">Dates</p>
+                                        <p class="text-xs mb-0">Created {{ wo.created_at | localtime('%m-%d-%Y') }}
+                                        {% if wo.due_date %}<br>Due {{ wo.due_date.strftime('%m-%d-%Y') }}{% endif %}
+                                        {% if wo.started_at %}<br>Started {{ wo.started_at | localtime('%m-%d-%Y') }}{% endif %}
+                                        {% if wo.completed_at %}<br>Completed {{ wo.completed_at | localtime('%m-%d-%Y') }}{% endif %}
+                                        {% if wo.closed_at %}<br>Closed {{ wo.closed_at | localtime('%m-%d-%Y') }}{% endif %}</p>
+
+                                        {% if manage and status_form.new_status.choices %}
+                                        <hr>
+                                        <p class="text-xs text-uppercase text-muted mb-2">Change Status</p>
+                                        <form method="POST" action="{{ url_for('routes.change_work_order_status', work_order_id=wo.id) }}">
+                                            {{ status_form.hidden_tag() }}
+                                            {{ status_form.new_status(class="form-select-box form-select mb-2") }}
+                                            {{ status_form.note(class="form-control mb-2", placeholder="Note (optional)") }}
+                                            <label class="form-label text-xs mb-0">Completion date (for Completed)</label>
+                                            {{ status_form.completed_at(class="form-control mb-2", type="date") }}
+                                            {{ status_form.resolution(class="form-control mb-2", rows=2, placeholder="Resolution (required to Close)") }}
+                                            {{ status_form.submit(class="btn bg-gradient-main w-100") }}
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Main column -->
+                            <div class="col-lg-9 mt-lg-0 mt-4">
+                                <form id="wo-form" method="POST" action="{{ url_for('routes.edit_work_order', work_order_id=wo.id) }}" enctype="multipart/form-data">
+                                    {{ form.hidden_tag() }}
+                                    <div class="ticket-content-box" id="wodetails">
+                                        <h3>Details</h3>
+                                        {% with ro = not manage %}{% include 'includes/work_order_fields.html' %}{% endwith %}
+                                        {% if manage %}
+                                        <div class="row g-3 mt-1">
+                                            <div class="col-12 col-sm-6">
+                                                <label for="attachment" class="form-label">Attach Photo/Document:</label>
+                                                <input type="file" name="attachment" id="attachment" class="form-control" accept="image/jpeg,image/png,application/pdf">
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        <div class="input-group input-group-outline justify-content-end gap-2 mt-4">
+                                            {% if manage %}{{ form.submit(class="btn bg-gradient-main") }}{% endif %}
+                                            <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.work_orders') }}">Back</a>
+                                        </div>
+                                    </div>
+                                </form>
+
+                                <!-- Comments: separate form -->
+                                <div class="ticket-content-box" id="wocomments">
+                                    <h3>Comments</h3>
+                                    {% for comment in wo.comments %}
+                                    <div class="my-2">
+                                        <p class="mb-0"><strong>{{ comment.user.get_full_name() if comment.user else 'Unknown' }}</strong>
+                                        <span class="text-secondary text-xs">{{ comment.created_at | localtime }}</span></p>
+                                        <p class="mb-0">{{ comment.content }}</p>
+                                        <hr>
+                                    </div>
+                                    {% else %}
+                                    <p class="text-secondary text-sm">No comments yet.</p>
+                                    {% endfor %}
+                                    <form method="POST" action="{{ url_for('routes.add_work_order_comment', work_order_id=wo.id) }}">
+                                        {{ comment_form.hidden_tag() }}
+                                        {{ comment_form.content(class="form-control mb-2", rows=3, placeholder="Write a comment...") }}
+                                        <div class="d-flex justify-content-end">
+                                            {{ comment_form.submit(class="btn bg-gradient-main") }}
+                                        </div>
+                                    </form>
+                                </div>
+
+                                <!-- Attachments -->
+                                <div class="ticket-content-box" id="woattachments">
+                                    <h3>Attachment Files</h3><br>
+                                    {% for attachment in wo.attachments %}
+                                    <div class="input-group-outline my-3">
+                                        <span class="me-2">{{ attachment.attach_file }}</span>
+                                        <a href="{{ url_for('routes.download_work_order_attachment', attachment_id=attachment.id) }}" class="btn btn-dark btn-sm me-2">
+                                            <i class="material-symbols-rounded">download</i> Download
+                                        </a>
+                                        {% if manage or attachment.user_id == current_user.id %}
+                                        <button type="button" class="btn btn-sm btn-danger delete-wo-attachment-btn" data-attachment-id="{{ attachment.id }}">
+                                            <i class="fas fa-trash"></i> Delete
+                                        </button>
+                                        {% endif %}
+                                        <hr>
+                                    </div>
+                                    {% else %}
+                                    <p class="text-secondary text-sm">No attachments yet.</p>
+                                    {% endfor %}
+                                </div>
+
+                                <!-- Labor -->
+                                <div class="ticket-content-box" id="wolabor">
+                                    <h3>Labor</h3>
+                                    {% if wo.labor_entries %}
+                                    <table class="table table-sm align-items-left mb-3">
+                                        <thead><tr>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Technician</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Type</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Hours</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Rate</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Cost</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Notes</th>
+                                            {% if manage %}<th></th>{% endif %}
+                                        </tr></thead>
+                                        <tbody>
+                                        {% for l in wo.labor_entries %}
+                                        <tr>
+                                            <td class="text-xs">{{ l.technician.get_full_name() }}</td>
+                                            <td class="text-xs">{{ l.labor_type }}</td>
+                                            <td class="text-xs">{{ l.labor_hours }}</td>
+                                            <td class="text-xs">{{ '$%.2f'|format(l.hourly_rate) if l.hourly_rate else 'N/A' }}</td>
+                                            <td class="text-xs">${{ '%.2f'|format(l.labor_cost) }}</td>
+                                            <td class="text-xs">{{ l.notes or '' }}</td>
+                                            {% if manage %}
+                                            <td class="text-end">
+                                                <form id="delete-labor-{{ l.id }}" action="{{ url_for('routes.delete_work_order_labor', labor_id=l.id) }}" method="POST">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal"
+                                                            data-confirm-message="Remove this labor entry?" data-form-id="delete-labor-{{ l.id }}">
+                                                        <i class="material-symbols-rounded position-relative text-lg">delete</i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                            {% endif %}
+                                        </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                    {% else %}
+                                    <p class="text-secondary text-sm">No labor logged yet.</p>
+                                    {% endif %}
+                                    {% if manage %}
+                                    <form method="POST" action="{{ url_for('routes.add_work_order_labor', work_order_id=wo.id) }}" class="row g-2 align-items-end">
+                                        {{ labor_form.hidden_tag() }}
+                                        <div class="col-auto">
+                                            {{ labor_form.technician_id.label(class="form-label") }}
+                                            {{ labor_form.technician_id(class="form-select-box form-select") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ labor_form.labor_type.label(class="form-label") }}
+                                            {{ labor_form.labor_type(class="form-select-box form-select") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ labor_form.labor_hours.label(class="form-label") }}
+                                            {{ labor_form.labor_hours(class="form-control", style="width: 8rem;") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ labor_form.hourly_rate.label(class="form-label") }}
+                                            {{ labor_form.hourly_rate(class="form-control", style="width: 8rem;") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ labor_form.start_time.label(class="form-label") }}
+                                            {{ labor_form.start_time(class="form-control", type="datetime-local") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ labor_form.end_time.label(class="form-label") }}
+                                            {{ labor_form.end_time(class="form-control", type="datetime-local") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ labor_form.notes.label(class="form-label") }}
+                                            {{ labor_form.notes(class="form-control") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ labor_form.submit(class="btn bg-gradient-main") }}
+                                        </div>
+                                    </form>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Materials -->
+                                <div class="ticket-content-box" id="womaterials">
+                                    <h3>Materials</h3>
+                                    {% if wo.materials %}
+                                    <table class="table table-sm align-items-left mb-3">
+                                        <thead><tr>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Description</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Qty</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Unit Cost</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Total</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Vendor</th>
+                                            {% if manage %}<th></th>{% endif %}
+                                        </tr></thead>
+                                        <tbody>
+                                        {% for m in wo.materials %}
+                                        <tr>
+                                            <td class="text-xs">{{ m.description }}</td>
+                                            <td class="text-xs">{{ m.quantity }}</td>
+                                            <td class="text-xs">${{ '%.2f'|format(m.unit_cost) }}</td>
+                                            <td class="text-xs">${{ '%.2f'|format(m.total_cost) }}</td>
+                                            <td class="text-xs">{{ m.vendor.name if m.vendor else '' }}</td>
+                                            {% if manage %}
+                                            <td class="text-end">
+                                                <form id="delete-material-{{ m.id }}" action="{{ url_for('routes.delete_work_order_material', material_id=m.id) }}" method="POST">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal"
+                                                            data-confirm-message="Remove this material?" data-form-id="delete-material-{{ m.id }}">
+                                                        <i class="material-symbols-rounded position-relative text-lg">delete</i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                            {% endif %}
+                                        </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                    {% else %}
+                                    <p class="text-secondary text-sm">No materials logged yet.</p>
+                                    {% endif %}
+                                    {% if manage %}
+                                    <form method="POST" action="{{ url_for('routes.add_work_order_material', work_order_id=wo.id) }}" class="row g-2 align-items-end">
+                                        {{ material_form.hidden_tag() }}
+                                        <div class="col-auto" style="min-width: 220px;">
+                                            {{ material_form.description.label(class="form-label") }}
+                                            {{ material_form.description(class="form-control") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ material_form.quantity.label(class="form-label") }}
+                                            {{ material_form.quantity(class="form-control", style="width: 7rem;") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ material_form.unit_cost.label(class="form-label") }}
+                                            {{ material_form.unit_cost(class="form-control", style="width: 8rem;") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ material_form.vendor_id.label(class="form-label") }}
+                                            {{ material_form.vendor_id(class="form-select-box form-select") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ material_form.notes.label(class="form-label") }}
+                                            {{ material_form.notes(class="form-control") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ material_form.submit(class="btn bg-gradient-main") }}
+                                        </div>
+                                    </form>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Cost Summary -->
+                                <div class="ticket-content-box" id="wocost">
+                                    <h3>Cost Summary</h3>
+                                    {% set cr = wo.cost_record %}
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-6 col-lg-3"><p class="text-xs text-uppercase text-muted mb-1">Labor</p><p class="mb-0">${{ '%.2f'|format(cr.labor_cost if cr else 0) }}</p></div>
+                                        <div class="col-6 col-lg-3"><p class="text-xs text-uppercase text-muted mb-1">Material</p><p class="mb-0">${{ '%.2f'|format(cr.material_cost if cr else 0) }}</p></div>
+                                        <div class="col-6 col-lg-3"><p class="text-xs text-uppercase text-muted mb-1">Vendor</p><p class="mb-0">${{ '%.2f'|format(cr.vendor_cost if cr else 0) }}</p></div>
+                                        <div class="col-6 col-lg-3"><p class="text-xs text-uppercase text-muted mb-1">Other</p><p class="mb-0">${{ '%.2f'|format(cr.other_cost if cr else 0) }}</p></div>
+                                    </div>
+                                    <p class="text-sm"><strong>Total Actual: ${{ '%.2f'|format(cr.total_cost if cr else 0) }}</strong>
+                                        {% if wo.estimated_cost %} &mdash; Estimated: ${{ '%.2f'|format(wo.estimated_cost) }}{% endif %}</p>
+                                    {% if manage %}
+                                    <form method="POST" action="{{ url_for('routes.update_work_order_cost', work_order_id=wo.id) }}" class="row g-2 align-items-end">
+                                        {{ cost_form.hidden_tag() }}
+                                        <div class="col-auto">
+                                            {{ cost_form.vendor_cost.label(class="form-label") }}
+                                            {{ cost_form.vendor_cost(class="form-control", style="width: 10rem;") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ cost_form.other_cost.label(class="form-label") }}
+                                            {{ cost_form.other_cost(class="form-control", style="width: 10rem;") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ cost_form.submit(class="btn bg-gradient-main") }}
+                                        </div>
+                                    </form>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Status history -->
+                                <div class="ticket-content-box" id="wohistory">
+                                    <h3>Status History</h3>
+                                    <table class="table table-sm align-items-left mb-0">
+                                        <thead><tr>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">When</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Change</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">By</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Note</th>
+                                        </tr></thead>
+                                        <tbody>
+                                        {% for h in wo.status_history %}
+                                        <tr>
+                                            <td class="text-xs">{{ h.changed_at | localtime }}</td>
+                                            <td class="text-xs">{% if h.from_status %}{{ h.from_status }} → {% endif %}<strong>{{ h.to_status }}</strong></td>
+                                            <td class="text-xs">{{ h.changed_by.get_full_name() if h.changed_by else 'System' }}</td>
+                                            <td class="text-xs">{{ h.note or '' }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {% if recurring_groups %}
+                                <!-- Recurring Issue (Phase 9): related work orders from the last 12 months -->
+                                <div class="ticket-content-box" id="worecurring">
+                                    <h3>Recurring Issue <span class="badge bg-warning">{{ recurring_groups|length }}</span></h3>
+                                    <p class="text-xs text-secondary">This work order repeats a pattern seen in the last 12 months &mdash; same asset, or same room/facility within the same category. Related work orders:</p>
+                                    {% for g in recurring_groups %}
+                                    <p class="text-sm mb-1"><strong>{{ g.label }}</strong> <span class="text-secondary">({{ g.count }} work orders)</span></p>
+                                    <ul class="text-sm mb-3">
+                                        {% for wid, number, title in g.work_orders %}{% if wid != wo.id %}
+                                        <li><a href="{{ url_for('routes.edit_work_order', work_order_id=wid) }}">{{ number }}</a> &mdash; {{ title }}</li>
+                                        {% endif %}{% endfor %}
+                                    </ul>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ g.csp_nonce }}">
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.delete-wo-attachment-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const attachmentId = this.getAttribute('data-attachment-id');
+            window.showDeleteConfirm('Are you sure you want to permanently delete this attachment?', function () {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `/delete_work_order_attachment/${attachmentId}`;
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrf_token';
+                csrfInput.value = document.querySelector('input[name="csrf_token"]').value;
+                form.appendChild(csrfInput);
+                document.body.appendChild(form);
+                form.submit();
+            });
+        });
+    });
+});
+</script>
+
+{% endblock %}

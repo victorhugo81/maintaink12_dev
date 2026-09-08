@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+        <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+        <div class="bg-gradient-main custom-title-card">
+          <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">label</i> {{ current_page_name }}</h2>
+          </div>
+          <div class="card-body px-0 pb-2">
+            <br>
+            <div class="table-per-page-section">
+            <div class="row justify-content-end">
+              <div class="col-2 text-end">
+              <a href="{{ url_for('routes.add_category') }}" type="button" class="btn bg-gradient-main add-table-button shadow-dark">Add Category</a>
+            </div>
+          </div>
+        </div>
+          <div class="table-responsive p-0">
+            <table class="table align-items-left mb-0 table-striped">
+              <thead>
+                <tr>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Category</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Subcategories</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Status</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for c in categories %}
+                <tr class="table-highlight-row">
+                  <td>
+                    <div class="d-flex px-2 py-1"><div class="d-flex flex-column justify-content-center">
+                      <a href="{{ url_for('routes.edit_category', category_id=c.id) }}"><h6 class="mb-0 text-sm">{{ c.name }}</h6></a>
+                    </div></div>
+                  </td>
+                  <td><span class="text-secondary text-xs">{{ c.subcategories|map(attribute='name')|join(', ') or '—' }}</span></td>
+                  <td><span class="badge {% if c.is_active %}bg-success{% else %}bg-secondary{% endif %}">{{ 'Active' if c.is_active else 'Inactive' }}</span></td>
+                  <td class="align-middle">
+                    <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ url_for('routes.edit_category', category_id=c.id) }}" class="btn table-button-edit font-weight-bold" aria-label="Edit category: {{ c.name }}">
+                      <i class="material-symbols-rounded position-relative text-lg">edit</i>
+                    </a>
+                    <form id="delete-category-{{ c.id }}" action="{{ url_for('routes.delete_category', category_id=c.id) }}" method="POST">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="button" class="btn table-button-delete font-weight-bold" aria-label="Delete category: {{ c.name }}"
+                              data-bs-toggle="modal" data-bs-target="#deleteConfirmModal"
+                              data-confirm-message="Delete the category &quot;{{ c.name }}&quot; and its subcategories?"
+                              data-form-id="delete-category-{{ c.id }}">
+                        <i class="material-symbols-rounded position-relative text-lg">delete</i>
+                      </button>
+                    </form>
+                    </div>
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-center text-secondary text-sm py-4">No categories defined.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+  </div>
+</div>
+</div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,212 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+        <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+        <div class="bg-gradient-main custom-title-card">
+          <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">precision_manufacturing</i> {{ current_page_name }}</h2>
+          </div>
+      <div class="card-body px-4 pb-4">
+            <br>
+
+    <div class="search-content-box">
+      <div class="row justify-content-between mb-4">
+          <div class="col">
+            <label for="search" class="filter-labels text-sm mb-0 text-capitalize">Search Tag / Serial / Name</label>
+            <form method="get" class="d-flex">
+              <input type="hidden" name="site_filter" value="{{ request.args.get('site_filter', '') }}">
+              <input type="hidden" name="facility_filter" value="{{ request.args.get('facility_filter', '') }}">
+              <input type="hidden" name="type_filter" value="{{ request.args.get('type_filter', '') }}">
+              <input type="hidden" name="condition_filter" value="{{ request.args.get('condition_filter', '') }}">
+              <input type="hidden" name="status_filter" value="{{ request.args.get('status_filter', '') }}">
+              <input type="text" name="search" id="search" class="form-control" value="{{ search }}" placeholder="Asset tag, serial number, or name">
+              <button type="submit" class="btn bg-gradient-main ms-2">Search</button>
+            </form>
+          </div>
+          {% if current_user.role_id in [1, 2] %}
+          <div class="col">
+            <label for="site_filter" class="filter-labels text-sm mb-0 text-capitalize">Filter By Site</label>
+            <form method="get" class="d-flex">
+              <input type="hidden" name="search" value="{{ search }}">
+              <input type="hidden" name="facility_filter" value="{{ request.args.get('facility_filter', '') }}">
+              <input type="hidden" name="type_filter" value="{{ request.args.get('type_filter', '') }}">
+              <input type="hidden" name="condition_filter" value="{{ request.args.get('condition_filter', '') }}">
+              <input type="hidden" name="status_filter" value="{{ request.args.get('status_filter', '') }}">
+              <select name="site_filter" class="form-select-box form-select" onchange="this.form.submit()">
+                  <option value="">All Sites</option>
+                  {% for site in sites %}
+                  <option value="{{ site.id }}" {% if request.args.get('site_filter', '')|int == site.id %}selected{% endif %}>{{ site.site_name }}</option>
+                  {% endfor %}
+              </select>
+            </form>
+          </div>
+          {% endif %}
+      </div>
+      <div class="row justify-content-between mb-4">
+          <div class="col">
+            <label for="facility_filter" class="filter-labels text-sm mb-0 text-capitalize">Filter By Facility</label>
+            <form method="get" class="d-flex">
+              <input type="hidden" name="search" value="{{ search }}">
+              <input type="hidden" name="site_filter" value="{{ request.args.get('site_filter', '') }}">
+              <input type="hidden" name="type_filter" value="{{ request.args.get('type_filter', '') }}">
+              <input type="hidden" name="condition_filter" value="{{ request.args.get('condition_filter', '') }}">
+              <input type="hidden" name="status_filter" value="{{ request.args.get('status_filter', '') }}">
+              <select name="facility_filter" class="form-select-box form-select" onchange="this.form.submit()">
+                  <option value="">All Facilities</option>
+                  {% for facility in facilities %}
+                  <option value="{{ facility.id }}" {% if request.args.get('facility_filter', '')|int == facility.id %}selected{% endif %}>{{ facility.name }}</option>
+                  {% endfor %}
+              </select>
+            </form>
+          </div>
+          <div class="col">
+            <label for="type_filter" class="filter-labels text-sm mb-0 text-capitalize">Filter By Type</label>
+            <form method="get" class="d-flex">
+              <input type="hidden" name="search" value="{{ search }}">
+              <input type="hidden" name="site_filter" value="{{ request.args.get('site_filter', '') }}">
+              <input type="hidden" name="facility_filter" value="{{ request.args.get('facility_filter', '') }}">
+              <input type="hidden" name="condition_filter" value="{{ request.args.get('condition_filter', '') }}">
+              <input type="hidden" name="status_filter" value="{{ request.args.get('status_filter', '') }}">
+              <select name="type_filter" class="form-select-box form-select" onchange="this.form.submit()">
+                  <option value="">All Types</option>
+                  {% for asset_type in asset_types %}
+                  <option value="{{ asset_type.id }}" {% if request.args.get('type_filter', '')|int == asset_type.id %}selected{% endif %}>{{ asset_type.name }}</option>
+                  {% endfor %}
+              </select>
+            </form>
+          </div>
+          <div class="col">
+            <label for="condition_filter" class="filter-labels text-sm mb-0 text-capitalize">Filter By Condition</label>
+            <form method="get" class="d-flex">
+              <input type="hidden" name="search" value="{{ search }}">
+              <input type="hidden" name="site_filter" value="{{ request.args.get('site_filter', '') }}">
+              <input type="hidden" name="facility_filter" value="{{ request.args.get('facility_filter', '') }}">
+              <input type="hidden" name="type_filter" value="{{ request.args.get('type_filter', '') }}">
+              <input type="hidden" name="status_filter" value="{{ request.args.get('status_filter', '') }}">
+              <select name="condition_filter" class="form-select-box form-select" onchange="this.form.submit()">
+                  <option value="">All Conditions</option>
+                  {% for label in condition_labels %}
+                  <option value="{{ label }}" {% if request.args.get('condition_filter', '') == label %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+              </select>
+            </form>
+          </div>
+          <div class="col">
+            <label for="status_filter" class="filter-labels text-sm mb-0 text-capitalize">Filter By Status</label>
+            <form method="get" class="d-flex">
+              <input type="hidden" name="search" value="{{ search }}">
+              <input type="hidden" name="site_filter" value="{{ request.args.get('site_filter', '') }}">
+              <input type="hidden" name="facility_filter" value="{{ request.args.get('facility_filter', '') }}">
+              <input type="hidden" name="type_filter" value="{{ request.args.get('type_filter', '') }}">
+              <input type="hidden" name="condition_filter" value="{{ request.args.get('condition_filter', '') }}">
+              <select name="status_filter" class="form-select-box form-select" onchange="this.form.submit()">
+                <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+              </select>
+            </form>
+          </div>
+      </div>
+    </div>
+
+            <div class="table-per-page-section">
+            <div class="row row justify-content-between">
+              <div class="col-4">
+                <form method="get" class="d-flex">
+                  <label for="per_page">Items per page: </label>
+                  <select name="per_page" id="per_page" class="per-page-drop"  onchange="this.form.submit()">
+                    <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                    <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+                    <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                  </select>
+                </form>
+              </div>
+              {% if current_user.is_admin %}
+              <div class="col-2 text-end">
+              <a href="{{ url_for('routes.add_asset') }}" type="button" class="btn bg-gradient-main add-table-button shadow-dark">Add Asset</a>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
+          <div class="table-responsive p-0">
+            <table class="table align-items-left mb-0 table-striped">
+              <thead>
+                <tr>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Asset Tag</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Name</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Type</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Location</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Condition</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Status</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for asset in assets %}
+                <tr class="table-highlight-row">
+                  <td>
+                    <div class="d-flex px-2 py-1">
+                      <div class="d-flex flex-column justify-content-center">
+                        <a href="{{ url_for('routes.edit_asset', asset_id=asset.id) }}">
+                          <h6 class="mb-0 text-sm">{{ asset.asset_tag }}</h6>
+                        </a>
+                      </div>
+                    </div>
+                  </td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ asset.name }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ asset.asset_type.name }}</span></td>
+                  <td>
+                    <span class="text-secondary text-xs font-weight-bold">
+                      {{ asset.facility.name }}{% if asset.room %} · Rm {{ asset.room.room_number }}{% endif %}
+                    </span>
+                  </td>
+                  <td>
+                    {% include 'includes/condition_badge.html' %}
+                  </td>
+                  <td>
+                    <span class="badge {% if asset.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                      {{ 'Active' if asset.is_active else 'Inactive' }}
+                    </span>
+                  </td>
+                  <td class="align-middle">
+                    <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ url_for('routes.edit_asset', asset_id=asset.id) }}" type="button" class="btn table-button-edit font-weight-bold" aria-label="View asset: {{ asset.asset_tag }}">
+                      <i class="material-symbols-rounded position-relative text-lg">{{ 'edit' if current_user.is_admin else 'visibility' }}</i>
+                    </a>
+                    {% if current_user.is_admin and asset.is_active %}
+                    <form id="delete-asset-{{ asset.id }}" action="{{ url_for('routes.delete_asset', asset_id=asset.id) }}" method="POST">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="button" class="btn table-button-delete font-weight-bold"
+                              aria-label="Deactivate asset: {{ asset.asset_tag }}"
+                              data-bs-toggle="modal"
+                              data-bs-target="#deleteConfirmModal"
+                              data-confirm-message="Are you sure you want to deactivate asset &quot;{{ asset.asset_tag }}&quot;? Its condition history is kept."
+                              data-form-id="delete-asset-{{ asset.id }}">
+                        <i class="material-symbols-rounded position-relative text-lg">delete</i>
+                      </button>
+                    </form>
+                    {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="7" class="text-center text-secondary text-sm py-4">No assets found.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <nav aria-label="Page navigation">
+            <ul class="pagination">
+              {{ pagination.links }}
+            </ul>
+  </div>
+</div>
+</div>
+</div>
+
+{% endblock %}

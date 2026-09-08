@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                <div class="bg-gradient-main shadow-dark border-radius-lg pt-4 pb-3">
+                    <h2 class="text-white text-capitalize ps-3">Edit Inspection Template</h2>
+                </div>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <form method="POST" action="{{ url_for('routes.edit_inspection_template', template_id=template.id) }}">
+                    {{ form.hidden_tag() }}
+                    <div class="col-12 d-flex justify-content-end align-items-center sticky-top bg-white py-2 mb-4 border-bottom">
+                        <div class="d-flex gap-2 mt-3 align-items-center">
+                            <div class="form-check me-3">
+                                {{ form.is_active(class="form-check-input") }}
+                                {{ form.is_active.label(class="form-check-label") }}
+                            </div>
+                            {{ form.submit(class="btn bg-gradient-main") }}
+                            <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.inspection_templates') }}">Back</a>
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <span aria-hidden="true" class="text-danger ms-1">*</span>
+                            {{ form.name.label(class="form-label") }}
+                            {{ form.name(class="form-control") }}
+                        </div>
+                        <div class="col-12">
+                            {{ form.description.label(class="form-label") }}
+                            {{ form.description(class="form-control", rows=2) }}
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            {{ form.category_id.label(class="form-label") }}
+                            {{ form.category_id(class="form-select-box form-select") }}
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            {{ form.priority_id.label(class="form-label") }}
+                            {{ form.priority_id(class="form-select-box form-select") }}
+                        </div>
+                    </div>
+                </form>
+
+                <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Checklist Items</p>
+                <hr class="mt-0 mb-3">
+                {% if template.items %}
+                <table class="table table-sm align-items-left mb-3">
+                    <thead><tr>
+                        <th class="text-uppercase text-xxs font-weight-bolder">Question</th>
+                        <th class="text-uppercase text-xxs font-weight-bolder">Order</th>
+                        <th class="text-uppercase text-xxs font-weight-bolder">Status</th>
+                        <th></th>
+                    </tr></thead>
+                    <tbody>
+                    {% for item in template.items %}
+                    <tr>
+                        <td>{{ item.question }}</td>
+                        <td class="text-xs">{{ item.sort_order }}</td>
+                        <td><span class="badge {% if item.is_active %}bg-success{% else %}bg-secondary{% endif %}">{{ 'Active' if item.is_active else 'Inactive' }}</span></td>
+                        <td class="text-end">
+                            {% if item.is_active %}
+                            <form id="delete-item-{{ item.id }}" action="{{ url_for('routes.delete_inspection_item', item_id=item.id) }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal"
+                                        data-confirm-message="Remove checklist item &quot;{{ item.question }}&quot;?"
+                                        data-form-id="delete-item-{{ item.id }}">
+                                    <i class="material-symbols-rounded position-relative text-lg">delete</i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-secondary text-sm">No checklist items yet.</p>
+                {% endif %}
+                <form method="POST" action="{{ url_for('routes.add_inspection_item', template_id=template.id) }}" class="row g-2 align-items-end">
+                    {{ item_form.hidden_tag() }}
+                    <div class="col-auto" style="min-width: 300px;">
+                        {{ item_form.question.label(class="form-label") }}
+                        {{ item_form.question(class="form-control", placeholder="e.g. Pressure gauge in operable range?") }}
+                    </div>
+                    <div class="col-auto">
+                        {{ item_form.sort_order.label(class="form-label") }}
+                        {{ item_form.sort_order(class="form-control") }}
+                    </div>
+                    <div class="col-auto">
+                        {{ item_form.submit(class="btn bg-gradient-main") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

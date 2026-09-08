@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                <div class="bg-gradient-main shadow-dark border-radius-lg pt-4 pb-3">
+                    <h2 class="text-white text-capitalize ps-3">Add New Capital Project</h2>
+                </div>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    <div class="col-12 d-flex justify-content-end align-items-center sticky-top bg-white py-2 mb-4 border-bottom">
+                        <div class="d-flex gap-2 mt-3">
+                            {{ form.submit(class="btn bg-gradient-main") }}
+                            <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.projects') }}">Back</a>
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-12 col-sm-6">
+                            <span aria-hidden="true" class="text-danger ms-1">*</span>
+                            {{ form.name.label(class="form-label") }}
+                            {{ form.name(class="form-control") }}
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            <span aria-hidden="true" class="text-danger ms-1">*</span>
+                            {{ form.site_id.label(class="form-label") }}
+                            {{ form.site_id(class="form-select-box form-select") }}
+                        </div>
+                        <div class="col-12">
+                            {{ form.description.label(class="form-label") }}
+                            {{ form.description(class="form-control", rows=3) }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            {{ form.status.label(class="form-label") }}
+                            {{ form.status(class="form-select-box form-select") }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            {{ form.budget.label(class="form-label") }}
+                            {{ form.budget(class="form-control", step="0.01") }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-2">
+                            {{ form.start_date.label(class="form-label") }}
+                            {{ form.start_date(class="form-control", type="date") }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-2">
+                            {{ form.target_end_date.label(class="form-label") }}
+                            {{ form.target_end_date(class="form-control", type="date") }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-2">
+                            {{ form.actual_end_date.label(class="form-label") }}
+                            {{ form.actual_end_date(class="form-control", type="date") }}
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

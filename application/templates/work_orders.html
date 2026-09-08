@@ -1,0 +1,179 @@
+{% extends 'base.html' %}
+{% block content %}
+{% set staff = current_user.role_id in [1, 2, 3] %}
+{% macro hidden_except(skip) -%}
+  {% for key in ['search', 'status_filter', 'priority_filter', 'category_filter', 'site_filter', 'assigned_filter', 'source_filter'] if key != skip -%}
+  <input type="hidden" name="{{ key }}" value="{{ request.args.get(key, 'open' if key == 'status_filter' else '') }}">
+  {% endfor -%}
+{%- endmacro %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+        <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+        <div class="bg-gradient-main custom-title-card">
+          <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">build</i> {{ current_page_name }}</h2>
+          </div>
+      <div class="card-body px-4 pb-4">
+            <br>
+
+    <div class="search-content-box">
+      <div class="row justify-content-between mb-4">
+          <div class="col">
+            <label for="search" class="filter-labels text-sm mb-0 text-capitalize">Search Number / Title</label>
+            <form method="get" class="d-flex">
+              {{ hidden_except('search') }}
+              <input type="text" name="search" id="search" class="form-control" value="{{ search }}" placeholder="WO-000123 or keywords">
+              <button type="submit" class="btn bg-gradient-main ms-2">Search</button>
+            </form>
+          </div>
+          <div class="col">
+            <label for="status_filter" class="filter-labels text-sm mb-0 text-capitalize">Status</label>
+            <form method="get" class="d-flex">
+              {{ hidden_except('status_filter') }}
+              <select name="status_filter" class="form-select-box form-select" onchange="this.form.submit()">
+                <option value="open" {% if status_filter == 'open' %}selected{% endif %}>All Open</option>
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Everything</option>
+                {% for s in statuses %}
+                <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          </div>
+          <div class="col">
+            <label for="priority_filter" class="filter-labels text-sm mb-0 text-capitalize">Priority</label>
+            <form method="get" class="d-flex">
+              {{ hidden_except('priority_filter') }}
+              <select name="priority_filter" class="form-select-box form-select" onchange="this.form.submit()">
+                <option value="">All Priorities</option>
+                {% for p in priorities %}
+                <option value="{{ p.id }}" {% if request.args.get('priority_filter', '')|int == p.id %}selected{% endif %}>{{ p.name }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          </div>
+      </div>
+      <div class="row justify-content-between mb-4">
+          <div class="col">
+            <label for="category_filter" class="filter-labels text-sm mb-0 text-capitalize">Category</label>
+            <form method="get" class="d-flex">
+              {{ hidden_except('category_filter') }}
+              <select name="category_filter" class="form-select-box form-select" onchange="this.form.submit()">
+                <option value="">All Categories</option>
+                {% for c in categories %}
+                <option value="{{ c.id }}" {% if request.args.get('category_filter', '')|int == c.id %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          </div>
+          {% if current_user.role_id in [1, 2] %}
+          <div class="col">
+            <label for="site_filter" class="filter-labels text-sm mb-0 text-capitalize">Site</label>
+            <form method="get" class="d-flex">
+              {{ hidden_except('site_filter') }}
+              <select name="site_filter" class="form-select-box form-select" onchange="this.form.submit()">
+                <option value="">All Sites</option>
+                {% for site in sites %}
+                <option value="{{ site.id }}" {% if request.args.get('site_filter', '')|int == site.id %}selected{% endif %}>{{ site.site_name }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          </div>
+          {% endif %}
+          {% if staff %}
+          <div class="col">
+            <label for="assigned_filter" class="filter-labels text-sm mb-0 text-capitalize">Assigned To</label>
+            <form method="get" class="d-flex">
+              {{ hidden_except('assigned_filter') }}
+              <select name="assigned_filter" class="form-select-box form-select" onchange="this.form.submit()">
+                <option value="">Anyone</option>
+                <option value="me" {% if request.args.get('assigned_filter') == 'me' %}selected{% endif %}>Me</option>
+                <option value="unassigned" {% if request.args.get('assigned_filter') == 'unassigned' %}selected{% endif %}>Unassigned</option>
+                {% for uid, name in assignees %}
+                <option value="{{ uid }}" {% if request.args.get('assigned_filter', '') == uid|string %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          </div>
+          <div class="col">
+            <label for="source_filter" class="filter-labels text-sm mb-0 text-capitalize">Source</label>
+            <form method="get" class="d-flex">
+              {{ hidden_except('source_filter') }}
+              <select name="source_filter" class="form-select-box form-select" onchange="this.form.submit()">
+                <option value="">All Sources</option>
+                {% for s in sources %}
+                <option value="{{ s }}" {% if request.args.get('source_filter') == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          </div>
+          {% endif %}
+      </div>
+    </div>
+
+            <div class="table-per-page-section">
+            <div class="row justify-content-between">
+              <div class="col-4">
+                <form method="get" class="d-flex">
+                  <label for="per_page">Items per page: </label>
+                  <select name="per_page" id="per_page" class="per-page-drop" onchange="this.form.submit()">
+                    <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                    <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+                    <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                  </select>
+                </form>
+              </div>
+              <div class="col-auto text-end d-flex gap-2">
+                <a href="{{ url_for('routes.request_work_order') }}" class="btn bg-gradient-main add-table-button shadow-dark">New Request</a>
+                {% if staff %}
+                <a href="{{ url_for('routes.add_work_order') }}" class="btn reset-button-box shadow-dark add-table-button">New Work Order</a>
+                {% endif %}
+              </div>
+          </div>
+        </div>
+
+          <div class="table-responsive p-0">
+            <table class="table align-items-left mb-0 table-striped">
+              <thead>
+                <tr>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Work Order</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Priority</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Location</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Category</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Assigned</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Status</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for wo in work_orders %}
+                <tr class="table-highlight-row">
+                  <td>
+                    <div class="d-flex px-2 py-1"><div class="d-flex flex-column justify-content-center">
+                      <a href="{{ url_for('routes.edit_work_order', work_order_id=wo.id) }}"><h6 class="mb-0 text-sm">{{ wo.wo_number }}</h6></a>
+                      <span class="text-secondary text-xs font-weight-bold text-truncate" style="max-width: 260px;">{{ wo.title }}</span>
+                    </div></div>
+                  </td>
+                  <td><span class="badge bg-{{ wo.priority.color }}">{{ wo.priority.name }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ wo.location_label }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ wo.category.name }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ wo.assigned_to.get_full_name() if wo.assigned_to else (wo.assigned_team or 'Unassigned') }}</span></td>
+                  <td><span class="badge bg-{{ status_badge.get(wo.status, 'secondary') }}">{{ wo.status }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ wo.created_at | localtime('%m-%d-%Y') }}</span></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-center text-secondary text-sm py-4">No work orders match.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <nav aria-label="Page navigation">
+            <ul class="pagination">
+              {{ pagination.links }}
+            </ul>
+  </div>
+</div>
+</div>
+</div>
+
+{% endblock %}

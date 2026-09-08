@@ -1,0 +1,355 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                <div class="bg-gradient-main custom-title-card">
+                    <h2 class="text-white ps-3"><i class="material-symbols-rounded opacity-5">construction</i> {{ project.name }}
+                        <span class="badge {% if project.status == 'Completed' %}bg-success{% elif project.status == 'Cancelled' %}bg-secondary{% elif project.status == 'On Hold' %}bg-warning{% else %}bg-info{% endif %} ms-2">{{ project.status }}</span>
+                    </h2>
+                </div>
+                <div class="card-body px-0 pb-2">
+                    <br>
+                    <div class="container-fluid my-3 py-3">
+                        <div class="row mb-5">
+
+                            <!-- Sidebar -->
+                            <div class="col-lg-3">
+                                <div class="card position-sticky top-1">
+                                    <div class="bg-white border-radius-lg p-3">
+                                        <ul class="nav flex-column mb-3">
+                                            <li class="nav-item"><a class="nav-link text-dark d-flex" data-scroll="" href="#pdetails"><i class="material-symbols-rounded text-lg me-2">info</i><span class="text-sm">Details</span></a></li>
+                                            <li class="nav-item pt-2"><a class="nav-link text-dark d-flex" data-scroll="" href="#ptasks"><i class="material-symbols-rounded text-lg me-2">checklist</i><span class="text-sm">Tasks</span></a></li>
+                                            <li class="nav-item pt-2"><a class="nav-link text-dark d-flex" data-scroll="" href="#pworkorders"><i class="material-symbols-rounded text-lg me-2">build</i><span class="text-sm">Work Orders</span></a></li>
+                                            <li class="nav-item pt-2"><a class="nav-link text-dark d-flex" data-scroll="" href="#passets"><i class="material-symbols-rounded text-lg me-2">precision_manufacturing</i><span class="text-sm">Assets</span></a></li>
+                                            <li class="nav-item pt-2"><a class="nav-link text-dark d-flex" data-scroll="" href="#pvendors"><i class="material-symbols-rounded text-lg me-2">local_shipping</i><span class="text-sm">Vendors</span></a></li>
+                                            <li class="nav-item pt-2"><a class="nav-link text-dark d-flex" data-scroll="" href="#pcosts"><i class="material-symbols-rounded text-lg me-2">payments</i><span class="text-sm">Costs</span></a></li>
+                                            <li class="nav-item pt-2"><a class="nav-link text-dark d-flex" data-scroll="" href="#pdocs"><i class="material-symbols-rounded text-lg me-2">description</i><span class="text-sm">Documents</span></a></li>
+                                        </ul>
+                                        <hr>
+                                        <p class="text-xs text-uppercase text-muted mb-1">Cost Roll-up</p>
+                                        <p class="text-xs mb-0">Direct: ${{ '%.2f'|format(rollup.direct_cost) }}</p>
+                                        <p class="text-xs mb-0">Work Orders ({{ rollup.work_order_count }}): ${{ '%.2f'|format(rollup.work_order_cost) }}</p>
+                                        <p class="text-sm mb-0"><strong>Total: ${{ '%.2f'|format(rollup.total_cost) }}</strong></p>
+                                        {% if project.budget %}
+                                        <p class="text-xs mb-0 mt-1">Budget: ${{ '%.2f'|format(project.budget) }}
+                                            {% set variance = rollup.total_cost - project.budget %}
+                                            <span class="{% if variance > 0 %}text-danger{% else %}text-success{% endif %}">({{ '+' if variance > 0 }}${{ '%.2f'|format(variance) }})</span>
+                                        </p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Main column -->
+                            <div class="col-lg-9 mt-lg-0 mt-4">
+                                <form id="project-form" method="POST" action="{{ url_for('routes.edit_project', project_id=project.id) }}">
+                                    {{ form.hidden_tag() }}
+                                    <div class="ticket-content-box" id="pdetails">
+                                        <h3>Details</h3>
+                                        <div class="row g-3">
+                                            <div class="col-12 col-sm-6">
+                                                {{ form.name.label(class="form-label") }}
+                                                {{ form.name(class="form-control", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6">
+                                                {{ form.site_id.label(class="form-label") }}
+                                                {{ form.site_id(class="form-select-box form-select", disabled=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12">
+                                                {{ form.description.label(class="form-label") }}
+                                                {{ form.description(class="form-control", rows=3, readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-3">
+                                                {{ form.status.label(class="form-label") }}
+                                                {{ form.status(class="form-select-box form-select", disabled=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-3">
+                                                {{ form.budget.label(class="form-label") }}
+                                                {{ form.budget(class="form-control", step="0.01", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-2">
+                                                {{ form.start_date.label(class="form-label") }}
+                                                {{ form.start_date(class="form-control", type="date", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-2">
+                                                {{ form.target_end_date.label(class="form-label") }}
+                                                {{ form.target_end_date(class="form-control", type="date", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-2">
+                                                {{ form.actual_end_date.label(class="form-label") }}
+                                                {{ form.actual_end_date(class="form-control", type="date", readonly=not current_user.is_admin) }}
+                                            </div>
+                                        </div>
+                                        <div class="input-group input-group-outline justify-content-end gap-2 mt-4">
+                                            {% if current_user.is_admin %}{{ form.submit(class="btn bg-gradient-main") }}{% endif %}
+                                            <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.projects') }}">Back</a>
+                                        </div>
+                                    </div>
+                                </form>
+
+                                <!-- Tasks -->
+                                <div class="ticket-content-box" id="ptasks">
+                                    <h3>Tasks</h3>
+                                    {% if project.tasks %}
+                                    <table class="table table-sm align-items-left mb-3">
+                                        <thead><tr>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Task</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Assigned</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Due</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Status</th>
+                                            {% if current_user.is_admin %}<th></th>{% endif %}
+                                        </tr></thead>
+                                        <tbody>
+                                        {% for t in project.tasks %}
+                                        <tr>
+                                            <td class="text-xs">{{ t.name }}</td>
+                                            <td class="text-xs">{{ t.assigned_to.get_full_name() if t.assigned_to else '' }}</td>
+                                            <td class="text-xs">{{ t.due_date.strftime('%m-%d-%Y') if t.due_date else '' }}</td>
+                                            <td><span class="badge {% if t.status == 'Completed' %}bg-success{% else %}bg-secondary{% endif %}">{{ t.status }}</span></td>
+                                            {% if current_user.is_admin %}
+                                            <td class="text-end">
+                                                <form id="toggle-task-{{ t.id }}" action="{{ url_for('routes.toggle_project_task', task_id=t.id) }}" method="POST" class="d-inline">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <button type="submit" class="btn btn-sm btn-outline-secondary">{{ 'Reopen' if t.status == 'Completed' else 'Complete' }}</button>
+                                                </form>
+                                                <form id="delete-task-{{ t.id }}" action="{{ url_for('routes.delete_project_task', task_id=t.id) }}" method="POST" class="d-inline">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal"
+                                                            data-confirm-message="Remove task &quot;{{ t.name }}&quot;?" data-form-id="delete-task-{{ t.id }}">
+                                                        <i class="material-symbols-rounded position-relative text-lg">delete</i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                            {% endif %}
+                                        </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                    {% else %}
+                                    <p class="text-secondary text-sm">No tasks yet.</p>
+                                    {% endif %}
+                                    {% if current_user.is_admin %}
+                                    <form method="POST" action="{{ url_for('routes.add_project_task', project_id=project.id) }}" class="row g-2 align-items-end">
+                                        {{ task_form.hidden_tag() }}
+                                        <div class="col-auto" style="min-width: 200px;">
+                                            {{ task_form.name.label(class="form-label") }}
+                                            {{ task_form.name(class="form-control") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ task_form.assigned_to_id.label(class="form-label") }}
+                                            {{ task_form.assigned_to_id(class="form-select-box form-select") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ task_form.due_date.label(class="form-label") }}
+                                            {{ task_form.due_date(class="form-control", type="date") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ task_form.submit(class="btn bg-gradient-main") }}
+                                        </div>
+                                    </form>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Work Orders -->
+                                <div class="ticket-content-box" id="pworkorders">
+                                    <h3>Linked Work Orders</h3>
+                                    {% if project.work_orders %}
+                                    <table class="table table-sm align-items-left mb-0">
+                                        <thead><tr>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Work Order</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Status</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Cost</th>
+                                        </tr></thead>
+                                        <tbody>
+                                        {% for wo in project.work_orders %}
+                                        <tr>
+                                            <td class="text-xs"><a href="{{ url_for('routes.edit_work_order', work_order_id=wo.id) }}">{{ wo.wo_number }}</a> — {{ wo.title }}</td>
+                                            <td><span class="badge bg-{{ status_badge.get(wo.status, 'secondary') }}">{{ wo.status }}</span></td>
+                                            <td class="text-xs">${{ '%.2f'|format(wo.cost_record.total_cost if wo.cost_record else (wo.actual_cost or 0)) }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                    {% else %}
+                                    <p class="text-secondary text-sm">No work orders linked yet — link one from the work order's own edit page.</p>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Assets -->
+                                <div class="ticket-content-box" id="passets">
+                                    <h3>Linked Assets</h3>
+                                    {% if project.assets %}
+                                    <table class="table table-sm align-items-left mb-0">
+                                        <thead><tr>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Asset</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Facility</th>
+                                        </tr></thead>
+                                        <tbody>
+                                        {% for a in project.assets %}
+                                        <tr>
+                                            <td class="text-xs"><a href="{{ url_for('routes.edit_asset', asset_id=a.id) }}">{{ a.asset_tag }}</a> — {{ a.name }}</td>
+                                            <td class="text-xs">{{ a.facility.name }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                    {% else %}
+                                    <p class="text-secondary text-sm">No assets linked yet — link one from the asset's own edit page.</p>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Vendors -->
+                                <div class="ticket-content-box" id="pvendors">
+                                    <h3>Vendors</h3>
+                                    {% if project.vendors %}
+                                    <table class="table table-sm align-items-left mb-3">
+                                        <tbody>
+                                        {% for v in project.vendors %}
+                                        <tr>
+                                            <td class="text-xs">{{ v.name }}</td>
+                                            {% if current_user.is_admin %}
+                                            <td class="text-end">
+                                                <form action="{{ url_for('routes.remove_project_vendor', project_id=project.id, vendor_id=v.id) }}" method="POST">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <button type="submit" class="btn btn-sm btn-danger">
+                                                        <i class="material-symbols-rounded position-relative text-lg">delete</i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                            {% endif %}
+                                        </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                    {% else %}
+                                    <p class="text-secondary text-sm">No vendors added yet.</p>
+                                    {% endif %}
+                                    {% if current_user.is_admin and vendor_form.vendor_id.choices %}
+                                    <form method="POST" action="{{ url_for('routes.add_project_vendor', project_id=project.id) }}" class="row g-2 align-items-end">
+                                        {{ vendor_form.hidden_tag() }}
+                                        <div class="col-auto">
+                                            {{ vendor_form.vendor_id(class="form-select-box form-select") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ vendor_form.submit(class="btn bg-gradient-main") }}
+                                        </div>
+                                    </form>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Costs -->
+                                <div class="ticket-content-box" id="pcosts">
+                                    <h3>Direct Project Costs</h3>
+                                    {% if project.costs %}
+                                    <table class="table table-sm align-items-left mb-3">
+                                        <thead><tr>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Date</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Description</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Type</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Amount</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Vendor</th>
+                                            {% if current_user.is_admin %}<th></th>{% endif %}
+                                        </tr></thead>
+                                        <tbody>
+                                        {% for c in project.costs %}
+                                        <tr>
+                                            <td class="text-xs">{{ c.incurred_date.strftime('%m-%d-%Y') if c.incurred_date else '' }}</td>
+                                            <td class="text-xs">{{ c.description }}</td>
+                                            <td class="text-xs">{{ c.cost_type }}</td>
+                                            <td class="text-xs">${{ '%.2f'|format(c.amount) }}</td>
+                                            <td class="text-xs">{{ c.vendor.name if c.vendor else '' }}</td>
+                                            {% if current_user.is_admin %}
+                                            <td class="text-end">
+                                                <form id="delete-cost-{{ c.id }}" action="{{ url_for('routes.delete_project_cost', cost_id=c.id) }}" method="POST">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal"
+                                                            data-confirm-message="Remove this cost entry?" data-form-id="delete-cost-{{ c.id }}">
+                                                        <i class="material-symbols-rounded position-relative text-lg">delete</i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                            {% endif %}
+                                        </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                    {% else %}
+                                    <p class="text-secondary text-sm">No direct costs logged yet.</p>
+                                    {% endif %}
+                                    {% if current_user.is_admin %}
+                                    <form method="POST" action="{{ url_for('routes.add_project_cost', project_id=project.id) }}" class="row g-2 align-items-end">
+                                        {{ cost_form.hidden_tag() }}
+                                        <div class="col-auto" style="min-width: 200px;">
+                                            {{ cost_form.description.label(class="form-label") }}
+                                            {{ cost_form.description(class="form-control") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ cost_form.cost_type.label(class="form-label") }}
+                                            {{ cost_form.cost_type(class="form-select-box form-select") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ cost_form.amount.label(class="form-label") }}
+                                            {{ cost_form.amount(class="form-control", style="width: 8rem;") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ cost_form.vendor_id.label(class="form-label") }}
+                                            {{ cost_form.vendor_id(class="form-select-box form-select") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ cost_form.incurred_date.label(class="form-label") }}
+                                            {{ cost_form.incurred_date(class="form-control", type="date") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ cost_form.submit(class="btn bg-gradient-main") }}
+                                        </div>
+                                    </form>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Documents -->
+                                <div class="ticket-content-box" id="pdocs">
+                                    <h3>Documents</h3>
+                                    {% for doc in project.documents %}
+                                    <div class="input-group-outline my-3">
+                                        <span class="me-2">{{ doc.attach_file }}</span>
+                                        <a href="{{ url_for('routes.download_project_document', document_id=doc.id) }}" class="btn btn-dark btn-sm me-2">
+                                            <i class="material-symbols-rounded">download</i> Download
+                                        </a>
+                                        {% if current_user.is_admin %}
+                                        <form id="delete-doc-{{ doc.id }}" action="{{ url_for('routes.delete_project_document', document_id=doc.id) }}" method="POST" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal"
+                                                    data-confirm-message="Delete this document?" data-form-id="delete-doc-{{ doc.id }}">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                        <hr>
+                                    </div>
+                                    {% else %}
+                                    <p class="text-secondary text-sm">No documents uploaded yet.</p>
+                                    {% endfor %}
+                                    {% if current_user.is_admin %}
+                                    <form method="POST" action="{{ url_for('routes.upload_project_document', project_id=project.id) }}" enctype="multipart/form-data" class="d-flex gap-2 align-items-end">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <div>
+                                            <label for="document" class="form-label">Attach Document:</label>
+                                            <input type="file" name="document" id="document" class="form-control" accept="image/jpeg,image/png,application/pdf">
+                                        </div>
+                                        <button type="submit" class="btn bg-gradient-main">Upload</button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

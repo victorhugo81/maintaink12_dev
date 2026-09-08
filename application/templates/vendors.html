@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+        <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+        <div class="bg-gradient-main custom-title-card">
+          <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">local_shipping</i> {{ current_page_name }}</h2>
+          </div>
+          <div class="card-body px-0 pb-2">
+            <br>
+            <div class="table-per-page-section">
+            <div class="row justify-content-between">
+              <div class="col-auto">
+                <a href="{{ url_for('routes.vendor_performance') }}" class="btn reset-button-box shadow-dark">Performance View</a>
+              </div>
+              <div class="col-auto text-end">
+              <a href="{{ url_for('routes.add_vendor') }}" type="button" class="btn bg-gradient-main add-table-button shadow-dark">Add Vendor</a>
+            </div>
+          </div>
+        </div>
+          <div class="table-responsive p-0">
+            <table class="table align-items-left mb-0 table-striped">
+              <thead>
+                <tr>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Vendor</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Contact</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Contract End</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Insurance</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">License</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Status</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for v in vendors %}
+                <tr class="table-highlight-row">
+                  <td>
+                    <div class="d-flex px-2 py-1"><div class="d-flex flex-column justify-content-center">
+                      <a href="{{ url_for('routes.edit_vendor', vendor_id=v.id) }}"><h6 class="mb-0 text-sm">{{ v.name }}</h6></a>
+                    </div></div>
+                  </td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ v.contact_name or v.phone or v.email or 'N/A' }}</span></td>
+                  <td>
+                    {% set s = expiration_status(v.contract_end_date) %}
+                    <span class="text-secondary text-xs font-weight-bold {% if s == 'expired' %}text-danger{% elif s == 'expiring_soon' %}text-warning{% endif %}">
+                      {{ v.contract_end_date.strftime('%m-%d-%Y') if v.contract_end_date else 'N/A' }}
+                    </span>
+                  </td>
+                  <td>
+                    {% set s = expiration_status(v.insurance_expiration) %}
+                    <span class="text-secondary text-xs font-weight-bold {% if s == 'expired' %}text-danger{% elif s == 'expiring_soon' %}text-warning{% endif %}">
+                      {{ v.insurance_expiration.strftime('%m-%d-%Y') if v.insurance_expiration else 'N/A' }}
+                    </span>
+                  </td>
+                  <td>
+                    {% set s = expiration_status(v.license_expiration) %}
+                    <span class="text-secondary text-xs font-weight-bold {% if s == 'expired' %}text-danger{% elif s == 'expiring_soon' %}text-warning{% endif %}">
+                      {{ v.license_expiration.strftime('%m-%d-%Y') if v.license_expiration else 'N/A' }}
+                    </span>
+                  </td>
+                  <td><span class="badge {% if v.is_active %}bg-success{% else %}bg-secondary{% endif %}">{{ 'Active' if v.is_active else 'Inactive' }}</span></td>
+                  <td class="align-middle">
+                    <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ url_for('routes.edit_vendor', vendor_id=v.id) }}" class="btn table-button-edit font-weight-bold" aria-label="Edit vendor: {{ v.name }}">
+                      <i class="material-symbols-rounded position-relative text-lg">edit</i>
+                    </a>
+                    {% if v.is_active %}
+                    <form id="delete-vendor-{{ v.id }}" action="{{ url_for('routes.delete_vendor', vendor_id=v.id) }}" method="POST">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="button" class="btn table-button-delete font-weight-bold" aria-label="Deactivate vendor: {{ v.name }}"
+                              data-bs-toggle="modal" data-bs-target="#deleteConfirmModal"
+                              data-confirm-message="Deactivate vendor &quot;{{ v.name }}&quot;? Past work orders keep the link."
+                              data-form-id="delete-vendor-{{ v.id }}">
+                        <i class="material-symbols-rounded position-relative text-lg">delete</i>
+                      </button>
+                    </form>
+                    {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-center text-secondary text-sm py-4">No vendors defined.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+  </div>
+</div>
+</div>
+</div>
+
+{% endblock %}

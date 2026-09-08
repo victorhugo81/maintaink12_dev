@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                <div class="bg-gradient-main shadow-dark border-radius-lg pt-4 pb-3">
+                    <h2 class="text-white text-capitalize ps-3">Add New Facility</h2>
+                </div>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <form method="POST" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+
+                    <!-- Sticky action bar -->
+                    <div class="col-12 d-flex justify-content-end align-items-center sticky-top bg-white py-2 mb-4 border-bottom">
+                        <div class="d-flex gap-2 mt-3">
+                            {{ form.submit(class="btn bg-gradient-main") }}
+                            <a type="button" class="btn reset-button-box shadow-dark" href="{{ url_for('routes.facilities') }}">Back</a>
+                        </div>
+                    </div>
+
+                    <!-- Section: Identification -->
+                    <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-3">Identification</p>
+                    <hr class="mt-0 mb-3">
+                    <div class="row g-3">
+                        <div class="col-12 col-sm-6 col-lg-4">
+                            <span aria-hidden="true" class="text-danger ms-1">*</span>
+                            {{ form.site_id.label(class="form-label") }}
+                            {{ form.site_id(class="form-select-box form-select") }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-4">
+                            <span aria-hidden="true" class="text-danger ms-1">*</span>
+                            {{ form.name.label(class="form-label") }}
+                            {{ form.name(class="form-control") }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-4">
+                            {{ form.facility_type.label(class="form-label") }}
+                            {{ form.facility_type(class="form-control", placeholder="e.g. Main Building, Gym, Portable") }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-4">
+                            {{ form.building_code.label(class="form-label") }}
+                            {{ form.building_code(class="form-control") }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-4">
+                            {{ form.year_built.label(class="form-label") }}
+                            {{ form.year_built(class="form-control") }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-4">
+                            {{ form.square_footage.label(class="form-label") }}
+                            {{ form.square_footage(class="form-control") }}
+                        </div>
+                    </div>
+
+                    <!-- Section: Location -->
+                    <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Location</p>
+                    <hr class="mt-0 mb-3">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            {{ form.address.label(class="form-label") }}
+                            {{ form.address(class="form-control") }}
+                        </div>
+                    </div>
+
+                    <!-- Section: Notes & Attachment -->
+                    <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Notes &amp; Attachment</p>
+                    <hr class="mt-0 mb-3">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            {{ form.notes.label(class="form-label") }}
+                            {{ form.notes(class="form-control", rows=3) }}
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            {{ form.attachment.label(class="form-label") }}
+                            {{ form.attachment(class="form-control", accept="image/jpeg,image/png,application/pdf") }}
+                        </div>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block content %}
+
+{% macro exp_badge(status, value) %}
+{% if value %}
+<span class="badge {% if status == 'expired' %}bg-danger{% elif status == 'expiring_soon' %}bg-warning{% else %}bg-success{% endif %}">
+  {{ value.strftime('%m-%d-%Y') }}
+</span>
+{% else %}
+<span class="text-secondary text-xs">N/A</span>
+{% endif %}
+{% endmacro %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+        <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+        <div class="bg-gradient-main custom-title-card">
+          <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">local_shipping</i> {{ current_page_name }}</h2>
+          </div>
+          <div class="card-body px-4 pb-4">
+            <br>
+            {% if current_user.is_admin %}
+            <div class="d-flex justify-content-end mb-4">
+              <a href="{{ url_for('routes.vendors') }}" class="btn reset-button-box shadow-dark">Manage Vendors</a>
+            </div>
+            {% endif %}
+
+          <div class="table-responsive p-0">
+            <table class="table align-items-left mb-0 table-striped">
+              <thead>
+                <tr>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Vendor</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Total Work Orders</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Open Work</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Total Cost</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Avg Completion (days)</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Contract End</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Insurance</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">License</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in rows %}
+                <tr class="table-highlight-row">
+                  <td>
+                    <div class="d-flex px-2 py-1"><div class="d-flex flex-column justify-content-center">
+                      <h6 class="mb-0 text-sm">{{ row.vendor.name }}</h6>
+                    </div></div>
+                  </td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ row.stats.total_count }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ row.stats.open_count }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">${{ '%.2f'|format(row.stats.total_cost) }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ row.stats.avg_completion_days if row.stats.avg_completion_days is not none else 'N/A' }}</span></td>
+                  <td>{{ exp_badge(row.contract_status, row.vendor.contract_end_date) }}</td>
+                  <td>{{ exp_badge(row.insurance_status, row.vendor.insurance_expiration) }}</td>
+                  <td>{{ exp_badge(row.license_status, row.vendor.license_expiration) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="text-center text-secondary text-sm py-4">No active vendors.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+  </div>
+</div>
+</div>
+</div>
+
+{% endblock %}

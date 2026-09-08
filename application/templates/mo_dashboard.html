@@ -1,0 +1,411 @@
+{% extends 'base.html' %}
+{% block content %}
+
+{% macro kpi_card(label, value, icon, href=None, tone='') %}
+<div class="col-xl-3 col-md-4 col-sm-6 mb-4">
+  {% if href %}<a href="{{ href }}">{% endif %}
+  <div class="small-cards-dashboard card">
+    <div class="card-header p-2 ps-3">
+      <div class="d-flex justify-content-between">
+        <div>
+          <p class="text-sm mb-0 text-capitalize">{{ label }}</p>
+          <h4 class="mb-0 {{ tone }}">{% if value is none %}&mdash;{% else %}{{ value }}{% endif %}</h4>
+        </div>
+        <div class="icon icon-md icon-shape text-center"><i class="material-symbols-rounded opacity-10">{{ icon }}</i></div>
+      </div>
+    </div>
+  </div>
+  {% if href %}</a>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro chart_box(key, title, subtitle, type='bar', cols='col-lg-4 col-md-6') %}
+<div class="tall-card-box {{ cols }} mb-4">
+  <div class="tall-card card">
+    <div class="card-dashboard-box">
+      <h6 class="mb-0">{{ title }}</h6>
+      <p class="text-sm">{{ subtitle }}</p>
+      <div class="pe-2"><div class="chart"><canvas data-chart="{{ key }}" data-type="{{ type }}" class="chart-canvas" height="190"></canvas></div></div>
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro pct(value) %}{% if value is none %}&mdash;{% else %}{{ value }}%{% endif %}{% endmacro %}
+{% macro days(value) %}{% if value is none %}&mdash;{% else %}{{ value }} d{% endif %}{% endmacro %}
+{% macro money(value) %}${{ '{:,.2f}'.format(value|float) }}{% endmacro %}
+
+{% set wo = data.wo %}
+{% set f = filters %}
+
+<div class="row">
+  <div class="col-12">
+    <div class="main-card-box card my-4">
+      <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+        <div class="bg-gradient-main custom-title-card d-flex justify-content-between align-items-center pe-3">
+          <h2 class="text-white text-capitalize ps-3 mb-0"><i class="material-symbols-rounded opacity-5">insights</i> {{ current_page_name }} &mdash; {{ view_labels[view] }}</h2>
+          {% if allowed_views|length > 1 %}
+          <div class="btn-group btn-group-sm">
+            {% for v in allowed_views %}
+            <a class="btn btn-sm {% if v == view %}btn-light{% else %}btn-outline-light{% endif %} mb-0"
+               href="{{ url_for('routes.mo_dashboard', view=v, preset=f.preset, start=f.start if f.preset == 'custom' else None, end=f.end if f.preset == 'custom' else None) }}">{{ view_labels[v] }}</a>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="card-body px-4 pb-4">
+        <br>
+
+        <!-- Filters: one GET form, every widget below uses the same filter dict -->
+        <form id="dashboard-filters" method="GET" action="{{ url_for('routes.mo_dashboard') }}" class="filter-container mb-4">
+          <input type="hidden" name="view" value="{{ view }}">
+          <div class="row g-2">
+            <div class="col-md-2 col-6">
+              <label class="filter-labels text-sm mb-0">Period</label>
+              <select class="form-select-box form-select" name="preset">
+                {% for p in presets %}<option value="{{ p }}" {% if f.preset == p %}selected{% endif %}>{{ preset_labels[p] }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4 col-12" id="custom-range" {% if f.preset != 'custom' %}hidden{% endif %}>
+              <label class="filter-labels text-sm mb-0">Custom range</label>
+              <div class="input-group input-group-sm">
+                <input type="date" class="form-control" name="start" value="{{ f.start }}">
+                <span class="input-group-text">to</span>
+                <input type="date" class="form-control" name="end" value="{{ f.end }}">
+                <button class="btn btn-sm btn-outline-secondary mb-0" type="submit">Apply</button>
+              </div>
+            </div>
+            {% if options.sites %}
+            <div class="col-md-2 col-6">
+              <label class="filter-labels text-sm mb-0">Site</label>
+              <select class="form-select-box form-select" name="site_id">
+                <option value="">All Sites</option>
+                {% for s in options.sites %}<option value="{{ s.id }}" {% if f.site_id == s.id %}selected{% endif %}>{{ s.site_name }}</option>{% endfor %}
+              </select>
+            </div>
+            {% endif %}
+            {% if options.facilities is defined %}
+            <div class="col-md-2 col-6">
+              <label class="filter-labels text-sm mb-0">Facility</label>
+              <select class="form-select-box form-select" name="facility_id">
+                <option value="">All Facilities</option>
+                {% for fac in options.facilities %}<option value="{{ fac.id }}" {% if f.facility_id == fac.id %}selected{% endif %}>{{ fac.name }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2 col-6">
+              <label class="filter-labels text-sm mb-0">Department (Team)</label>
+              <select class="form-select-box form-select" name="team">
+                <option value="">All Teams</option>
+                {% for t in options.teams %}<option value="{{ t }}" {% if f.team == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2 col-6">
+              <label class="filter-labels text-sm mb-0">Technician</label>
+              <select class="form-select-box form-select" name="technician_id">
+                <option value="">All Technicians</option>
+                {% for t in options.technicians %}<option value="{{ t.id }}" {% if f.technician_id == t.id %}selected{% endif %}>{{ t.get_full_name() }}</option>{% endfor %}
+              </select>
+            </div>
+            {% endif %}
+            <div class="col-md-2 col-6">
+              <label class="filter-labels text-sm mb-0">Category</label>
+              <select class="form-select-box form-select" name="category_id">
+                <option value="">All Categories</option>
+                {% for c in options.categories %}<option value="{{ c.id }}" {% if f.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2 col-6">
+              <label class="filter-labels text-sm mb-0">Priority</label>
+              <select class="form-select-box form-select" name="priority_id">
+                <option value="">All Priorities</option>
+                {% for p in options.priorities %}<option value="{{ p.id }}" {% if f.priority_id == p.id %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2 col-6">
+              <label class="filter-labels text-sm mb-0">Status</label>
+              <select class="form-select-box form-select" name="status">
+                <option value="">All Statuses</option>
+                {% for s in options.statuses %}<option value="{{ s }}" {% if f.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+              </select>
+            </div>
+          </div>
+          <p class="text-xs text-secondary mt-2 mb-0">Period: {{ f.start.strftime('%b %d, %Y') }} &ndash; {{ f.end.strftime('%b %d, %Y') }}. "Current" figures describe the filtered scope right now; "in period" figures count work orders opened (or completed) within these dates.</p>
+        </form>
+
+        {# ============================ EXECUTIVE / MANAGER ============================ #}
+        {% if view in ('executive', 'manager') %}
+        {% set fac = data.facility %}{% set m = data.maintenance %}{% set cost = data.cost %}
+
+        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">Work Orders &mdash; current</h6>
+        <div class="row">
+          {{ kpi_card('Total Open', wo.total_open, 'build', url_for('routes.work_orders')) }}
+          {{ kpi_card('Overdue', wo.overdue, 'alarm', None, 'text-danger' if wo.overdue else '') }}
+          {{ kpi_card('Unassigned', wo.unassigned, 'person_off', url_for('routes.work_orders', assigned_filter='unassigned')) }}
+          {{ kpi_card('Emergency / Critical', wo.emergency ~ ' / ' ~ wo.critical, 'emergency', None, 'text-danger' if (wo.emergency or wo.critical) else '') }}
+          {% if view == 'manager' %}
+          {{ kpi_card('New Requests', wo.new_requests, 'inbox', url_for('routes.work_orders', status_filter='New')) }}
+          {{ kpi_card('In Progress', wo.in_progress, 'progress_activity', url_for('routes.work_orders', status_filter='In Progress')) }}
+          {{ kpi_card('Waiting', wo.waiting, 'hourglass_top') }}
+          {{ kpi_card('Backlog (open > 30 days)', wo.backlog, 'inventory') }}
+          {% endif %}
+        </div>
+
+        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">Work Orders &mdash; {{ f.period_label }}</h6>
+        <div class="row">
+          {{ kpi_card('Opened', wo.created_in_period, 'add_circle') }}
+          {{ kpi_card('Completed', wo.completed, 'task_alt') }}
+          {{ kpi_card('Completion Rate', pct(wo.completion_rate), 'percent') }}
+          {{ kpi_card('SLA Compliance (due date)', pct(wo.sla_compliance), 'verified') }}
+          {% if view == 'manager' %}
+          {{ kpi_card('Avg Response', days(wo.avg_response_days), 'timer') }}
+          {{ kpi_card('Avg Resolution', days(wo.avg_resolution_days), 'schedule') }}
+          {{ kpi_card('Repeat Work', pct(wo.repeat_work_pct), 'repeat') }}
+          {{ kpi_card('Labor Hours', m.labor_hours, 'engineering') }}
+          {% endif %}
+        </div>
+
+        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">Facilities, Maintenance &amp; Cost</h6>
+        <div class="row">
+          {{ kpi_card('Facilities / Rooms / Assets', fac.total_facilities ~ ' / ' ~ fac.total_rooms ~ ' / ' ~ fac.total_assets, 'domain', url_for('routes.facilities')) }}
+          {{ kpi_card('Assets Poor / Critical', fac.assets_poor_critical, 'warning', url_for('routes.capital_replacement'), 'text-danger' if fac.assets_poor_critical else '') }}
+          {{ kpi_card('Assets Past Expected Life', fac.assets_past_expected_life, 'history') }}
+          {{ kpi_card('PM Due / Overdue', m.pm_due ~ ' / ' ~ m.pm_overdue, 'event_repeat', url_for('routes.pm_dashboard'), 'text-danger' if m.pm_overdue else '') }}
+          {{ kpi_card('Inspections Due / Overdue', m.inspections_due ~ ' / ' ~ m.inspections_overdue, 'checklist', url_for('routes.inspection_dashboard'), 'text-danger' if m.inspections_overdue else '') }}
+          {{ kpi_card('Maintenance Cost (' ~ f.period_label ~ ')', money(cost.actual_total), 'payments', url_for('routes.cost_rollups')) }}
+          {{ kpi_card('Estimated vs Actual', money(cost.estimated_total) ~ ' / ' ~ money(cost.actual_total), 'balance') }}
+          {{ kpi_card('Preventive vs Corrective', pct(m.preventive_pct) ~ ' PM', 'autorenew') }}
+          {% if view == 'manager' %}
+          {{ kpi_card('Assets Requiring Attention', fac.assets_requiring_attention, 'priority_high') }}
+          {{ kpi_card('Cost per Work Order', money(cost.cost_per_work_order), 'receipt_long') }}
+          {{ kpi_card('Labor / Material / Vendor', money(cost.labor_cost) ~ ' / ' ~ money(cost.material_cost) ~ ' / ' ~ money(cost.vendor_cost), 'stacked_bar_chart') }}
+          {{ kpi_card('Recurring Issues', data.recurring|length, 'repeat', None, 'text-warning' if data.recurring else '') }}
+          {% endif %}
+        </div>
+
+        <!-- Operational Insights -->
+        <div class="ticket-content-box mb-4" id="insights">
+          <h3>Operational Insights</h3>
+          <p class="text-xs text-secondary">Rule-based statements generated from the figures above for the current filters &mdash; nothing here is estimated or inferred beyond the query results.</p>
+          {% for i in data.insights %}
+          <div class="alert alert-{{ i.level }} text-white text-sm py-2 mb-2" role="alert">{{ i.text }}</div>
+          {% else %}
+          <p class="text-sm text-secondary mb-0">Not enough data in this period to state anything with confidence.</p>
+          {% endfor %}
+        </div>
+
+        <!-- Charts -->
+        <div class="row">
+          {% if view == 'executive' %}
+          {{ chart_box('by_facility', 'Work Orders by Facility', 'Opened ' ~ f.period_label ~ ' (top 10)') }}
+          {{ chart_box('cost_over_time', 'Cost Over Time', 'Actual cost by month', 'line') }}
+          {{ chart_box('pm_vs_corrective', 'Preventive vs Corrective', 'By work order source', 'doughnut') }}
+          {{ chart_box('condition_distribution', 'Asset Condition', 'Current condition of active assets', 'doughnut') }}
+          {{ chart_box('by_month', 'Work Orders by Month', 'Opened per month') }}
+          {{ chart_box('by_category', 'Work Orders by Category', 'Opened ' ~ f.period_label ~ ' (top 10)') }}
+          {% else %}
+          {{ chart_box('by_status', 'Work Orders by Status', 'Opened ' ~ f.period_label) }}
+          {{ chart_box('by_priority', 'Work Orders by Priority', 'Opened ' ~ f.period_label) }}
+          {{ chart_box('by_facility', 'Work Orders by Facility', 'Opened ' ~ f.period_label ~ ' (top 10)') }}
+          {{ chart_box('by_category', 'Work Orders by Category', 'Opened ' ~ f.period_label ~ ' (top 10)') }}
+          {{ chart_box('by_technician', 'Work Orders by Technician', 'Assigned, opened ' ~ f.period_label ~ ' (top 10)') }}
+          {{ chart_box('by_month', 'Work Orders by Month', 'Opened per month') }}
+          {{ chart_box('cost_over_time', 'Cost Over Time', 'Actual cost by month', 'line') }}
+          {{ chart_box('trends', 'Response & Completion Trends', 'Average days, by month opened', 'line') }}
+          {{ chart_box('pm_vs_corrective', 'Preventive vs Corrective', 'By work order source', 'doughnut') }}
+          {{ chart_box('condition_distribution', 'Asset Condition', 'Current condition of active assets', 'doughnut') }}
+          {% endif %}
+        </div>
+
+        <!-- Facility Health -->
+        <div class="ticket-content-box mb-4" id="health">
+          <h3>Facility Health Score</h3>
+          <p class="text-xs text-secondary">0&ndash;100, higher is healthier. Every contributing factor is shown &mdash; a factor with no data is excluded from that facility's score, never counted as zero. Period-based factors (inspection failures, maintenance cost, recurring problems) follow the date filter above.</p>
+          <div class="table-responsive p-0">
+            <table class="table align-items-left mb-0 table-striped">
+              <thead><tr>
+                <th class="text-uppercase text-xxs font-weight-bolder">Facility</th>
+                <th class="text-uppercase text-xxs font-weight-bolder">Score</th>
+                {% for name in health_factors %}<th class="text-uppercase text-xxs font-weight-bolder">{{ name }}</th>{% endfor %}
+              </tr></thead>
+              <tbody>
+              {% for row in data.health %}
+              <tr class="table-highlight-row">
+                <td><a href="{{ url_for('routes.edit_facility', facility_id=row.facility.id) }}"><span class="text-sm font-weight-bold">{{ row.facility.name }}</span></a><br><span class="text-xs text-secondary">{{ row.facility.site.site_name }}</span></td>
+                <td>{% if row.health.score is not none %}<span class="badge {% if row.health.score >= 75 %}bg-success{% elif row.health.score >= 50 %}bg-warning{% else %}bg-danger{% endif %}">{{ row.health.score }}</span> <span class="text-xs text-secondary">({{ row.health.factor_count }}/7)</span>{% else %}<span class="badge bg-secondary">No data</span>{% endif %}</td>
+                {% for name in health_factors %}{% set fct = row.health.factors[name] %}
+                <td class="text-xs">{% if fct.available %}<strong>{{ fct.value }}</strong>{% else %}<span class="text-secondary">&mdash;</span>{% endif %}<br><span class="text-secondary">{{ fct.detail }}</span></td>
+                {% endfor %}
+              </tr>
+              {% else %}
+              <tr><td colspan="9" class="text-center text-secondary text-sm py-4">No active facilities in this scope.</td></tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Recurring Issues -->
+        <div class="ticket-content-box mb-4" id="recurring">
+          <h3>Recurring Issues</h3>
+          <p class="text-xs text-secondary">Work orders repeating {{ f.period_label }} on the same asset, the same room or facility within one category, or with the same description (3 or more).</p>
+          {% set groups = data.recurring if view == 'manager' else data.recurring[:5] %}
+          {% if groups %}
+          <div class="table-responsive p-0">
+            <table class="table align-items-left mb-0 table-striped">
+              <thead><tr>
+                <th class="text-uppercase text-xxs font-weight-bolder">Issue</th>
+                <th class="text-uppercase text-xxs font-weight-bolder">Kind</th>
+                <th class="text-uppercase text-xxs font-weight-bolder">Count</th>
+                <th class="text-uppercase text-xxs font-weight-bolder">Work Orders</th>
+              </tr></thead>
+              <tbody>
+              {% for g in groups %}
+              <tr class="table-highlight-row">
+                <td><span class="text-sm font-weight-bold">{{ g.label }}</span></td>
+                <td><span class="badge bg-secondary">{{ g.kind }}</span></td>
+                <td><span class="text-sm font-weight-bold text-warning">{{ g.count }}</span></td>
+                <td class="text-xs">{% for wid, number, title in g.work_orders[:8] %}<a href="{{ url_for('routes.edit_work_order', work_order_id=wid) }}" title="{{ title }}">{{ number }}</a>{% if not loop.last %}, {% endif %}{% endfor %}{% if g.work_orders|length > 8 %} &hellip;{% endif %}</td>
+              </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if view == 'executive' and data.recurring|length > 5 %}<p class="text-xs text-secondary mt-2 mb-0">Showing 5 of {{ data.recurring|length }} &mdash; switch to the M&amp;O Manager view for the full list.</p>{% endif %}
+          {% else %}
+          <p class="text-sm text-secondary mb-0">No recurring issues detected {{ f.period_label }}.</p>
+          {% endif %}
+        </div>
+
+        {% if view == 'manager' and fac.open_issues_by_facility %}
+        <div class="ticket-content-box mb-4" id="open-by-facility">
+          <h3>Open Issues by Facility</h3>
+          <table class="table table-sm align-items-left mb-0">
+            <tbody>{% for name, count in fac.open_issues_by_facility %}<tr><td class="text-sm">{{ name }}</td><td class="text-sm font-weight-bold text-end">{{ count }}</td></tr>{% endfor %}</tbody>
+          </table>
+        </div>
+        {% endif %}
+
+        {# ============================ TECHNICIAN ============================ #}
+        {% elif view == 'technician' %}
+        {% set m = data.maintenance %}
+        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">My Work &mdash; current</h6>
+        <div class="row">
+          {{ kpi_card('My Open', wo.total_open, 'build', url_for('routes.work_orders', assigned_filter='me')) }}
+          {{ kpi_card('In Progress', wo.in_progress, 'progress_activity') }}
+          {{ kpi_card('Overdue', wo.overdue, 'alarm', None, 'text-danger' if wo.overdue else '') }}
+          {{ kpi_card('Due Today', wo.due_today, 'today', None, 'text-warning' if wo.due_today else '') }}
+          {{ kpi_card('Due This Week', wo.due_this_week, 'date_range') }}
+          {{ kpi_card('Waiting', wo.waiting, 'hourglass_top') }}
+          {{ kpi_card('PM Due / Overdue (my site)', m.pm_due ~ ' / ' ~ m.pm_overdue, 'event_repeat', url_for('routes.pm_dashboard')) }}
+          {{ kpi_card('Inspections Due / Overdue (my site)', m.inspections_due ~ ' / ' ~ m.inspections_overdue, 'checklist', url_for('routes.inspection_dashboard')) }}
+        </div>
+        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">My Work &mdash; {{ f.period_label }}</h6>
+        <div class="row">
+          {{ kpi_card('Assigned to Me (opened)', wo.created_in_period, 'assignment_ind') }}
+          {{ kpi_card('Completed', wo.completed, 'task_alt') }}
+          {{ kpi_card('Avg Resolution', days(wo.avg_resolution_days), 'schedule') }}
+          {{ kpi_card('SLA Compliance (due date)', pct(wo.sla_compliance), 'verified') }}
+        </div>
+        <div class="row">
+          {{ chart_box('by_status', 'My Work Orders by Status', 'Opened ' ~ f.period_label) }}
+          {{ chart_box('by_priority', 'My Work Orders by Priority', 'Opened ' ~ f.period_label) }}
+          {{ chart_box('by_month', 'My Work Orders by Month', 'Opened per month') }}
+        </div>
+        <div class="ticket-content-box mb-4" id="my-work">
+          <h3>My Open Work Orders</h3>
+          <p class="text-xs text-secondary">Soonest due first (up to 20). <a href="{{ url_for('routes.work_orders', assigned_filter='me') }}">View all</a>.</p>
+          <div class="table-responsive p-0">
+            <table class="table align-items-left mb-0 table-striped">
+              <thead><tr>
+                <th class="text-uppercase text-xxs font-weight-bolder">WO</th>
+                <th class="text-uppercase text-xxs font-weight-bolder">Title</th>
+                <th class="text-uppercase text-xxs font-weight-bolder">Facility</th>
+                <th class="text-uppercase text-xxs font-weight-bolder">Priority</th>
+                <th class="text-uppercase text-xxs font-weight-bolder">Status</th>
+                <th class="text-uppercase text-xxs font-weight-bolder">Due</th>
+              </tr></thead>
+              <tbody>
+              {% for w in data.my_work_orders %}
+              <tr class="table-highlight-row">
+                <td><a href="{{ url_for('routes.edit_work_order', work_order_id=w.id) }}"><span class="text-sm font-weight-bold">{{ w.wo_number }}</span></a></td>
+                <td class="text-sm">{{ w.title }}</td>
+                <td class="text-xs">{{ w.facility.name if w.facility else '' }}</td>
+                <td><span class="badge bg-{{ w.priority.color }}">{{ w.priority.name }}</span></td>
+                <td><span class="badge bg-{{ status_badge.get(w.status, 'secondary') }}">{{ w.status }}</span></td>
+                <td class="text-xs {% if w.due_date and w.due_date < data.today %}text-danger font-weight-bold{% endif %}">{{ w.due_date or '' }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="6" class="text-center text-secondary text-sm py-4">Nothing open is assigned to you.</td></tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {# ============================ SCHOOL STAFF ============================ #}
+        {% else %}
+        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">My Requests &mdash; current</h6>
+        <div class="row">
+          {{ kpi_card('Open', wo.total_open, 'build', url_for('routes.work_orders')) }}
+          {{ kpi_card('New (not yet assigned)', wo.new_requests, 'inbox') }}
+          {{ kpi_card('In Progress', wo.in_progress, 'progress_activity') }}
+          {{ kpi_card('Waiting', wo.waiting, 'hourglass_top') }}
+        </div>
+        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">My Requests &mdash; {{ f.period_label }}</h6>
+        <div class="row">
+          {{ kpi_card('Submitted', wo.created_in_period, 'add_circle', url_for('routes.request_work_order')) }}
+          {{ kpi_card('Completed', wo.completed, 'task_alt') }}
+          {{ kpi_card('Avg Resolution', days(wo.avg_resolution_days), 'schedule') }}
+        </div>
+        <div class="row">
+          {{ chart_box('by_status', 'My Requests by Status', 'Submitted ' ~ f.period_label) }}
+          <div class="tall-card-box col-lg-4 col-md-6 mb-4">
+            <div class="tall-card card"><div class="card-dashboard-box">
+              <h6 class="mb-0">Open Issues by Facility</h6>
+              <p class="text-sm">Everything open at your site, not just your requests.</p>
+              <table class="table table-sm align-items-left mb-0">
+                <tbody>{% for name, count in data.open_issues_by_facility %}<tr><td class="text-sm">{{ name }}</td><td class="text-sm font-weight-bold text-end">{{ count }}</td></tr>{% else %}<tr><td class="text-sm text-secondary">No open work orders at your site.</td></tr>{% endfor %}</tbody>
+              </table>
+            </div></div>
+          </div>
+        </div>
+        <div class="ticket-content-box mb-4" id="my-requests">
+          <h3>My Recent Requests</h3>
+          <div class="table-responsive p-0">
+            <table class="table align-items-left mb-0 table-striped">
+              <thead><tr>
+                <th class="text-uppercase text-xxs font-weight-bolder">WO</th>
+                <th class="text-uppercase text-xxs font-weight-bolder">Title</th>
+                <th class="text-uppercase text-xxs font-weight-bolder">Facility</th>
+                <th class="text-uppercase text-xxs font-weight-bolder">Status</th>
+                <th class="text-uppercase text-xxs font-weight-bolder">Submitted</th>
+              </tr></thead>
+              <tbody>
+              {% for w in data.my_requests %}
+              <tr class="table-highlight-row">
+                <td><a href="{{ url_for('routes.edit_work_order', work_order_id=w.id) }}"><span class="text-sm font-weight-bold">{{ w.wo_number }}</span></a></td>
+                <td class="text-sm">{{ w.title }}</td>
+                <td class="text-xs">{{ w.facility.name if w.facility else '' }}</td>
+                <td><span class="badge bg-{{ status_badge.get(w.status, 'secondary') }}">{{ w.status }}</span></td>
+                <td class="text-xs">{{ w.created_at | localtime('%m-%d-%Y') }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" class="text-center text-secondary text-sm py-4">You haven't submitted any requests yet. <a href="{{ url_for('routes.request_work_order') }}">Submit one</a>.</td></tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script nonce="{{ g.csp_nonce }}">window.MO_DASHBOARD = {{ {'charts': data.charts}|tojson }};</script>
+<script src="{{ url_for('static', filename='js/plugins/chartjs.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/mo_dashboard.js') }}"></script>
+
+{% endblock %}

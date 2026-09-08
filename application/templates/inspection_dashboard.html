@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block content %}
+
+{% macro inspection_table(items) %}
+{% if items %}
+<table class="table table-sm align-items-left mb-0">
+    <thead><tr>
+        <th class="text-uppercase text-xxs font-weight-bolder">Due Date</th>
+        <th class="text-uppercase text-xxs font-weight-bolder">Template</th>
+        <th class="text-uppercase text-xxs font-weight-bolder">Target</th>
+        <th class="text-uppercase text-xxs font-weight-bolder">Inspector</th>
+    </tr></thead>
+    <tbody>
+    {% for insp in items|sort(attribute='due_date') %}
+    <tr>
+        <td class="text-xs"><a href="{{ url_for('routes.edit_inspection', inspection_id=insp.id) }}">{{ insp.due_date.strftime('%m-%d-%Y') }}</a></td>
+        <td class="text-xs">{{ insp.template.name }}</td>
+        <td class="text-xs">{{ insp.target_label }}</td>
+        <td class="text-xs">{{ insp.inspector.get_full_name() if insp.inspector else 'Unassigned' }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="text-secondary text-sm mb-0">None.</p>
+{% endif %}
+{% endmacro %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+        <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+        <div class="bg-gradient-main custom-title-card">
+          <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">checklist</i> {{ current_page_name }}</h2>
+          </div>
+          <div class="card-body px-4 pb-4">
+            <br>
+            <div class="d-flex justify-content-end mb-4">
+              <a href="{{ url_for('routes.inspections') }}" class="btn reset-button-box shadow-dark">All Inspections</a>
+            </div>
+
+            <div class="row g-3 mb-4">
+              <div class="col-6 col-lg-3">
+                <div class="p-3 border-radius-lg" style="background:#fdecea;">
+                  <p class="text-xs text-uppercase mb-1">Overdue</p>
+                  <h3 class="mb-0">{{ buckets.overdue|length }}</h3>
+                </div>
+              </div>
+              <div class="col-6 col-lg-3">
+                <div class="p-3 border-radius-lg" style="background:#fff4e5;">
+                  <p class="text-xs text-uppercase mb-1">Due Today</p>
+                  <h3 class="mb-0">{{ buckets.due_today|length }}</h3>
+                </div>
+              </div>
+              <div class="col-6 col-lg-3">
+                <div class="p-3 border-radius-lg" style="background:#e8f4fd;">
+                  <p class="text-xs text-uppercase mb-1">Due This Week</p>
+                  <h3 class="mb-0">{{ buckets.due_this_week|length }}</h3>
+                </div>
+              </div>
+              <div class="col-6 col-lg-3">
+                <div class="p-3 border-radius-lg" style="background:#eafaf1;">
+                  <p class="text-xs text-uppercase mb-1">Upcoming</p>
+                  <h3 class="mb-0">{{ buckets.upcoming|length }}</h3>
+                </div>
+              </div>
+            </div>
+
+            <p class="text-uppercase text-sm text-muted fw-bold mb-2">Overdue</p>
+            <hr class="mt-0 mb-3">
+            {{ inspection_table(buckets.overdue) }}
+
+            <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Due Today</p>
+            <hr class="mt-0 mb-3">
+            {{ inspection_table(buckets.due_today) }}
+
+            <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Due This Week</p>
+            <hr class="mt-0 mb-3">
+            {{ inspection_table(buckets.due_this_week) }}
+
+            <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Upcoming</p>
+            <hr class="mt-0 mb-3">
+            {{ inspection_table(buckets.upcoming) }}
+  </div>
+</div>
+</div>
+</div>
+
+{% endblock %}

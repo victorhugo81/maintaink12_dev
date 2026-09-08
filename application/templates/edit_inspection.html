@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                <div class="bg-gradient-main custom-title-card">
+                    <h2 class="text-white ps-3"><i class="material-symbols-rounded opacity-5">checklist</i> {{ inspection.template.name }}
+                        <span class="badge {% if inspection.status == 'Completed' %}bg-success{% else %}bg-warning{% endif %} ms-2">{{ inspection.status }}</span>
+                    </h2>
+                    <p class="text-white ps-3 mb-0">{{ inspection.target_label }} &mdash; due {{ inspection.due_date.strftime('%m-%d-%Y') }}</p>
+                </div>
+                <div class="card-body px-4 pb-4">
+                    <br>
+                    <div class="row g-3 mb-4">
+                        <div class="col-12 col-sm-4">
+                            <p class="text-xs text-uppercase text-muted mb-1">Inspector</p>
+                            <p class="text-sm mb-0">{{ inspection.inspector.get_full_name() if inspection.inspector else 'Unassigned' }}</p>
+                        </div>
+                        <div class="col-12 col-sm-4">
+                            <p class="text-xs text-uppercase text-muted mb-1">Site</p>
+                            <p class="text-sm mb-0">{{ inspection.site.site_name }}</p>
+                        </div>
+                        {% if inspection.status == 'Completed' %}
+                        <div class="col-12 col-sm-4">
+                            <p class="text-xs text-uppercase text-muted mb-1">Completed</p>
+                            <p class="text-sm mb-0">{{ inspection.completed_at | localtime }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% if inspection.notes %}
+                    <p class="text-sm"><strong>Notes:</strong> {{ inspection.notes }}</p>
+                    {% endif %}
+
+                    {% if inspection.status == 'Completed' %}
+                    <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-4">Results</p>
+                    <hr class="mt-0 mb-3">
+                    <table class="table table-sm align-items-left mb-3">
+                        <thead><tr>
+                            <th class="text-uppercase text-xxs font-weight-bolder">Question</th>
+                            <th class="text-uppercase text-xxs font-weight-bolder">Result</th>
+                            <th class="text-uppercase text-xxs font-weight-bolder">Notes</th>
+                        </tr></thead>
+                        <tbody>
+                        {% for item in active_items %}
+                        {% set result = results_by_item.get(item.id) %}
+                        <tr>
+                            <td class="text-xs">{{ item.question }}</td>
+                            <td>
+                                {% if result %}
+                                <span class="badge {% if result.result == 'Pass' %}bg-success{% elif result.result == 'Fail' %}bg-danger{% else %}bg-warning{% endif %}">{{ result.result }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-xs">{{ result.notes if result else '' }}</td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    {% if inspection.generated_work_order %}
+                    <p class="text-sm">Work order generated: <a href="{{ url_for('routes.edit_work_order', work_order_id=inspection.generated_work_order.id) }}">{{ inspection.generated_work_order.wo_number }}</a></p>
+                    {% endif %}
+
+                    {% else %}
+                    <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-4">Record Results</p>
+                    <hr class="mt-0 mb-3">
+                    {% if active_items %}
+                    <form method="POST" action="{{ url_for('routes.record_inspection_results', inspection_id=inspection.id) }}">
+                        {{ results_form.hidden_tag() }}
+                        {% for entry in results_form.items.entries %}
+                        {% set item = active_items[loop.index0] %}
+                        <div class="row g-3 align-items-center mb-3 pb-3 border-bottom">
+                            <div class="col-12 col-lg-4">
+                                <strong>{{ item.question }}</strong>
+                            </div>
+                            <div class="col-12 col-lg-4">
+                                {% for subfield in entry.form.result %}
+                                <div class="form-check form-check-inline">
+                                    {{ subfield(class="form-check-input") }}
+                                    {{ subfield.label(class="form-check-label") }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-12 col-lg-4">
+                                {{ entry.form.notes(class="form-control", placeholder="Notes (optional)") }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                        <div class="form-check mb-3">
+                            {{ results_form.generate_work_order(class="form-check-input") }}
+                            {{ results_form.generate_work_order.label(class="form-check-label") }}
+                        </div>
+                        <div class="d-flex justify-content-end gap-2">
+                            {{ results_form.submit(class="btn bg-gradient-main") }}
+                        </div>
+                    </form>
+                    {% else %}
+                    <p class="text-secondary text-sm">This template has no active checklist items.</p>
+                    {% endif %}
+                    {% endif %}
+
+                    <div class="d-flex justify-content-end mt-4">
+                        <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.inspections') }}">Back</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

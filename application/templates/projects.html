@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+        <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+        <div class="bg-gradient-main custom-title-card">
+          <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">construction</i> {{ current_page_name }}</h2>
+          </div>
+          <div class="card-body px-4 pb-4">
+            <br>
+            <div class="d-flex justify-content-between mb-4">
+              <form method="get" class="d-flex">
+                <select name="status_filter" class="form-select-box form-select" onchange="this.form.submit()">
+                  <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active (not Completed/Cancelled)</option>
+                  <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+                  {% for s in statuses %}
+                  <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s }}</option>
+                  {% endfor %}
+                </select>
+              </form>
+              <div class="d-flex gap-2">
+                <a href="{{ url_for('routes.capital_replacement') }}" class="btn reset-button-box shadow-dark">Capital Replacement</a>
+                {% if current_user.is_admin %}
+                <a href="{{ url_for('routes.add_project') }}" class="btn bg-gradient-main add-table-button shadow-dark">Add Project</a>
+                {% endif %}
+              </div>
+            </div>
+
+          <div class="table-responsive p-0">
+            <table class="table align-items-left mb-0 table-striped">
+              <thead>
+                <tr>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Project</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Site</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Status</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Budget</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Target End</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in projects %}
+                <tr class="table-highlight-row">
+                  <td>
+                    <div class="d-flex px-2 py-1"><div class="d-flex flex-column justify-content-center">
+                      <a href="{{ url_for('routes.edit_project', project_id=p.id) }}"><h6 class="mb-0 text-sm">{{ p.name }}</h6></a>
+                    </div></div>
+                  </td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ p.site.site_name }}</span></td>
+                  <td>
+                    <span class="badge {% if p.status == 'Completed' %}bg-success{% elif p.status == 'Cancelled' %}bg-secondary{% elif p.status == 'On Hold' %}bg-warning{% else %}bg-info{% endif %}">{{ p.status }}</span>
+                  </td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ '$%.2f'|format(p.budget) if p.budget else 'N/A' }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ p.target_end_date.strftime('%m-%d-%Y') if p.target_end_date else 'N/A' }}</span></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-center text-secondary text-sm py-4">No projects found.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+  </div>
+</div>
+</div>
+</div>
+
+{% endblock %}

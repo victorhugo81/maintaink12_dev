@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+        <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+        <div class="bg-gradient-main custom-title-card">
+          <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">warning</i> {{ current_page_name }}</h2>
+          </div>
+          <div class="card-body px-4 pb-4">
+            <br>
+            <p class="text-xs text-secondary">Ranked by Asset Risk Score, highest risk first. Every contributing factor is shown — "No data" factors are excluded from an asset's score, never counted as zero. Click an asset to see the full breakdown and set its safety/operational factors.</p>
+          <div class="table-responsive p-0">
+            <table class="table align-items-left mb-0 table-striped">
+              <thead>
+                <tr>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Asset</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Type</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Facility</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Risk Score</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Condition</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Age</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Failure Freq.</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Maint. Cost</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Safety</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Op. Importance</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Warranty</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in rows %}
+                <tr class="table-highlight-row">
+                  <td>
+                    <div class="d-flex px-2 py-1"><div class="d-flex flex-column justify-content-center">
+                      <a href="{{ url_for('routes.edit_asset', asset_id=row.asset.id) }}"><h6 class="mb-0 text-sm">{{ row.asset.asset_tag }}</h6></a>
+                    </div></div>
+                  </td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ row.asset.asset_type.name }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ row.asset.facility.name }}</span></td>
+                  <td>
+                    {% if row.risk.score is not none %}
+                    <span class="badge {% if row.risk.score >= 75 %}bg-danger{% elif row.risk.score >= 50 %}bg-warning{% else %}bg-success{% endif %}">{{ row.risk.score }}</span>
+                    <span class="text-secondary text-xs">({{ row.risk.factor_count }}/7)</span>
+                    {% else %}
+                    <span class="badge bg-secondary">No data</span>
+                    {% endif %}
+                  </td>
+                  {% for factor_name in ['Condition', 'Age', 'Failure Frequency', 'Maintenance Cost', 'Safety Impact', 'Operational Importance', 'Warranty Status'] %}
+                  <td class="text-xs">
+                    {% set f = row.risk.factors[factor_name] %}
+                    {% if f.available %}{{ f.value }}{% else %}<span class="text-secondary">—</span>{% endif %}
+                  </td>
+                  {% endfor %}
+                </tr>
+                {% else %}
+                <tr><td colspan="11" class="text-center text-secondary text-sm py-4">No assets found.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+  </div>
+</div>
+</div>
+</div>
+
+{% endblock %}

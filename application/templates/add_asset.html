@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                <div class="bg-gradient-main shadow-dark border-radius-lg pt-4 pb-3">
+                    <h2 class="text-white text-capitalize ps-3">Add New Asset</h2>
+                </div>
+            </div>
+            <div class="card-body px-4 pb-4">
+                {% if not form.facility_id.choices %}
+                <p class="text-secondary text-sm">No active facilities yet — <a href="{{ url_for('routes.add_facility') }}">add a facility</a> first.</p>
+                {% endif %}
+                {% if not form.asset_type_id.choices %}
+                <p class="text-secondary text-sm">No asset types yet — <a href="{{ url_for('routes.add_asset_type') }}">add an asset type</a> first.</p>
+                {% endif %}
+                <form method="POST" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+
+                    <div class="col-12 d-flex justify-content-end align-items-center sticky-top bg-white py-2 mb-4 border-bottom">
+                        <div class="d-flex gap-2 mt-3">
+                            {{ form.submit(class="btn bg-gradient-main") }}
+                            <a type="button" class="btn reset-button-box shadow-dark" href="{{ url_for('routes.assets') }}">Back</a>
+                        </div>
+                    </div>
+
+                    <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-3">Identification</p>
+                    <hr class="mt-0 mb-3">
+                    <div class="row g-3">
+                        <div class="col-12 col-sm-6 col-lg-4">
+                            <span aria-hidden="true" class="text-danger ms-1">*</span>
+                            {{ form.asset_tag.label(class="form-label") }}
+                            {{ form.asset_tag(class="form-control", placeholder="Unique tag, e.g. HVAC-0042") }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-4">
+                            <span aria-hidden="true" class="text-danger ms-1">*</span>
+                            {{ form.name.label(class="form-label") }}
+                            {{ form.name(class="form-control") }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-4">
+                            <span aria-hidden="true" class="text-danger ms-1">*</span>
+                            {{ form.asset_type_id.label(class="form-label") }}
+                            {{ form.asset_type_id(class="form-select-box form-select") }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-4">
+                            {{ form.manufacturer.label(class="form-label") }}
+                            {{ form.manufacturer(class="form-control") }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-4">
+                            {{ form.model_number.label(class="form-label") }}
+                            {{ form.model_number(class="form-control") }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-4">
+                            {{ form.serial_number.label(class="form-label") }}
+                            {{ form.serial_number(class="form-control") }}
+                        </div>
+                    </div>
+
+                    <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Location</p>
+                    <hr class="mt-0 mb-3">
+                    <div class="row g-3">
+                        <div class="col-12 col-sm-6">
+                            <span aria-hidden="true" class="text-danger ms-1">*</span>
+                            {{ form.facility_id.label(class="form-label") }}
+                            {{ form.facility_id(class="form-select-box form-select") }}
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            {{ form.room_id.label(class="form-label") }}
+                            {{ form.room_id(class="form-select-box form-select") }}
+                        </div>
+                    </div>
+
+                    <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Lifecycle &amp; Cost</p>
+                    <hr class="mt-0 mb-3">
+                    <div class="row g-3">
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            {{ form.install_date.label(class="form-label") }}
+                            {{ form.install_date(class="form-control", type="date") }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            {{ form.purchase_date.label(class="form-label") }}
+                            {{ form.purchase_date(class="form-control", type="date") }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            {{ form.purchase_cost.label(class="form-label") }}
+                            {{ form.purchase_cost(class="form-control", step="0.01") }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            {{ form.warranty_expiration.label(class="form-label") }}
+                            {{ form.warranty_expiration(class="form-control", type="date") }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            {{ form.expected_life_years.label(class="form-label") }}
+                            {{ form.expected_life_years(class="form-control") }}
+                        </div>
+                        <div class="col-12 col-sm-6 col-lg-3">
+                            {{ form.project_id.label(class="form-label") }}
+                            {{ form.project_id(class="form-select-box form-select") }}
+                        </div>
+                    </div>
+
+                    <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Notes &amp; Attachment</p>
+                    <hr class="mt-0 mb-3">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            {{ form.notes.label(class="form-label") }}
+                            {{ form.notes(class="form-control", rows=3) }}
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            {{ form.attachment.label(class="form-label") }}
+                            {{ form.attachment(class="form-control", accept="image/jpeg,image/png,application/pdf") }}
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

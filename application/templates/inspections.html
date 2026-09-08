@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+        <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+        <div class="bg-gradient-main custom-title-card">
+          <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">checklist</i> {{ current_page_name }}</h2>
+          </div>
+          <div class="card-body px-4 pb-4">
+            <br>
+            <div class="d-flex justify-content-between mb-4">
+              <form method="get" class="d-flex">
+                <select name="status_filter" class="form-select-box form-select" onchange="this.form.submit()">
+                  <option value="Scheduled" {% if status_filter == 'Scheduled' %}selected{% endif %}>Scheduled</option>
+                  <option value="Completed" {% if status_filter == 'Completed' %}selected{% endif %}>Completed</option>
+                  <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+                </select>
+              </form>
+              <div class="d-flex gap-2">
+                <a href="{{ url_for('routes.inspection_dashboard') }}" class="btn reset-button-box shadow-dark">Due/Overdue Dashboard</a>
+                <a href="{{ url_for('routes.add_inspection') }}" class="btn bg-gradient-main add-table-button shadow-dark">Schedule Inspection</a>
+              </div>
+            </div>
+
+          <div class="table-responsive p-0">
+            <table class="table align-items-left mb-0 table-striped">
+              <thead>
+                <tr>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Due Date</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Template</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Target</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Inspector</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for insp in inspections %}
+                <tr class="table-highlight-row">
+                  <td>
+                    <div class="d-flex px-2 py-1"><div class="d-flex flex-column justify-content-center">
+                      <a href="{{ url_for('routes.edit_inspection', inspection_id=insp.id) }}"><h6 class="mb-0 text-sm">{{ insp.due_date.strftime('%m-%d-%Y') }}</h6></a>
+                    </div></div>
+                  </td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ insp.template.name }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ insp.target_label }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ insp.inspector.get_full_name() if insp.inspector else 'Unassigned' }}</span></td>
+                  <td>
+                    <span class="badge {% if insp.status == 'Completed' %}bg-success{% else %}bg-warning{% endif %}">{{ insp.status }}</span>
+                    {% if insp.status == 'Completed' and insp.failed_item_count %}<span class="badge bg-danger">{{ insp.failed_item_count }} failed</span>{% endif %}
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-center text-secondary text-sm py-4">No inspections found.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+  </div>
+</div>
+</div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+        <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+        <div class="bg-gradient-main custom-title-card">
+          <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">payments</i> {{ current_page_name }}</h2>
+          </div>
+          <div class="card-body px-4 pb-4">
+            <br>
+            <div class="mb-4">
+              <label for="dimension" class="filter-labels text-sm mb-0 text-capitalize">Group By</label>
+              <form method="get" class="d-flex">
+                <select name="dimension" id="dimension" class="form-select-box form-select" onchange="this.form.submit()">
+                  {% for d in dimensions %}
+                  <option value="{{ d }}" {% if dimension == d %}selected{% endif %}>{{ dimension_labels[d] }}</option>
+                  {% endfor %}
+                </select>
+              </form>
+            </div>
+
+          <div class="table-responsive p-0">
+            <table class="table align-items-left mb-0 table-striped">
+              <thead>
+                <tr>
+                  <th class="text-uppercase text-xxs font-weight-bolder">{{ dimension_labels[dimension] }}</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Work Orders</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Estimated</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Actual</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Variance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in rows %}
+                <tr class="table-highlight-row">
+                  <td><span class="text-sm font-weight-bold">{{ row.label }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ row.count }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">${{ '%.2f'|format(row.estimated) }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">${{ '%.2f'|format(row.actual) }}</span></td>
+                  <td>
+                    {% set variance = row.actual - row.estimated %}
+                    <span class="text-xs font-weight-bold {% if variance > 0 %}text-danger{% elif variance < 0 %}text-success{% endif %}">
+                      {{ '+' if variance > 0 }}${{ '%.2f'|format(variance) }}
+                    </span>
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-center text-secondary text-sm py-4">No work orders to roll up.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+  </div>
+</div>
+</div>
+</div>
+
+{% endblock %}

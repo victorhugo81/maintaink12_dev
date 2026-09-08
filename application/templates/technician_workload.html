@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+        <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+        <div class="bg-gradient-main custom-title-card">
+          <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">engineering</i> {{ current_page_name }}</h2>
+          </div>
+          <div class="card-body px-4 pb-4">
+            <br>
+          <div class="table-responsive p-0">
+            <table class="table align-items-left mb-0 table-striped">
+              <thead>
+                <tr>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Technician</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Open</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">In Progress</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Overdue</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Due Today</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Due This Week</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in rows %}
+                <tr class="table-highlight-row">
+                  <td><span class="text-sm font-weight-bold">{{ row.technician.get_full_name() }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ row.open }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ row.in_progress }}</span></td>
+                  <td><span class="text-xs font-weight-bold {% if row.overdue %}text-danger{% endif %}">{{ row.overdue }}</span></td>
+                  <td><span class="text-xs font-weight-bold {% if row.due_today %}text-warning{% endif %}">{{ row.due_today }}</span></td>
+                  <td><span class="text-secondary text-xs font-weight-bold">{{ row.due_this_week }}</span></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center text-secondary text-sm py-4">No technicians found.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+  </div>
+</div>
+</div>
+</div>
+
+{% endblock %}

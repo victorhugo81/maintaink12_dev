@@ -1,0 +1,98 @@
+{# Shared staff work-order fields. Expects `form`; optional `ro` (readonly) flag. #}
+{% set ro = ro if ro is defined else False %}
+<p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-3">What</p>
+<hr class="mt-0 mb-3">
+<div class="row g-3">
+    <div class="col-12">
+        <span aria-hidden="true" class="text-danger ms-1">*</span>
+        {{ form.title.label(class="form-label") }}
+        {{ form.title(class="form-control", readonly=ro) }}
+    </div>
+    <div class="col-12">
+        {{ form.description.label(class="form-label") }}
+        {{ form.description(class="form-control", rows=3, readonly=ro) }}
+    </div>
+    <div class="col-12 col-sm-6 col-lg-4">
+        <span aria-hidden="true" class="text-danger ms-1">*</span>
+        {{ form.category_id.label(class="form-label") }}
+        {{ form.category_id(class="form-select-box form-select", disabled=ro) }}
+    </div>
+    <div class="col-12 col-sm-6 col-lg-4">
+        {{ form.subcategory_id.label(class="form-label") }}
+        {{ form.subcategory_id(class="form-select-box form-select", disabled=ro) }}
+    </div>
+    <div class="col-12 col-sm-6 col-lg-4">
+        <span aria-hidden="true" class="text-danger ms-1">*</span>
+        {{ form.priority_id.label(class="form-label") }}
+        {{ form.priority_id(class="form-select-box form-select", disabled=ro) }}
+    </div>
+</div>
+
+<p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Where</p>
+<hr class="mt-0 mb-3">
+<div class="row g-3">
+    <div class="col-12 col-sm-6 col-lg-3">
+        <span aria-hidden="true" class="text-danger ms-1">*</span>
+        {{ form.site_id.label(class="form-label") }}
+        {{ form.site_id(class="form-select-box form-select", disabled=ro) }}
+        <small class="text-secondary text-xs">Overridden by the facility's site when a facility is chosen.</small>
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        {{ form.facility_id.label(class="form-label") }}
+        {{ form.facility_id(class="form-select-box form-select", disabled=ro) }}
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        {{ form.room_id.label(class="form-label") }}
+        {{ form.room_id(class="form-select-box form-select", disabled=ro) }}
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        {{ form.asset_id.label(class="form-label") }}
+        {{ form.asset_id(class="form-select-box form-select", disabled=ro) }}
+    </div>
+</div>
+
+<p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Who &amp; When</p>
+<hr class="mt-0 mb-3">
+<div class="row g-3">
+    <div class="col-12 col-sm-6 col-lg-3">
+        {{ form.assigned_to_id.label(class="form-label") }}
+        {{ form.assigned_to_id(class="form-select-box form-select", disabled=ro) }}
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        {{ form.assigned_team.label(class="form-label") }}
+        {{ form.assigned_team(class="form-control", placeholder="e.g. HVAC crew", readonly=ro) }}
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        {{ form.scheduled_date.label(class="form-label") }}
+        {{ form.scheduled_date(class="form-control", type="date", readonly=ro) }}
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        {{ form.due_date.label(class="form-label") }}
+        {{ form.due_date(class="form-control", type="date", readonly=ro) }}
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        {{ form.vendor_id.label(class="form-label") }}
+        {{ form.vendor_id(class="form-select-box form-select", disabled=ro) }}
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        {{ form.project_id.label(class="form-label") }}
+        {{ form.project_id(class="form-select-box form-select", disabled=ro) }}
+    </div>
+</div>
+
+<p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Cost &amp; Resolution</p>
+<hr class="mt-0 mb-3">
+<div class="row g-3">
+    <div class="col-12 col-sm-6 col-lg-3">
+        {{ form.estimated_cost.label(class="form-label") }}
+        {{ form.estimated_cost(class="form-control", step="0.01", readonly=ro) }}
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        {{ form.actual_cost.label(class="form-label") }}
+        {{ form.actual_cost(class="form-control", step="0.01", readonly=ro) }}
+    </div>
+    <div class="col-12">
+        {{ form.resolution.label(class="form-label") }}
+        {{ form.resolution(class="form-control", rows=2, readonly=ro, placeholder="Required before a work order can be Closed") }}
+    </div>
+</div>

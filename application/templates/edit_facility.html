@@ -1,0 +1,257 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<!-- main content card -->
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                <div class="bg-gradient-main custom-title-card">
+                    <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">domain</i> {{ facility.name }}</h2>
+                </div>
+                <div class="card-body px-0 pb-2">
+                    <br>
+                    <div class="container-fluid my-3 py-3">
+
+                        <div class="row mb-5">
+                            <div class="col-lg-3">
+                                <div class="card position-sticky top-1">
+                                    <ul class="nav flex-column bg-white border-radius-lg p-3">
+                                        <li class="nav-item">
+                                            <a class="nav-link text-dark d-flex" data-scroll="" href="#facilitydetails">
+                                                <i class="material-symbols-rounded text-lg me-2">info</i>
+                                                <span class="text-sm">Facility Details</span>
+                                            </a>
+                                        </li>
+                                        <li class="nav-item pt-2">
+                                            <a class="nav-link text-dark d-flex" data-scroll="" href="#facilityfloors">
+                                                <i class="material-symbols-rounded text-lg me-2">layers</i>
+                                                <span class="text-sm">Floors</span>
+                                            </a>
+                                        </li>
+                                        <li class="nav-item pt-2">
+                                            <a class="nav-link text-dark d-flex" data-scroll="" href="#facilityattachments">
+                                                <i class="material-symbols-rounded text-lg me-2">attach_file</i>
+                                                <span class="text-sm">Attachments</span>
+                                            </a>
+                                        </li>
+                                        {% if health is defined and health %}
+                                        <li class="nav-item pt-2">
+                                            <a class="nav-link text-dark d-flex" data-scroll="" href="#facilityhealth">
+                                                <i class="material-symbols-rounded text-lg me-2">monitor_heart</i>
+                                                <span class="text-sm">Health Score</span>
+                                            </a>
+                                        </li>
+                                        {% endif %}
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="col-lg-9 mt-lg-0 mt-4">
+                                <!-- Main edit/detail form. The floors form below is deliberately
+                                     outside this <form> — HTML forbids nesting forms. -->
+                                <form id="facility-form" method="POST" action="{{ url_for('routes.edit_facility', facility_id=facility.id) }}" enctype="multipart/form-data">
+                                    {{ form.hidden_tag() }}
+                                    <div class="ticket-content-box" id="facilitydetails">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <h3>Facility Details</h3>
+                                            {% if current_user.is_admin %}
+                                            <div class="form-check">
+                                                {{ form.is_active(class="form-check-input") }}
+                                                {{ form.is_active.label(class="form-check-label") }}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        <br>
+                                        <div class="row g-3">
+                                            <div class="col-12 col-sm-6 col-lg-4">
+                                                {{ form.site_id.label(class="form-label") }}
+                                                {{ form.site_id(class="form-select-box form-select", disabled=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-4">
+                                                {{ form.name.label(class="form-label") }}
+                                                {{ form.name(class="form-control", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-4">
+                                                {{ form.facility_type.label(class="form-label") }}
+                                                {{ form.facility_type(class="form-control", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-4">
+                                                {{ form.building_code.label(class="form-label") }}
+                                                {{ form.building_code(class="form-control", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-4">
+                                                {{ form.year_built.label(class="form-label") }}
+                                                {{ form.year_built(class="form-control", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12 col-sm-6 col-lg-4">
+                                                {{ form.square_footage.label(class="form-label") }}
+                                                {{ form.square_footage(class="form-control", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12">
+                                                {{ form.address.label(class="form-label") }}
+                                                {{ form.address(class="form-control", readonly=not current_user.is_admin) }}
+                                            </div>
+                                            <div class="col-12">
+                                                {{ form.notes.label(class="form-label") }}
+                                                {{ form.notes(class="form-control", rows=3, readonly=not current_user.is_admin) }}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Attachments (upload input belongs to the main form) -->
+                                    <div class="ticket-content-box" id="facilityattachments">
+                                        <h3>Attachment Files</h3><br>
+                                        {% if current_user.is_admin %}
+                                        <div class="input-group-outline my-3">
+                                            <label for="attachment" class="form-label">Attach Photo/Document:</label><br>
+                                            <input type="file" name="attachment" id="attachment" class="form-control" accept="image/jpeg,image/png,application/pdf">
+                                        </div>
+                                        <hr>
+                                        {% endif %}
+                                        {% for attachment in facility.attachments %}
+                                        <div class="input-group-outline my-3" id="facility-attachment-container-{{ attachment.id }}">
+                                            <span class="me-2">{{ attachment.attach_file }}</span>
+                                            <a href="{{ url_for('routes.download_facility_attachment', attachment_id=attachment.id) }}" class="btn btn-dark btn-sm me-2">
+                                                <i class="material-symbols-rounded">download</i> Download
+                                            </a>
+                                            {% if current_user.is_admin %}
+                                            <button type="button" class="btn btn-sm btn-danger delete-facility-attachment-btn" data-attachment-id="{{ attachment.id }}">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </button>
+                                            {% endif %}
+                                            <hr>
+                                        </div>
+                                        {% else %}
+                                        <p class="text-secondary text-sm">No attachments yet.</p>
+                                        {% endfor %}
+                                    </div>
+
+                                    <div class="input-group input-group-outline justify-content-end gap-2">
+                                        {% if current_user.is_admin %}{{ form.submit(class="btn bg-gradient-main") }}{% endif %}
+                                        <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.facilities') }}">Back</a>
+                                    </div>
+                                </form>
+
+                                <!-- Floors: separate form, outside the main one -->
+                                <div class="ticket-content-box" id="facilityfloors">
+                                    <h3>Floors</h3>
+                                    {% if facility.floors %}
+                                    <table class="table table-sm align-items-left mb-3">
+                                        <thead>
+                                            <tr>
+                                                <th class="text-uppercase text-xxs font-weight-bolder">Name</th>
+                                                <th class="text-uppercase text-xxs font-weight-bolder">Rooms</th>
+                                                {% if current_user.is_admin %}<th></th>{% endif %}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for floor in facility.floors %}
+                                            <tr>
+                                                <td>{{ floor.name }}</td>
+                                                <td>{{ floor.rooms|length }}</td>
+                                                {% if current_user.is_admin %}
+                                                <td class="text-end">
+                                                    <form id="delete-floor-{{ floor.id }}" action="{{ url_for('routes.delete_floor', floor_id=floor.id) }}" method="POST">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                        <button type="button" class="btn btn-sm btn-danger"
+                                                                data-bs-toggle="modal"
+                                                                data-bs-target="#deleteConfirmModal"
+                                                                data-confirm-message="Delete floor &quot;{{ floor.name }}&quot;?"
+                                                                data-form-id="delete-floor-{{ floor.id }}">
+                                                            <i class="material-symbols-rounded position-relative text-lg">delete</i>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                                {% endif %}
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                    {% else %}
+                                    <p class="text-secondary text-sm">No floors added yet.</p>
+                                    {% endif %}
+
+                                    {% if current_user.is_admin %}
+                                    <form method="POST" action="{{ url_for('routes.add_floor', facility_id=facility.id) }}" class="row g-2 align-items-end">
+                                        {{ floor_form.hidden_tag() }}
+                                        <div class="col-auto">
+                                            {{ floor_form.name.label(class="form-label") }}
+                                            {{ floor_form.name(class="form-control", placeholder="e.g. 1st Floor") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ floor_form.sort_order.label(class="form-label") }}
+                                            {{ floor_form.sort_order(class="form-control") }}
+                                        </div>
+                                        <div class="col-auto">
+                                            {{ floor_form.submit(class="btn bg-gradient-main") }}
+                                        </div>
+                                    </form>
+                                    {% endif %}
+                                </div>
+
+                                {% if health is defined and health %}
+                                <!-- Facility Health Score (Phase 9): every factor shown, last 90 days for period-based ones -->
+                                <div class="ticket-content-box" id="facilityhealth">
+                                    <h3>Health Score
+                                        {% if health.score is not none %}
+                                        <span class="badge {% if health.score >= 75 %}bg-success{% elif health.score >= 50 %}bg-warning{% else %}bg-danger{% endif %}">{{ health.score }}</span>
+                                        <span class="text-xs text-secondary">({{ health.factor_count }} of 7 factors have data)</span>
+                                        {% else %}<span class="badge bg-secondary">No data</span>{% endif %}
+                                    </h3>
+                                    <p class="text-xs text-secondary">0&ndash;100, higher is healthier; the mean of the factors below that have data. Inspection failures, maintenance cost and recurring problems cover the last 90 days. The <a href="{{ url_for('routes.mo_dashboard') }}">M&amp;O Dashboard</a> compares every facility for any period.</p>
+                                    <table class="table table-sm align-items-left mb-0">
+                                        <thead><tr>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Factor</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Contribution</th>
+                                            <th class="text-uppercase text-xxs font-weight-bolder">Based on</th>
+                                        </tr></thead>
+                                        <tbody>
+                                        {% for name in health_factors %}{% set fct = health.factors[name] %}
+                                        <tr>
+                                            <td class="text-sm">{{ name }}</td>
+                                            <td class="text-sm">{% if fct.available %}<strong>{{ fct.value }}</strong>{% else %}<span class="text-secondary">No data</span>{% endif %}</td>
+                                            <td class="text-xs text-secondary">{{ fct.detail }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if current_user.is_admin %}
+<script nonce="{{ g.csp_nonce }}">
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.delete-facility-attachment-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const attachmentId = this.getAttribute('data-attachment-id');
+            window.showDeleteConfirm(
+                'Are you sure you want to permanently delete this attachment?',
+                function () {
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = `/delete_facility_attachment/${attachmentId}`;
+                    const csrfInput = document.createElement('input');
+                    csrfInput.type = 'hidden';
+                    csrfInput.name = 'csrf_token';
+                    csrfInput.value = document.querySelector('input[name="csrf_token"]').value;
+                    form.appendChild(csrfInput);
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            );
+        });
+    });
+});
+</script>
+{% endif %}
+
+{% endblock %}

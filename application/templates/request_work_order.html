@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-8">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                <div class="bg-gradient-main shadow-dark border-radius-lg pt-4 pb-3">
+                    <h2 class="text-white text-capitalize ps-3">Request Maintenance</h2>
+                </div>
+            </div>
+            <div class="card-body px-4 pb-4">
+                {% if not form.facility_id.choices %}
+                <p class="text-secondary text-sm">No buildings are set up for your site yet — please contact the M&amp;O office.</p>
+                {% endif %}
+                <form method="POST" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+                    <div class="row g-3 mt-1">
+                        <div class="col-12">
+                            <span aria-hidden="true" class="text-danger ms-1">*</span>
+                            {{ form.title.label(class="form-label") }}
+                            {{ form.title(class="form-control form-control-lg", placeholder="e.g. Classroom too hot, leaking sink, broken door latch", autofocus=True) }}
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            <span aria-hidden="true" class="text-danger ms-1">*</span>
+                            {{ form.facility_id.label(class="form-label") }}
+                            {{ form.facility_id(class="form-select-box form-select form-select-lg") }}
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            {{ form.room_id.label(class="form-label") }}
+                            {{ form.room_id(class="form-select-box form-select form-select-lg") }}
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            <span aria-hidden="true" class="text-danger ms-1">*</span>
+                            {{ form.category_id.label(class="form-label") }}
+                            {{ form.category_id(class="form-select-box form-select form-select-lg") }}
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            <span aria-hidden="true" class="text-danger ms-1">*</span>
+                            {{ form.priority_id.label(class="form-label") }}
+                            {{ form.priority_id(class="form-select-box form-select form-select-lg") }}
+                        </div>
+                        <div class="col-12">
+                            {{ form.description.label(class="form-label") }}
+                            {{ form.description(class="form-control", rows=4, placeholder="Anything that helps the technician find and fix it") }}
+                        </div>
+                        <div class="col-12">
+                            {{ form.attachment.label(class="form-label") }}
+                            {{ form.attachment(class="form-control form-control-lg", accept="image/jpeg,image/png", capture="environment") }}
+                        </div>
+                        <div class="col-12 d-grid gap-2 mt-4">
+                            {{ form.submit(class="btn btn-lg bg-gradient-main") }}
+                            <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.work_orders') }}">Cancel</a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

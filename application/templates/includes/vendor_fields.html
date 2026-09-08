@@ -1,0 +1,51 @@
+{# Shared VendorForm fields for add/edit. Expects `form`. #}
+<p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-3">Contact</p>
+<hr class="mt-0 mb-3">
+<div class="row g-3">
+    <div class="col-12 col-sm-6">
+        <span aria-hidden="true" class="text-danger ms-1">*</span>
+        {{ form.name.label(class="form-label") }}
+        {{ form.name(class="form-control") }}
+    </div>
+    <div class="col-12 col-sm-6">
+        {{ form.contact_name.label(class="form-label") }}
+        {{ form.contact_name(class="form-control") }}
+    </div>
+    <div class="col-12 col-sm-6">
+        {{ form.phone.label(class="form-label") }}
+        {{ form.phone(class="form-control") }}
+    </div>
+    <div class="col-12 col-sm-6">
+        {{ form.email.label(class="form-label") }}
+        {{ form.email(class="form-control") }}
+    </div>
+    <div class="col-12">
+        {{ form.address.label(class="form-label") }}
+        {{ form.address(class="form-control") }}
+    </div>
+</div>
+
+<p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Contract &amp; Compliance</p>
+<hr class="mt-0 mb-3">
+<div class="row g-3">
+    <div class="col-12 col-sm-6 col-lg-3">
+        {{ form.contract_start_date.label(class="form-label") }}
+        {{ form.contract_start_date(class="form-control", type="date") }}
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        {{ form.contract_end_date.label(class="form-label") }}
+        {{ form.contract_end_date(class="form-control", type="date") }}
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        {{ form.insurance_expiration.label(class="form-label") }}
+        {{ form.insurance_expiration(class="form-control", type="date") }}
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        {{ form.license_expiration.label(class="form-label") }}
+        {{ form.license_expiration(class="form-control", type="date") }}
+    </div>
+    <div class="col-12">
+        {{ form.notes.label(class="form-label") }}
+        {{ form.notes(class="form-control", rows=3) }}
+    </div>
+</div>

@@ -1,0 +1,13 @@
+{# Expects `asset` (or anything with condition_label / condition_score) in context. #}
+{% set label = asset.condition_label %}
+{% if label %}
+<span class="badge
+  {% if label in ['Excellent', 'Good'] %}bg-success
+  {% elif label == 'Fair' %}bg-info
+  {% elif label == 'Poor' %}bg-warning
+  {% else %}bg-danger{% endif %}">
+  {{ label }} ({{ asset.condition_score }})
+</span>
+{% else %}
+<span class="badge bg-secondary">Not assessed</span>
+{% endif %}
