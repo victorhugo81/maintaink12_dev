@@ -15,7 +15,7 @@ root_pass = getpass("Enter MySQL root password: ")
 # Step 2: Generate secret key, database name, user/pass
 secret_key = secrets.token_urlsafe(32)
 random_prefix = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=5))
-database_name = f"{random_prefix}_assistitk12"
+database_name = f"{random_prefix}_maintaink12"
 new_db_user = f"user_{random_prefix}"
 new_db_pass = secrets.token_urlsafe(16)
 
@@ -50,7 +50,14 @@ finally:
         connection.close()
 
 # Step 4: Write to .env
+# FLASK_CONFIG=development here matches this script's purpose (local/first-time
+# setup) — create_app() defaults to ProductionConfig when it's unset, which
+# then requires a persistent RATELIMIT_STORAGE_URI (e.g. Redis) and would
+# otherwise fail immediately on the very next step (seed_data.py). Change to
+# 'production' — and set RATELIMIT_STORAGE_URI to a real Redis URL — when
+# deploying this for real.
 env_content = f"""# .env file
+FLASK_CONFIG=development
 SECRET_KEY={secret_key}
 DATABASE_URL=mysql+pymysql://{new_db_user}:{new_db_pass}@{host}/{database_name}
 """
