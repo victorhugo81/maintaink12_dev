@@ -4,7 +4,7 @@ from flask_login import login_user, login_required, logout_user, current_user
 from flask_paginate import Pagination, get_page_args
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from .models import User, Role, Site, Notification, Organization, Ticket, Title, Ticket_content, Ticket_attachment, BulkUploadLog, Facility, Floor, Room, FacilityAttachment, RoomAttachment, AssetType, Asset, AssetConditionHistory, AssetAttachment, condition_label_for_score, CONDITION_SCALE, Priority, Category, Subcategory, WorkOrder, WorkOrderComment, WorkOrderAttachment, WorkOrderStatusHistory, MaintenancePlan, MaintenanceSchedule, InspectionTemplate, InspectionItem, Inspection, InspectionResult, INSPECTION_RESULTS, Vendor, WorkOrderMaterial, WorkOrderLabor, CostRecord, Project, ProjectTask, ProjectCost, ProjectDocument, PROJECT_STATUSES, SLARule, NotificationPreference, NotificationLog, NOTIFICATION_EVENTS, NOTIFICATION_EVENT_LABELS, CsvImportLog
+from .models import User, Role, Site, Notification, Organization, Ticket, Title, Ticket_content, Ticket_attachment, BulkUploadLog, Facility, Floor, Room, FacilityAttachment, RoomAttachment, AssetType, Asset, AssetConditionHistory, AssetAttachment, condition_label_for_score, CONDITION_SCALE, Priority, Category, Subcategory, WorkOrder, WorkOrderComment, WorkOrderAttachment, WorkOrderStatusHistory, MaintenancePlan, MaintenanceSchedule, InspectionTemplate, InspectionItem, Inspection, InspectionResult, INSPECTION_RESULTS, Vendor, WorkOrderMaterial, WorkOrderLabor, CostRecord, Project, ProjectTask, ProjectCost, ProjectDocument, PROJECT_STATUSES, SLARule, NotificationPreference, NotificationLog, NOTIFICATION_EVENTS, NOTIFICATION_EVENT_LABELS, CsvImportLog, AuditLog
 from .forms import LoginForm, UserForm, RoleForm, SiteForm, NotificationForm, OrganizationForm, EmailConfigForm, TicketForm, TitleForm, TicketContentForm, FacilityForm, FloorForm, RoomForm, AssetTypeForm, AssetForm, AssetConditionForm, PriorityForm, CategoryForm, SubcategoryForm, WorkOrderRequestForm, WorkOrderForm, WorkOrderStatusForm, WorkOrderCommentForm, MaintenancePlanForm, InspectionTemplateForm, InspectionItemForm, InspectionForm, InspectionResultsForm, InspectionResultItemForm, VendorForm, WorkOrderLaborForm, WorkOrderMaterialForm, CostRecordForm, ProjectForm, ProjectTaskForm, ProjectCostForm, ProjectVendorForm, AssetRiskFieldsForm, SLARuleForm, NotificationPreferenceForm, CsvImportUploadForm
 from .utils import validate_password, validate_file_upload, encrypt_mail_password, decrypt_mail_password, hash_email, get_app_version
 from .email_utils import send_ticket_notification, send_temp_password_email, send_password_updated_email, send_work_order_notification
@@ -5255,6 +5255,7 @@ def notification_preferences():
 # *********************************************************************
 @routes_blueprint.route('/search')
 @login_required
+@limiter.limit("60 per minute", key_func=get_remote_address)
 def search():
     current_page_name = 'Search'
     query_text = request.args.get('q', '').strip()
@@ -5304,6 +5305,7 @@ def csv_import_template(entity_type):
 
 @routes_blueprint.route('/csv_import/<entity_type>', methods=['GET', 'POST'])
 @login_required
+@limiter.limit("10 per minute", key_func=get_remote_address)
 def csv_import_upload(entity_type):
     current_page_name = 'CSV Import'
     is_admin()
@@ -5345,5 +5347,36 @@ def csv_import_upload(entity_type):
         current_path=request.path, current_page_name=current_page_name)
 
 
+# *********************************************************************
+# ****************** Audit Log (Phase 12) *********************************
+# *********************************************************************
+# Read-only. Rows are written automatically by application/audit.py's
+# Session flush listener — no route in this file writes AuditLog by hand.
+@routes_blueprint.route('/audit_log')
+@login_required
+def audit_log():
+    current_page_name = 'Audit Log'
+    is_admin()
+    entity_type = request.args.get('entity_type') or None
+    entity_id = request.args.get('entity_id', type=int)
+    user_id = request.args.get('user_id', type=int)
 
+    query = AuditLog.query
+    if entity_type:
+        query = query.filter(AuditLog.entity_type == entity_type)
+    if entity_id:
+        query = query.filter(AuditLog.entity_id == entity_id)
+    if user_id is not None:
+        query = query.filter(AuditLog.user_id.is_(None) if user_id == 0 else AuditLog.user_id == user_id)
 
+    page, per_page, offset = get_page_args(page_parameter="page", per_page_parameter="per_page")
+    total = query.count()
+    entries = query.options(db.joinedload(AuditLog.user)).order_by(AuditLog.created_at.desc(), AuditLog.id.desc()) \
+                   .offset(offset).limit(per_page).all()
+    pagination = Pagination(page=page, per_page=per_page, total=total, css_framework='bootstrap5')
+
+    from . import audit as audit_module
+    return render_template('audit_log.html', entries=entries, pagination=pagination, per_page=per_page, total=total,
+        entity_types=audit_module.TRACKED, entity_type=entity_type, entity_id=entity_id, user_id=user_id,
+        users=User.query.order_by(User.first_name, User.last_name).all(),
+        current_path=request.path, current_page_name=current_page_name)

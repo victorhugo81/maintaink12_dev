@@ -288,6 +288,7 @@
                                 <div class="ticket-content-box" id="assetrisk">
                                     <h3>Asset Risk Score</h3>
                                     <p class="text-xs text-secondary">Every factor below is shown so the score is never a black box. "No data" factors are excluded from the average, not counted as zero.</p>
+                                    <div class="table-responsive">
                                     <table class="table table-sm align-items-left mb-3">
                                         <thead><tr>
                                             <th class="text-uppercase text-xxs font-weight-bolder">Factor</th>
@@ -304,6 +305,7 @@
                                         {% endfor %}
                                         </tbody>
                                     </table>
+                                    </div>
                                     <p class="text-sm"><strong>Overall Risk Score: {{ risk.score if risk.score is not none else 'No data' }}</strong>
                                         {% if risk.score is not none %} (average of {{ risk.factor_count }} of 7 available factors){% endif %}</p>
 

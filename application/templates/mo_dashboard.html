@@ -320,9 +320,11 @@
         {% if view == 'manager' and fac.open_issues_by_facility %}
         <div class="ticket-content-box mb-4" id="open-by-facility">
           <h3>Open Issues by Facility</h3>
+          <div class="table-responsive">
           <table class="table table-sm align-items-left mb-0">
             <tbody>{% for name, count in fac.open_issues_by_facility %}<tr><td class="text-sm">{{ name }}</td><td class="text-sm font-weight-bold text-end">{{ count }}</td></tr>{% endfor %}</tbody>
           </table>
+          </div>
         </div>
         {% endif %}
 
@@ -404,9 +406,11 @@
             <div class="tall-card card"><div class="card-dashboard-box">
               <h6 class="mb-0">Open Issues by Facility</h6>
               <p class="text-sm">Everything open at your site, not just your requests.</p>
+              <div class="table-responsive">
               <table class="table table-sm align-items-left mb-0">
                 <tbody>{% for name, count in data.open_issues_by_facility %}<tr><td class="text-sm">{{ name }}</td><td class="text-sm font-weight-bold text-end">{{ count }}</td></tr>{% else %}<tr><td class="text-sm text-secondary">No open work orders at your site.</td></tr>{% endfor %}</tbody>
               </table>
+              </div>
             </div></div>
           </div>
         </div>

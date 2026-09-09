@@ -1000,6 +1000,33 @@ class CsvImportLog(db.Model):
     uploader = db.relationship('User', foreign_keys=[uploaded_by_id])
 
 
+# ---------------------------------------------------------------------------
+# Maintaink12 M&O models — Audit Log (Phase 12)
+#
+# One row per changed FIELD (not per save): who, what entity, which field,
+# old value, new value, when. Written automatically by application/audit.py's
+# Session before_flush listener for every model in audit.TRACKED — routes
+# never write these by hand, so a new field or a new route can't forget to.
+# Append-only by convention (no route edits or deletes rows; there is no
+# ORM guard like AssetConditionHistory's because the admin page is
+# read-only and nothing else references the table).
+# ---------------------------------------------------------------------------
+
+class AuditLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    entity_type = db.Column(db.String(40), nullable=False, index=True)
+    entity_id = db.Column(db.Integer, nullable=True, index=True)
+    entity_label = db.Column(db.String(200), nullable=True)
+    action = db.Column(db.String(10), nullable=False)  # create | update | delete
+    field = db.Column(db.String(60), nullable=True)
+    old_value = db.Column(db.Text, nullable=True)
+    new_value = db.Column(db.Text, nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True, index=True)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False, index=True)
+
+    user = db.relationship('User', foreign_keys=[user_id])
+
+
 class ConditionHistoryImmutableError(Exception):
     """Raised when code tries to update or delete an AssetConditionHistory row."""
 

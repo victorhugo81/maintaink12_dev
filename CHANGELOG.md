@@ -9,6 +9,39 @@ Maintaink12 started as a copy of the [AssistItK12](https://github.com/victorhugo
 codebase (see docs/PROJECT_PLAN.md) — this changelog covers Maintaink12's own history from
 that point forward, not AssistItK12's.
 
+## [0.12.0] - 2026-09-09
+
+### Added
+- Audit log (`AuditLog`, `application/audit.py`, `/audit_log`): who changed what, old
+  value, new value, when — one row per changed field — for work orders, assets, facilities,
+  rooms, users, roles/permissions, cost records, labor/material entries, projects, vendors
+  and SLA rules. Written automatically by a SQLAlchemy Session flush listener, so every save
+  path (routes, PM generator, CSV importer, notification sweep) is covered without per-route
+  bookkeeping. Password/email/lockout fields are logged as changed but masked. Admin-only,
+  filterable by entity type, entity id, and user (including "System" for background jobs).
+- Security review across every M&O route, with 74 new tests: IDOR on work orders, assets,
+  facilities, rooms, inspections, projects and every attachment/download route (a site-2
+  Technician gets 403 on site-1 records), privilege escalation (Technician → 17 admin routes,
+  School Staff → 9 staff routes, role_id smuggled into /profile), CSRF enforcement (token-less
+  POST is 400 and writes nothing), upload validation (disallowed extension, spoofed magic
+  bytes, traversal in the client filename), path-traversal safety on downloads, production
+  cookie hardening, security headers on the new pages, and a legacy-AssistItK12 regression
+  sweep. Rate limits added to `/search` and the CSV upload.
+- Mobile pass on the technician flows: every table on the work order, inspection, asset and
+  dashboard pages is now inside `table-responsive`; the mobile menu carries every
+  technician task (M&O Dashboard "My Work", Work Orders, New Request, Inspections, Assets,
+  Search, Notification Preferences); photo inputs use `accept="image/*"` with
+  `capture="environment"` on the two camera-first flows (request photo, condition photo).
+- `docs/MIGRATION_GUIDE.md` — the final summary for an existing AssistItK12 installation
+  moving to Maintaink12: what changed, what was added, what was preserved, every schema
+  change, new dependencies, security improvements, and the upgrade procedure.
+
+### Fixed
+- Two audit-listener bugs caught by the first smoke run: masked fields (password resets) were
+  dropped by the "old == new" no-op check because masking ran before the comparison; and a
+  second edit after a commit logged `old_value=None` because SQLAlchemy has no loaded prior
+  value for an expired scalar — now read with a Core SELECT on the flush connection.
+
 ## [0.11.0] - 2026-09-08
 
 ### Added

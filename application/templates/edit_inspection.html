@@ -36,6 +36,7 @@
                     {% if inspection.status == 'Completed' %}
                     <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-4">Results</p>
                     <hr class="mt-0 mb-3">
+                    <div class="table-responsive">
                     <table class="table table-sm align-items-left mb-3">
                         <thead><tr>
                             <th class="text-uppercase text-xxs font-weight-bolder">Question</th>
@@ -57,6 +58,7 @@
                         {% endfor %}
                         </tbody>
                     </table>
+                    </div>
                     {% if inspection.generated_work_order %}
                     <p class="text-sm">Work order generated: <a href="{{ url_for('routes.edit_work_order', work_order_id=inspection.generated_work_order.id) }}">{{ inspection.generated_work_order.wo_number }}</a></p>
                     {% endif %}

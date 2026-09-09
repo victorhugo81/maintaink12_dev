@@ -112,6 +112,12 @@
             <span class="nav-link-text ms-1">CSV Import</span>
           </a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link{% if request.endpoint == 'routes.audit_log' %} active{% endif %}" href="{{ url_for('routes.audit_log') }}">
+            <i class="material-symbols-rounded">history</i>
+            <span class="nav-link-text ms-1">Audit Log</span>
+          </a>
+        </li>
         {% endif %}
         {% endif %}
         <li class="nav-item nav-cat-list">
@@ -343,6 +349,9 @@
                   </li>
                   <li class="list-group-item">
                     <a class="{% if request.path.startswith('/csv_import') %}active{% else %}text-dark{% endif %}" href="{{ url_for('routes.csv_import_index') }}">CSV Import</a>
+                  </li>
+                  <li class="list-group-item">
+                    <a class="{% if request.path == '/audit_log' %}active{% else %}text-dark{% endif %}" href="{{ url_for('routes.audit_log') }}">Audit Log</a>
                   </li>
                   {% endif %}
                   {% endif %}

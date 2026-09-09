@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                <div class="bg-gradient-main custom-title-card">
+                    <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">history</i> {{ current_page_name }}</h2>
+                </div>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <br>
+                <form method="GET" action="{{ url_for('routes.audit_log') }}" class="filter-container mb-4">
+                    <div class="row g-2">
+                        <div class="col-md-3 col-6">
+                            <label class="filter-labels text-sm mb-0">Entity</label>
+                            <select class="form-select-box form-select" name="entity_type" onchange="this.form.submit()">
+                                <option value="">All</option>
+                                {% for t in entity_types %}<option value="{{ t }}" {% if entity_type == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="filter-labels text-sm mb-0">Entity ID</label>
+                            <input type="number" class="form-control" name="entity_id" value="{{ entity_id or '' }}">
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <label class="filter-labels text-sm mb-0">User</label>
+                            <select class="form-select-box form-select" name="user_id" onchange="this.form.submit()">
+                                <option value="">All</option>
+                                <option value="0" {% if user_id == 0 %}selected{% endif %}>System</option>
+                                {% for u in users %}<option value="{{ u.id }}" {% if user_id == u.id %}selected{% endif %}>{{ u.get_full_name() }}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3 col-6 d-flex align-items-end">
+                            <button class="btn btn-sm bg-gradient-main mb-0" type="submit">Filter</button>
+                        </div>
+                    </div>
+                </form>
+
+                <div class="table-responsive p-0">
+                    <table class="table align-items-left mb-0 table-striped">
+                        <thead><tr>
+                            <th class="text-uppercase text-xxs font-weight-bolder">When</th>
+                            <th class="text-uppercase text-xxs font-weight-bolder">Who</th>
+                            <th class="text-uppercase text-xxs font-weight-bolder">Entity</th>
+                            <th class="text-uppercase text-xxs font-weight-bolder">Action</th>
+                            <th class="text-uppercase text-xxs font-weight-bolder">Field</th>
+                            <th class="text-uppercase text-xxs font-weight-bolder">Old</th>
+                            <th class="text-uppercase text-xxs font-weight-bolder">New</th>
+                        </tr></thead>
+                        <tbody>
+                        {% for e in entries %}
+                        <tr>
+                            <td class="text-xs">{{ e.created_at | localtime }}</td>
+                            <td class="text-xs">{{ e.user.get_full_name() if e.user else 'System' }}</td>
+                            <td class="text-xs">{{ e.entity_type }} #{{ e.entity_id }}{% if e.entity_label %} <span class="text-secondary">— {{ e.entity_label }}</span>{% endif %}</td>
+                            <td><span class="badge {% if e.action == 'create' %}bg-success{% elif e.action == 'delete' %}bg-danger{% else %}bg-info{% endif %}">{{ e.action }}</span></td>
+                            <td class="text-xs">{{ e.field or '' }}</td>
+                            <td class="text-xs text-secondary">{{ e.old_value if e.old_value is not none else '' }}</td>
+                            <td class="text-xs">{{ e.new_value if e.new_value is not none else '' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="7" class="text-center text-secondary text-sm py-4">No audit entries match.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3">{{ pagination.links }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

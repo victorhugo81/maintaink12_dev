@@ -132,6 +132,7 @@
                                 <div class="ticket-content-box" id="wolabor">
                                     <h3>Labor</h3>
                                     {% if wo.labor_entries %}
+                                    <div class="table-responsive">
                                     <table class="table table-sm align-items-left mb-3">
                                         <thead><tr>
                                             <th class="text-uppercase text-xxs font-weight-bolder">Technician</th>
@@ -166,6 +167,7 @@
                                         {% endfor %}
                                         </tbody>
                                     </table>
+                                    </div>
                                     {% else %}
                                     <p class="text-secondary text-sm">No labor logged yet.</p>
                                     {% endif %}
@@ -211,6 +213,7 @@
                                 <div class="ticket-content-box" id="womaterials">
                                     <h3>Materials</h3>
                                     {% if wo.materials %}
+                                    <div class="table-responsive">
                                     <table class="table table-sm align-items-left mb-3">
                                         <thead><tr>
                                             <th class="text-uppercase text-xxs font-weight-bolder">Description</th>
@@ -243,6 +246,7 @@
                                         {% endfor %}
                                         </tbody>
                                     </table>
+                                    </div>
                                     {% else %}
                                     <p class="text-secondary text-sm">No materials logged yet.</p>
                                     {% endif %}
@@ -309,6 +313,7 @@
                                 <!-- Status history -->
                                 <div class="ticket-content-box" id="wohistory">
                                     <h3>Status History</h3>
+                                    <div class="table-responsive">
                                     <table class="table table-sm align-items-left mb-0">
                                         <thead><tr>
                                             <th class="text-uppercase text-xxs font-weight-bolder">When</th>
@@ -327,6 +332,7 @@
                                         {% endfor %}
                                         </tbody>
                                     </table>
+                                    </div>
                                 </div>
 
                                 {% if recurring_groups %}

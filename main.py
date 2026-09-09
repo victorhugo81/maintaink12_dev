@@ -131,6 +131,9 @@ def create_app(config_name=None):
     from application.routes import routes_blueprint
     app.register_blueprint(routes_blueprint)
 
+    # Audit log (Phase 12): importing registers the Session flush listeners once.
+    import application.audit  # noqa: F401
+
     # Per-request CSP nonce for inline <script> blocks — lets templates opt
     # in individually (nonce="{{ g.csp_nonce }}") instead of the CSP allowing
     # 'unsafe-inline' globally, which would let any injected <script> run too.
