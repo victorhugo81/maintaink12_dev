@@ -45,7 +45,9 @@
                   <th class="text-uppercase text-xxs font-weight-bolder">CDS Code</th>
                   <th class="text-uppercase text-xxs font-weight-bolder">Site Code</th>
                   <th class="text-uppercase text-xxs font-weight-bolder">Site Address</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">City/State</th>
                   <th class="text-uppercase text-xxs font-weight-bolder">Site Type</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Principal</th>
                   <th class="text-uppercase text-xxs font-weight-bolder text-end">Actions</th>
                 </tr>
               </thead>
@@ -72,7 +74,15 @@
                     <span class="text-secondary text-xs font-weight-bold justify-content-center">{{ site.site_address }}</span>
                   </td>
                   <td>
+                    <span class="text-secondary text-xs font-weight-bold justify-content-center">{{ [site.site_city, site.site_state]|select|join(', ') }}</span>
+                  </td>
+                  <td>
                     <span class="text-secondary text-xs font-weight-bold justify-content-center">{{ site.site_type }}</span>
+                  </td>
+                  <td>
+                    {% set principal_name = [site.principal_first_name, site.principal_last_name]|select|join(' ') %}
+                    <span class="text-secondary text-xs font-weight-bold justify-content-center">{{ principal_name }}</span>
+                    {% if site.principal_email %}<br><span class="text-secondary text-xs">{{ site.principal_email }}</span>{% endif %}
                   </td>
                   <td class="align-middle">
                     <div class="d-flex justify-content-end gap-2">

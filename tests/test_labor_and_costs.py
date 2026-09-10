@@ -400,10 +400,7 @@ class TestTechnicianWorkloadRoute:
         assert b'Workload' in r.data and b'Tech' in r.data
 
 
-class TestTicketsAndOtherModulesStillWork:
-    def test_ticket_routes_unaffected(self, user_client):
-        assert user_client.get('/tickets').status_code == 200
-
+class TestOtherModulesStillWork:
     def test_work_order_detail_still_loads(self, app, admin_client):
         wo_id = _work_order(app, 'Still loads WO')
         assert admin_client.get(f'/edit_work_order/{wo_id}').status_code == 200

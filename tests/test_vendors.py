@@ -228,10 +228,7 @@ class TestExpirationStatus:
         assert b'bg-warning' in r.data
 
 
-class TestTicketsAndOtherModulesStillWork:
+class TestOtherModulesStillWork:
     """Vendors touched the existing work_order table — confirm nothing else broke."""
-    def test_ticket_routes_unaffected(self, user_client):
-        assert user_client.get('/tickets').status_code == 200
-
     def test_work_order_list_still_loads(self, admin_client):
         assert admin_client.get('/work_orders').status_code == 200

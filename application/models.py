@@ -103,63 +103,19 @@ class Site(db.Model):
     site_code = db.Column(db.String(100), nullable=False)
     site_address = db.Column(db.String(100), nullable=False)
     site_type = db.Column(db.String(100), nullable=False)
+    # Optional — not in SITE_REQUIRED (routes.py), so existing sites and the
+    # manual Add/Edit Site form both work without them. Populated by the
+    # sites.csv bulk importer's sitecity/sitestate/sitezip/prnfirstn/prnlastn/
+    # email/phone columns (application/routes.py's _process_sites_rows).
+    site_city = db.Column(db.String(100), nullable=True)
+    site_state = db.Column(db.String(50), nullable=True)
+    site_zip = db.Column(db.String(20), nullable=True)
+    principal_first_name = db.Column(db.String(100), nullable=True)
+    principal_last_name = db.Column(db.String(100), nullable=True)
+    principal_email = db.Column(db.String(255), nullable=True)
+    principal_phone = db.Column(db.String(30), nullable=True)
     users = db.relationship('User', backref='site', lazy=True)
-    tickets = db.relationship('Ticket', back_populates='site')  # Matches the relationship in Ticket
     facilities = db.relationship('Facility', backref='site', lazy=True)
-
-
-class Ticket(db.Model):
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    title_id = db.Column(db.Integer, db.ForeignKey('title.id'), nullable=False)
-    tck_status = db.Column(db.String(45), nullable=False, index=True)
-    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
-    updated_at = db.Column(db.DateTime, onupdate=_utcnow, nullable=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)  # User who created the ticket
-    site_id = db.Column(db.Integer, db.ForeignKey('site.id'), nullable=False)  # Related site
-    assigned_to_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)  # User assigned to the ticket
-    escalated = db.Column(db.Integer, nullable=True, default=0) 
-
-    # Relationships
-    user = db.relationship('User', foreign_keys=[user_id], backref='created_tickets')
-    assigned_to = db.relationship('User', foreign_keys=[assigned_to_id], backref='assigned_tickets')
-    title = db.relationship('Title', backref='tickets')
-    contents = db.relationship('Ticket_content', back_populates='ticket', cascade='all, delete-orphan')
-    site = db.relationship('Site', back_populates='tickets')
-    attachments = db.relationship('Ticket_attachment', backref='ticket', lazy=True, cascade='all, delete-orphan')
-    
-    @classmethod
-    def get_tickets_by_status(cls, status):
-        return cls.query.filter_by(tck_status=status).all()
-
-    @classmethod
-    def get_tickets_assigned_to_user(cls, user_id):
-        return cls.query.filter_by(assigned_to_id=user_id).all()
-
-
-class Title(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title_name = db.Column(db.String(100), unique=True, nullable=False)
-
-
-class Ticket_content(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(db.Integer, db.ForeignKey('ticket.id'), nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    cnt_created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-
-    # Relationship back to the Ticket model
-    ticket = db.relationship('Ticket', back_populates='contents')
-    user = db.relationship('User', backref='comments')
-
-
-class Ticket_attachment(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(db.Integer, db.ForeignKey('ticket.id'), nullable=False)
-    attach_image = db.Column(db.String(255), nullable=False)  # This column should exist
-    uploaded_at = db.Column(db.DateTime, default=_utcnow, nullable=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-
 
 
 class BulkUploadLog(db.Model):
@@ -389,11 +345,14 @@ class AssetAttachment(db.Model):
 # ---------------------------------------------------------------------------
 # Maintaink12 M&O models — Work Orders (Phase 3)
 #
-# WorkOrder is a new model, not an extension of Ticket (see
-# docs/PHASE_0_ARCHITECTURE_ANALYSIS.md, Recommendation 2): requester is
-# optional (PM/Inspection/Manual sources), the status vocabulary is the
-# 11-state workflow in application/workflow.py, and it links to the
-# Facility/Room/Asset hierarchy. Status changes must go through
+# WorkOrder was built as a new model rather than an extension of the original
+# AssistItK12 Ticket (see docs/PHASE_0_ARCHITECTURE_ANALYSIS.md, Recommendation
+# 2): requester is optional (PM/Inspection/Manual sources), the status
+# vocabulary is the 11-state workflow in application/workflow.py, and it links
+# to the Facility/Room/Asset hierarchy. Ticket/Title were removed entirely in
+# Phase 13 once WorkOrder covered the same ground (docs/PHASE_13_REPORT.md) —
+# this history is kept here since it explains WorkOrder's shape. Status
+# changes must go through
 # workflow.apply_transition(), which writes WorkOrderStatusHistory.
 # ---------------------------------------------------------------------------
 

@@ -440,10 +440,12 @@ class TestSessionAndHeaders:
 # ---------------------------------------------------------------------------
 # Legacy AssistItK12 regression sweep
 # ---------------------------------------------------------------------------
+# Tickets/Titles were removed entirely (docs/PHASE_13_REPORT.md, redundant
+# with WorkOrder) — this sweep now covers what's left of the legacy surface.
 
 class TestLegacyRegression:
-    @pytest.mark.parametrize('url', ['/', '/tickets', '/add_ticket', '/users', '/add_user', '/sites', '/roles',
-                                     '/titles', '/notifications', '/profile', '/bulk-data-upload'])
+    @pytest.mark.parametrize('url', ['/', '/users', '/add_user', '/sites', '/roles',
+                                     '/notifications', '/profile', '/bulk-data-upload'])
     def test_legacy_admin_pages_still_load(self, admin_client, url):
         assert admin_client.get(url).status_code == 200
 
@@ -457,5 +459,5 @@ class TestLegacyRegression:
             app.config['WTF_CSRF_ENABLED'] = False
 
     def test_legacy_user_pages_still_load(self, user_client):
-        for url in ('/', '/tickets', '/add_ticket', '/profile'):
+        for url in ('/', '/profile'):
             assert user_client.get(url).status_code == 200

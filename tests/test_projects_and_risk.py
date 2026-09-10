@@ -700,10 +700,7 @@ class TestProjectAssociationsAndRollup:
             assert task.status == 'Completed' and task.completed_at is not None
 
 
-class TestTicketsAndOtherModulesStillWork:
-    def test_ticket_routes_unaffected(self, user_client):
-        assert user_client.get('/tickets').status_code == 200
-
+class TestOtherModulesStillWork:
     def test_asset_and_work_order_detail_still_load(self, app, admin_client):
         asset_id = _make_asset(app, 'REGRESSION-ASSET')
         wo_id = _make_work_order(app, asset_id)

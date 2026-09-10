@@ -1,5 +1,5 @@
 """
-CRUD tests for Roles, Sites, Titles, and Notifications.
+CRUD tests for Roles, Sites, and Notifications.
 All actions require admin access.
 """
 import pytest
@@ -136,34 +136,6 @@ class TestSites:
 # ---------------------------------------------------------------------------
 # Titles
 # ---------------------------------------------------------------------------
-
-class TestTitles:
-    def test_titles_page_loads(self, admin_client):
-        r = admin_client.get('/titles')
-        assert r.status_code == 200
-
-    def test_add_title(self, app, admin_client):
-        r = admin_client.post('/add_title', data={
-            'title_name': 'Test Title',
-        }, follow_redirects=True)
-        assert r.status_code == 200
-
-        with app.app_context():
-            from application.models import Title
-            title = Title.query.filter_by(title_name='Test Title').first()
-            assert title is not None
-
-    def test_delete_title(self, app, admin_client):
-        with app.app_context():
-            from application.models import Title
-            title = Title.query.filter_by(title_name='Test Title').first()
-            if title is None:
-                pytest.skip('Test Title not found')
-            title_id = title.id
-
-        r = admin_client.post(f'/delete_title/{title_id}', follow_redirects=True)
-        assert r.status_code == 200
-
 
 # ---------------------------------------------------------------------------
 # Notifications

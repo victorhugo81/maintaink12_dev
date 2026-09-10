@@ -17,7 +17,6 @@ AUTH_REQUIRED_ROUTES = [
     '/add_user',
     '/roles',
     '/sites',
-    '/tickets',
     '/profile',
 ]
 
@@ -42,7 +41,6 @@ ADMIN_ONLY_ROUTES = [
     '/add_role',
     '/sites',
     '/add_site',
-    '/titles',
     '/notifications',
     '/bulk-data-upload',
 ]

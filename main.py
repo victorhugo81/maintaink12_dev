@@ -43,8 +43,6 @@ def create_app(config_name=None):
 
     app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'application/static/uploads')
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    app.config['UPLOAD_ATTACHMENT'] = os.path.join(app.root_path, 'application/static/uploads/attachments')
-    os.makedirs(app.config['UPLOAD_ATTACHMENT'], exist_ok=True)
     app.config['UPLOAD_FACILITY_ATTACHMENT'] = os.path.join(app.root_path, 'application/static/uploads/facility_attachments')
     os.makedirs(app.config['UPLOAD_FACILITY_ATTACHMENT'], exist_ok=True)
     app.config['UPLOAD_ROOM_ATTACHMENT'] = os.path.join(app.root_path, 'application/static/uploads/room_attachments')

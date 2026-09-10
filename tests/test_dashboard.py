@@ -442,24 +442,28 @@ class TestRecurringQueries:
 # ---------------------------------------------------------------------------
 
 class TestDashboardRoutes:
+    """Tickets were removed (docs/PHASE_13_REPORT.md) and this dashboard moved
+    from /dashboard to the app root "/" — /dashboard is now a thin redirect
+    to "/", covered separately by TestDashboardLegacyAlias below."""
+
     def test_requires_login(self, client):
-        r = client.get('/dashboard')
+        r = client.get('/')
         assert r.status_code in (302, 401)
 
     def test_admin_default_is_executive_and_can_switch(self, admin_client):
-        r = admin_client.get('/dashboard')
+        r = admin_client.get('/')
         assert r.status_code == 200 and b'Executive' in r.data and b'Facility Health Score' in r.data
-        r = admin_client.get('/dashboard?view=manager&preset=year')
+        r = admin_client.get('/?view=manager&preset=year')
         assert r.status_code == 200 and b'M&amp;O Manager' in r.data and b'Response &amp; Completion' in r.data
-        r = admin_client.get('/dashboard?view=technician')
-        assert r.status_code == 200 and b'M&amp;O Dashboard &mdash; Executive' in r.data   # not allowed -> default
+        r = admin_client.get('/?view=technician')
+        assert r.status_code == 200 and b'Dashboard &mdash; Executive' in r.data   # not allowed -> default
 
     def test_filters_change_the_numbers(self, app, admin_client, kpi_facility):
-        r = admin_client.get(f'/dashboard?view=manager&preset=custom&start={TODAY - timedelta(days=60)}&end={TODAY}&facility_id={kpi_facility}')
+        r = admin_client.get(f'/?view=manager&preset=custom&start={TODAY - timedelta(days=60)}&end={TODAY}&facility_id={kpi_facility}')
         assert r.status_code == 200
         assert b'KPI Building' in r.data
         assert b'Backlog (open &gt; 30 days)' in r.data
-        r = admin_client.get('/dashboard?preset=custom&start=bad&end=2026-01-01')
+        r = admin_client.get('/?preset=custom&start=bad&end=2026-01-01')
         assert r.status_code == 200   # invalid custom range falls back to this month
 
     def test_technician_gets_own_view_only(self, app):
@@ -467,7 +471,7 @@ class TestDashboardRoutes:
         fid = _facility(app, 'Tech Dash Building')
         _wo(app, fid, 'Tech dash mine', assigned_to_id=tech_id, due_in=0)
         c = _client_as(app, tech_id)
-        r = c.get('/dashboard?view=executive')
+        r = c.get('/?view=executive')
         assert r.status_code == 200
         assert b'Technician' in r.data and b'My Open Work Orders' in r.data and b'Tech dash mine' in r.data
         assert b'Facility Health Score' not in r.data
@@ -477,11 +481,25 @@ class TestDashboardRoutes:
         fid = _facility(app, 'Staff Dash Building')
         _wo(app, fid, 'Staff dash request', requester_id=staff_id, source='Request')
         c = _client_as(app, staff_id)
-        r = c.get('/dashboard?view=manager')
+        r = c.get('/?view=manager')
         assert r.status_code == 200
         assert b'School Staff' in r.data and b'Staff dash request' in r.data and b'Open Issues by Facility' in r.data
         assert b'Maintenance Cost' not in r.data
 
+
+class TestDashboardLegacyAlias:
+    def test_dashboard_redirects_to_root_preserving_query_args(self, admin_client):
+        r = admin_client.get('/dashboard?view=manager&preset=year', follow_redirects=False)
+        assert r.status_code == 302
+        assert r.headers['Location'].startswith('/?') or r.headers['Location'] == '/'
+        assert 'view=manager' in r.headers['Location'] and 'preset=year' in r.headers['Location']
+
+    def test_dashboard_redirect_lands_on_working_page(self, admin_client):
+        r = admin_client.get('/dashboard', follow_redirects=True)
+        assert r.status_code == 200 and b'Executive' in r.data
+
+
+class TestDashboardCrossPageChecks:
     def test_facility_page_shows_health_factors(self, admin_client, kpi_facility):
         r = admin_client.get(f'/edit_facility/{kpi_facility}')
         assert r.status_code == 200
@@ -496,9 +514,6 @@ class TestDashboardRoutes:
             from application.models import WorkOrder
             sibling = WorkOrder.query.get(ids[1]).wo_number.encode()
         assert sibling in r.data
-
-    def test_legacy_ticket_dashboard_untouched(self, admin_client):
-        assert admin_client.get('/').status_code == 200
 
 
 # ---------------------------------------------------------------------------

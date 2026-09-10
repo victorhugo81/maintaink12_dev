@@ -4,10 +4,10 @@ from flask_login import login_user, login_required, logout_user, current_user
 from flask_paginate import Pagination, get_page_args
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from .models import User, Role, Site, Notification, Organization, Ticket, Title, Ticket_content, Ticket_attachment, BulkUploadLog, Facility, Floor, Room, FacilityAttachment, RoomAttachment, AssetType, Asset, AssetConditionHistory, AssetAttachment, condition_label_for_score, CONDITION_SCALE, Priority, Category, Subcategory, WorkOrder, WorkOrderComment, WorkOrderAttachment, WorkOrderStatusHistory, MaintenancePlan, MaintenanceSchedule, InspectionTemplate, InspectionItem, Inspection, InspectionResult, INSPECTION_RESULTS, Vendor, WorkOrderMaterial, WorkOrderLabor, CostRecord, Project, ProjectTask, ProjectCost, ProjectDocument, PROJECT_STATUSES, SLARule, NotificationPreference, NotificationLog, NOTIFICATION_EVENTS, NOTIFICATION_EVENT_LABELS, CsvImportLog, AuditLog
-from .forms import LoginForm, UserForm, RoleForm, SiteForm, NotificationForm, OrganizationForm, EmailConfigForm, TicketForm, TitleForm, TicketContentForm, FacilityForm, FloorForm, RoomForm, AssetTypeForm, AssetForm, AssetConditionForm, PriorityForm, CategoryForm, SubcategoryForm, WorkOrderRequestForm, WorkOrderForm, WorkOrderStatusForm, WorkOrderCommentForm, MaintenancePlanForm, InspectionTemplateForm, InspectionItemForm, InspectionForm, InspectionResultsForm, InspectionResultItemForm, VendorForm, WorkOrderLaborForm, WorkOrderMaterialForm, CostRecordForm, ProjectForm, ProjectTaskForm, ProjectCostForm, ProjectVendorForm, AssetRiskFieldsForm, SLARuleForm, NotificationPreferenceForm, CsvImportUploadForm
+from .models import User, Role, Site, Notification, Organization, BulkUploadLog, Facility, Floor, Room, FacilityAttachment, RoomAttachment, AssetType, Asset, AssetConditionHistory, AssetAttachment, condition_label_for_score, CONDITION_SCALE, Priority, Category, Subcategory, WorkOrder, WorkOrderComment, WorkOrderAttachment, WorkOrderStatusHistory, MaintenancePlan, MaintenanceSchedule, InspectionTemplate, InspectionItem, Inspection, InspectionResult, INSPECTION_RESULTS, Vendor, WorkOrderMaterial, WorkOrderLabor, CostRecord, Project, ProjectTask, ProjectCost, ProjectDocument, PROJECT_STATUSES, SLARule, NotificationPreference, NotificationLog, NOTIFICATION_EVENTS, NOTIFICATION_EVENT_LABELS, CsvImportLog, AuditLog
+from .forms import LoginForm, UserForm, RoleForm, SiteForm, NotificationForm, OrganizationForm, EmailConfigForm, FacilityForm, FloorForm, RoomForm, AssetTypeForm, AssetForm, AssetConditionForm, PriorityForm, CategoryForm, SubcategoryForm, WorkOrderRequestForm, WorkOrderForm, WorkOrderStatusForm, WorkOrderCommentForm, MaintenancePlanForm, InspectionTemplateForm, InspectionItemForm, InspectionForm, InspectionResultsForm, InspectionResultItemForm, VendorForm, WorkOrderLaborForm, WorkOrderMaterialForm, CostRecordForm, ProjectForm, ProjectTaskForm, ProjectCostForm, ProjectVendorForm, AssetRiskFieldsForm, SLARuleForm, NotificationPreferenceForm, CsvImportUploadForm
 from .utils import validate_password, validate_file_upload, encrypt_mail_password, decrypt_mail_password, hash_email, get_app_version
-from .email_utils import send_ticket_notification, send_temp_password_email, send_password_updated_email, send_work_order_notification
+from .email_utils import send_temp_password_email, send_password_updated_email, send_work_order_notification
 from . import workflow
 from .workflow import WorkflowError
 from . import pm
@@ -169,25 +169,9 @@ def is_tech_role():
     if not current_user.is_authenticated or current_user.role_id not in [2, 3]:  # Assuming 2 = Specialist, 3 = Technician
         abort(403)
 
-def can_access_ticket(ticket):
-    """
-    Central authorization check for ticket detail/comment/attachment routes.
-
-    Admins and Specialists (1, 2) can access any ticket. Technicians (3) are
-    scoped to their own site — matching the filtering already applied on the
-    /tickets list route — so a Technician can't reach another site's ticket
-    just by guessing/incrementing the ticket_id in the URL. Everyone else may
-    only access tickets they created or are assigned to.
-    """
-    if current_user.role_id in (1, 2):
-        return True
-    if current_user.role_id == 3:
-        return ticket.site_id == current_user.site_id
-    return current_user.id == ticket.user_id or current_user.id == ticket.assigned_to_id
-
 def can_access_site(site_id):
     """
-    Site-scoping check for Facility/Room routes, mirroring can_access_ticket.
+    Site-scoping check for Facility/Room routes.
 
     Admins and Specialists (1, 2) can view/manage facilities and rooms at any
     site. Everyone else (Technicians included) is scoped to their own site,
@@ -450,123 +434,46 @@ def test_email():
 # *****************************************************************
 
 # *********************************************************************
-# ****************** Dashboard Page *******************************
-@routes_blueprint.route('/', methods=['GET', 'POST'])
+# ****************** Dashboard Page (M&O Dashboard) ***********************
+# *********************************************************************
+# The main landing page. Tickets were removed as a redundant parallel track
+# to WorkOrder (see docs/PHASE_13_REPORT.md); this is the same role-based
+# dashboard that used to live at /dashboard (application/analytics.py) —
+# Admins/Specialists may switch between Executive and M&O Manager views,
+# Technicians get the Technician view pinned to their own work and site,
+# everyone else gets the School Staff view pinned to their own requests.
+@routes_blueprint.route('/')
 @login_required
 def index():
-    # Mapping paths to page names
-    page_names = {'/': 'Dashboard'}
-    current_path = request.path
-    current_page_name = page_names.get(current_path, 'Unknown Page')
+    current_page_name = 'Dashboard'
+    allowed = analytics.allowed_views(current_user)
+    view = request.args.get('view') or analytics.default_view(current_user)
+    if view not in allowed:
+        view = analytics.default_view(current_user)
 
-    # Get the current user's details
-    current_user_role = current_user.role_id
-    current_user_site_id = current_user.site_id
-    current_user_id = current_user.id
+    site_ids = _visible_site_ids()
+    filters = analytics.parse_filters(request.args, site_ids)
+    data = analytics.build_dashboard(view, filters, current_user)
 
-    # Get the current year and selected year from query parameters
-    current_year = datetime.now().year
-    selected_year = request.args.get('year', type=int)  # Default is None for "All Years"
+    options = {}
+    if view in ('executive', 'manager'):
+        fac_query = Facility.query.filter_by(is_active=True)
+        if filters['site_ids']:
+            fac_query = fac_query.filter(Facility.site_id.in_(filters['site_ids']))
+        options['sites'] = Site.query.order_by(Site.site_name).all() if site_ids is None else []
+        options['facilities'] = fac_query.order_by(Facility.name).all()
+        options['technicians'] = User.query.filter(User.role_id.in_((2, 3)), User.status == 'Active') \
+                                           .order_by(User.first_name, User.last_name).all()
+        options['teams'] = [t for (t,) in db.session.query(WorkOrder.assigned_team).distinct()
+                                                    .filter(WorkOrder.assigned_team.isnot(None)).order_by(WorkOrder.assigned_team).all()]
+    options['categories'] = Category.query.filter_by(is_active=True).order_by(Category.sort_order, Category.name).all()
+    options['priorities'] = Priority.query.filter_by(is_active=True).order_by(Priority.sort_order).all()
+    options['statuses'] = workflow.ALL_STATUSES
 
-    # Fetch available years dynamically from ticket data
-    available_years = sorted([
-        int(year[0]) for year in Ticket.query.with_entities(
-            db.func.extract('year', Ticket.created_at).distinct()
-        ).all()
-    ], reverse=True)
-
-
-    # Role-based site filtering 
-    if current_user_role in [1, 2]:  # Admin or Manager
-        sites = Site.query.all()
-        selected_site_id = request.args.get('site_id', type=int)  # Selected site from dropdown        
-    elif current_user_role == 3:  # Limited user
-        sites = Site.query.filter_by(id=current_user_site_id).all()
-        selected_site_id = current_user_site_id
-    else:  # Regular user
-        sites = Site.query.filter_by(id=current_user_site_id).all()
-        selected_site_id = current_user_site_id
-
-    # Base query filter
-    query_filter = []
-    if selected_year:  # If a specific year is selected, filter by year
-        query_filter.append(db.func.extract('year', Ticket.created_at) == selected_year)
-
-    # Query ticket counts based on role and filters
-    if current_user_role in [1, 2]:  # Admin or Manager
-        if selected_site_id:  # Filter by selected site
-            query_filter.append(Ticket.site_id == selected_site_id)
-        pending_count = Ticket.query.filter(Ticket.tck_status == '1-pending', *query_filter).count()
-        in_progress_count = Ticket.query.filter(Ticket.tck_status == '2-progress', *query_filter).count()
-        completed_count = Ticket.query.filter(Ticket.tck_status == '3-completed', *query_filter).count()
-    elif current_user_role == 3:  # Limited user: tickets for their site
-        query_filter.append(Ticket.site_id == current_user_site_id)
-        pending_count = Ticket.query.filter(Ticket.tck_status == '1-pending', *query_filter).count()
-        in_progress_count = Ticket.query.filter(Ticket.tck_status == '2-progress', *query_filter).count()
-        completed_count = Ticket.query.filter(Ticket.tck_status == '3-completed', *query_filter).count()
-    else:  # Regular user: only their own tickets
-        query_filter.append(Ticket.user_id == current_user_id)
-        pending_count = Ticket.query.filter(Ticket.tck_status == '1-pending', *query_filter).count()
-        in_progress_count = Ticket.query.filter(Ticket.tck_status == '2-progress', *query_filter).count()
-        completed_count = Ticket.query.filter(Ticket.tck_status == '3-completed', *query_filter).count()
-
-    # Calculate the total count
-    total_count = pending_count + in_progress_count + completed_count
-
-    # Query to get the top 5 most popular titles with filters applied
-    top_titles_query = (
-        db.session.query(Title.id, Title.title_name, func.count(Ticket.id).label('ticket_count'))
-        .join(Ticket, Title.id == Ticket.title_id).filter(*query_filter)  # Apply the filters
-        .group_by(Title.id, Title.title_name).order_by(func.count(Ticket.id).desc()).limit(5).all())
-
-    # Add an index to the top_titles data
-    top_titles = [
-        {"rank": idx + 1, "title_id": title_id, "title_name": title_name, "ticket_count": ticket_count}
-        for idx, (title_id, title_name, ticket_count) in enumerate(top_titles_query)
-    ]
-
-    # Initialize counts for all 12 months
-    ticket_counts = {month: 0 for month in range(1, 13)}
-
-    # Fetch tickets and count them per month
-    for ticket in db.session.query(Ticket).filter(*query_filter).all():
-        month = ticket.created_at.month  # Ensure this is between 1 and 12
-        if 1 <= month <= 12:  # Extra safeguard
-            ticket_counts[month] += 1
-
-    # Use full month names for clarity
-    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    counts = [ticket_counts[month] for month in range(1, 13)]  # Ensure all 12 months are included
-
-        # Fetch ticket counts for each weekday (Monday to Friday) for the bar chart
-    weekday_counts = {day: 0 for day in range(1, 6)}  # Initialize counts for Monday to Friday
-    for ticket in db.session.query(Ticket).filter(*query_filter).all():
-        weekday = ticket.created_at.weekday() + 1  # Monday = 1, Sunday = 7
-        if weekday in weekday_counts:
-            weekday_counts[weekday] += 1
-
-    weekdays = ["M", "T", "W", "Th", "F"]
-    weekday_counts_list = [weekday_counts[day] for day in range(1, 6)]
-
-
-    # Render the template with the context
-    return render_template(
-        'index.html',
-        available_years=available_years,
-        selected_year=selected_year,
-        sites=sites,
-        current_page_name=current_page_name,
-        selected_site_id=selected_site_id,
-        pending_count=pending_count,
-        in_progress_count=in_progress_count,
-        completed_count=completed_count,
-        total_count=total_count,
-        top_titles=top_titles,
-        months=months,
-        counts=counts,
-        weekdays=weekdays,
-        weekday_counts=weekday_counts_list
-    )
+    return render_template('mo_dashboard.html', data=data, view=view, allowed_views=allowed,
+        view_labels=analytics.VIEW_LABELS, filters=filters, presets=analytics.PRESETS,
+        preset_labels=analytics.PRESET_LABELS, options=options, health_factors=analytics.HEALTH_FACTORS,
+        status_badge=workflow.STATUS_BADGE, current_path=request.path, current_page_name=current_page_name)
 
 
 # ***************************************************************
@@ -871,6 +778,22 @@ def _normalize_cds(raw):
         return raw
 
 
+# sites.csv from the district's source system uses its own column names for
+# these optional fields (not in SITE_REQUIRED) — mapped here to the site_*/
+# principal_* model fields rather than renaming the model to match a
+# legacy/external export's naming.
+SITE_OPTIONAL_CSV_MAP = {
+    'site_city': 'sitecity', 'site_state': 'sitestate', 'site_zip': 'sitezip',
+    'principal_first_name': 'prnfirstn', 'principal_last_name': 'prnlastn',
+    'principal_email': 'email', 'principal_phone': 'phone',
+}
+
+
+def _optional_site_fields(row):
+    return {model_field: (row.get(csv_col) or '').strip() or None
+            for model_field, csv_col in SITE_OPTIONAL_CSV_MAP.items()}
+
+
 def _process_sites_rows(rows):
     """Upsert sites from a list of CSV dicts. Returns (added, updated). Raises ValueError on bad data."""
     added = updated = 0
@@ -888,6 +811,7 @@ def _process_sites_rows(rows):
     for row in rows:
         name = row['site_name'].strip()
         cds  = _normalize_cds(row['site_cds'])
+        optional = _optional_site_fields(row)
         site = site_cache.get(name)
         if site:
             site.site_acronyms = row['site_acronyms'].strip()
@@ -895,6 +819,8 @@ def _process_sites_rows(rows):
             site.site_code     = row['site_code'].strip()
             site.site_address  = row['site_address'].strip()
             site.site_type     = row['site_type'].strip()
+            for field, value in optional.items():
+                setattr(site, field, value)
             updated += 1
         else:
             new_site = Site(
@@ -904,6 +830,7 @@ def _process_sites_rows(rows):
                 site_code     = row['site_code'].strip(),
                 site_address  = row['site_address'].strip(),
                 site_type     = row['site_type'].strip(),
+                **optional,
             )
             db.session.add(new_site)
             site_cache[name] = new_site  # prevent duplicate inserts if name appears twice in CSV
@@ -1609,7 +1536,14 @@ def add_site():
             site_code=form.site_code.data,
             site_cds=form.site_cds.data,
             site_address=form.site_address.data,
-            site_type=form.site_type.data 
+            site_city=form.site_city.data or None,
+            site_state=form.site_state.data or None,
+            site_zip=form.site_zip.data or None,
+            site_type=form.site_type.data,
+            principal_first_name=form.principal_first_name.data or None,
+            principal_last_name=form.principal_last_name.data or None,
+            principal_email=form.principal_email.data or None,
+            principal_phone=form.principal_phone.data or None,
         )
         db.session.add(new_site)
         db.session.commit()
@@ -1642,7 +1576,14 @@ def edit_site(site_id):
             site.site_code == form.site_code.data and
             site.site_cds == form.site_cds.data and
             site.site_address == form.site_address.data and
-            site.site_type == form.site_type.data
+            (site.site_city or '') == (form.site_city.data or '') and
+            (site.site_state or '') == (form.site_state.data or '') and
+            (site.site_zip or '') == (form.site_zip.data or '') and
+            site.site_type == form.site_type.data and
+            (site.principal_first_name or '') == (form.principal_first_name.data or '') and
+            (site.principal_last_name or '') == (form.principal_last_name.data or '') and
+            (site.principal_email or '') == (form.principal_email.data or '') and
+            (site.principal_phone or '') == (form.principal_phone.data or '')
         ):
             flash('No changes were made.', 'info')
             return render_template('edit_site.html', form=form, site=site)
@@ -1651,7 +1592,14 @@ def edit_site(site_id):
         site.site_code = form.site_code.data
         site.site_cds = form.site_cds.data
         site.site_address = form.site_address.data
+        site.site_city = form.site_city.data or None
+        site.site_state = form.site_state.data or None
+        site.site_zip = form.site_zip.data or None
         site.site_type = form.site_type.data
+        site.principal_first_name = form.principal_first_name.data or None
+        site.principal_last_name = form.principal_last_name.data or None
+        site.principal_email = form.principal_email.data or None
+        site.principal_phone = form.principal_phone.data or None
         db.session.commit()
         flash('Site updated successfully!', 'success')
         return redirect(url_for('routes.sites'))
@@ -1807,626 +1755,6 @@ def delete_notification(notification_id):
 
 
 # *********************************************************************
-# ****************** Tickets Management Page *******************************
-@routes_blueprint.route('/tickets', methods=['GET'])
-@login_required
-def tickets():
-    # Mapping paths to page names
-    page_names = {'/tickets': 'Manage Tickets'}
-    current_path = request.path
-    current_page_name = page_names.get(current_path, 'Unknown Page')
-
-    # Get query parameters
-    site_filter = request.args.get('site_filter', '')
-    status_filter = request.args.get('status_filter', '').strip()
-    assigned_user_filter = request.args.get('assigned_user_filter', '')
-    category_filter = request.args.get('category_filter', '')
-
-    # Fetch the current user's role and site information
-    current_user_role_id = current_user.role_id  
-    current_user_site_id = current_user.site_id  
-
-    # Start the query with explicit joins
-    query = Ticket.query.join(User, Ticket.user_id == User.id).join(Site, Site.id == User.site_id)
-
-    # Apply role-specific filtering
-    if current_user_role_id == 3:
-        query = query.filter(Site.id == current_user_site_id)
-    elif current_user_role_id not in [1, 2, 3]:
-        query = query.filter(Site.id == current_user_site_id, Ticket.user_id == current_user.id)
-
-    # Apply site filter if provided
-    if site_filter:
-        try:
-            query = query.filter(Site.id == int(site_filter))
-        except ValueError:
-            pass
-
-    # Apply status filter
-    if status_filter:
-        query = query.filter(Ticket.tck_status == status_filter)
-    
-    # Apply assigned user filter
-    if assigned_user_filter:
-        try:
-            query = query.filter(Ticket.assigned_to_id == int(assigned_user_filter))
-        except ValueError:
-            pass
-
-    # Apply category (ticket title) filter
-    if category_filter:
-        try:
-            query = query.filter(Ticket.title_id == int(category_filter))
-        except ValueError:
-            pass
-
-    # Pagination setup
-    page, per_page, offset = get_page_args(page_parameter="page", per_page_parameter="per_page")
-    total = query.count()
-
-    # Sorting logic
-    order_by_clause = [
-        case(
-            # Priority 1: Open and escalated (highest priority)
-            ((Ticket.tck_status == "1-pending") & (Ticket.escalated == 1), 1),
-            # Priority 2: In progress and escalated
-            ((Ticket.tck_status == "2-progress") & (Ticket.escalated == 1), 2),
-            # Priority 3: Open and not escalated
-            ((Ticket.tck_status == "1-pending") & (Ticket.escalated == 0), 3),
-            # Priority 4: In progress and not escalated
-            ((Ticket.tck_status == "2-progress") & (Ticket.escalated == 0), 4),
-            # Default case
-            else_=5
-        ),
-        Ticket.created_at.desc()  # For tickets with same priority, sort by most recent
-    ]
-
-    # Apply ordering
-    tickets = query.order_by(*order_by_clause).offset(offset).limit(per_page).all()
-
-    # Fetch sites for the dropdown
-    if current_user_role_id in [1, 2]:
-        sites = Site.query.order_by(Site.site_name).all()
-    else:
-        sites = Site.query.filter_by(id=current_user_site_id).order_by(Site.site_name).all()
-
-    # Define status choices
-    status_choices = [
-        ('1-pending', 'Pending'),
-        ('2-progress', 'In Progress'),
-        ('3-completed', 'Completed')
-    ]
-
-    # Fetch only users with role_id 1 (admin) or 2 (specialist) for assigned user filter - tickets.html
-    assigned_users = User.query.filter(User.role_id.in_([1, 2, 3])).order_by(User.first_name).all()
-
-    # Fetch ticket titles for the category filter - tickets.html
-    categories = Title.query.order_by(Title.title_name).all()
-
-    # Pagination setup - tickets.html
-    pagination = Pagination(page=page, per_page=per_page, total=total, css_framework='bootstrap5')
-
-    return render_template(
-        'tickets.html',
-        tickets=tickets,
-        pagination=pagination,
-        per_page=per_page,
-        total=total,
-        current_path=current_path,
-        current_page_name=current_page_name,
-        statuses=status_choices,
-        sites=sites,
-        assigned_users=assigned_users,  # Pass filtered users
-        categories=categories
-    )
-
-
-
-
-
-
-
-# ****************** Add Ticket Page *******************************
-@routes_blueprint.route('/add_ticket', methods=['GET', 'POST'])
-@login_required
-def add_ticket():
-    # Mapping paths to page names
-    page_names = {'/add_ticket': 'New Tickets'}
-    current_path = request.path
-    current_page_name = page_names.get(current_path, 'Unknown Page')
-
-    form = TicketForm()
-    titles = Title.query.order_by(Title.title_name).all()  # Get all titles sorted by name
-    tech_users = User.query.filter(User.role_id.in_([2, 3])).all()
-    form.title_id.choices = [(title.id, title.title_name) for title in titles]
-    form.assigned_to_id.choices = [(user.id, user.get_full_name()) for user in tech_users]
-    
-    if form.validate_on_submit():
-        # Ensure site_id is set based on the logged-in user's site_id
-        site_id = current_user.site_id  # Use current user's site_id directly
-        # Find a user with role_id=3 in the same site to auto-assign
-        assignee = User.query.filter_by(role_id=3, site_id=site_id).first()
-        # Create new ticket
-        ticket = Ticket(
-            title_id=form.title_id.data,
-            tck_status="1-pending",  # Ensure it's always 'Pending'
-            assigned_to_id=assignee.id if assignee else None,
-            escalated = 0,
-            user_id=current_user.id,
-            site_id=site_id,  # Assign site_id directly from current_user
-            created_at=datetime.now(timezone.utc)
-        )
-        db.session.add(ticket)
-        db.session.flush()
-        
-    # Handle file upload
-        uploaded_file = request.files.get('attachment')
-        if uploaded_file and uploaded_file.filename:
-            is_valid, error_message = validate_file_upload(uploaded_file)
-            if not is_valid:
-                flash(error_message, 'error')
-                return redirect(request.url)
-
-            file_ext = os.path.splitext(uploaded_file.filename)[1].lower()
-            # Generate a unique filename
-            new_filename = f"ticket_{ticket.id}_{datetime.now().strftime('%Y%m%d-%H%M%S')}{file_ext}"
-            filename = secure_filename(new_filename)
-            upload_folder = current_app.config['UPLOAD_ATTACHMENT']
-            os.makedirs(upload_folder, exist_ok=True)
-            filepath = os.path.join(upload_folder, filename)
-
-            # Save the file to disk
-            uploaded_file.save(filepath)
-
-            # Verify the file was saved correctly
-            if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
-                flash('Failed to save attachment (empty file)', 'error')
-                return redirect(request.url)
-
-            # Check if this attachment already exists (prevent duplicates)
-            existing_attachment = Ticket_attachment.query.filter_by(
-                ticket_id=ticket.id,
-                attach_image=filename
-            ).first()
-
-            if not existing_attachment:  # Only add if it doesn't exist
-                new_attachment = Ticket_attachment(
-                    ticket_id=ticket.id,
-                    attach_image=filename,
-                    uploaded_at=datetime.now(timezone.utc),
-                    user_id=current_user.id
-                )
-                db.session.add(new_attachment)
-            else:
-                flash('This attachment already exists.', 'warning')
-
-        # Add initial comment (if any)
-        initial_comment = request.form.get('initial_comment')
-        if initial_comment:
-            new_content = Ticket_content(
-                ticket_id=ticket.id,
-                content=initial_comment,
-                cnt_created_at=datetime.now(timezone.utc),
-                user_id=current_user.id
-            )
-            db.session.add(new_content)
-
-        # Commit all changes at once
-        db.session.commit()
-        send_ticket_notification('created', ticket, initial_comment=initial_comment or '')
-        flash('Ticket created successfully!', 'success')
-        return redirect(url_for('routes.tickets'))
-    
-    return render_template('add_ticket.html', form=form, titles=titles, 
-        current_path=current_path,
-        current_page_name=current_page_name
-        )
-
-
-
-
-@routes_blueprint.route('/download_attachment/<int:attachment_id>')
-@login_required
-def download_attachment(attachment_id):
-    attachment = Ticket_attachment.query.get_or_404(attachment_id)
-    ticket = Ticket.query.get_or_404(attachment.ticket_id)
-
-    if not can_access_ticket(ticket):
-        abort(403)
-
-    filename = attachment.attach_image.split('/')[-1]
-    upload_folder = current_app.config['UPLOAD_ATTACHMENT']
-
-    file_path = os.path.join(upload_folder, filename)
-    if not os.path.exists(file_path):
-        current_app.logger.error(f"Attachment not found at: {file_path}")
-        flash('File not found.', 'error')
-        return redirect(url_for('routes.tickets'))
-
-    return send_from_directory(upload_folder, filename, as_attachment=True)
-
-
-# ****************** Delete attachment Page *******************************
-@routes_blueprint.route('/delete_attachment/<int:attachment_id>', methods=['POST'])
-@login_required
-def delete_attachment(attachment_id):
-    current_app.logger.info(f"Delete attachment request - Attachment ID: {attachment_id}, User: {current_user.id}")
-    
-    # Find attachment
-    attachment = db.session.get(Ticket_attachment, attachment_id)
-    if not attachment:
-        flash('Attachment not found.', 'danger')
-        return redirect(url_for('routes.index'))
-
-    # Get ticket id for redirect
-    ticket_id = attachment.ticket_id
-
-    # Check permissions (site-scoped access, or whoever uploaded the attachment)
-    ticket = db.session.get(Ticket, ticket_id)
-    if not (can_access_ticket(ticket) or current_user.id == attachment.user_id):
-        flash('You do not have permission to delete this attachment.', 'danger')
-        return redirect(url_for('routes.edit_ticket', ticket_id=ticket_id))
-    
-    try:
-        # Get filename for file deletion
-        if '/' in attachment.attach_image:
-            filename = attachment.attach_image.split('/')[-1]
-        else:
-            filename = attachment.attach_image
-        
-        # Get filepath
-        file_path = os.path.join(current_app.config['UPLOAD_ATTACHMENT'], filename)
-        current_app.logger.debug(f"Attempting to delete file: {file_path}")
-        
-        # Delete physical file if it exists
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            current_app.logger.info(f"File deleted successfully: {file_path}")
-        
-        # Delete database record
-        db.session.delete(attachment)
-        ticket.updated_at = datetime.now(timezone.utc)  # Update ticket timestamp
-        db.session.commit()
-        current_app.logger.info(f"Attachment {attachment_id} deleted from database")
-        
-        flash('Attachment deleted successfully.', 'success')
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"Error deleting attachment {attachment_id}: {str(e)}")
-        flash('Error deleting attachment.', 'danger')
-    
-    return redirect(url_for('routes.edit_ticket', ticket_id=ticket_id))
-
-
-
-
-# ****************** edit Ticket Page *******************************
-@routes_blueprint.route('/edit_ticket/<int:ticket_id>', methods=['GET', 'POST'])
-@login_required
-def edit_ticket(ticket_id):
-    current_path = request.path
-    current_page_name = 'Manage Ticket'
-
-    ticket = Ticket.query.options(db.joinedload(Ticket.contents)).get_or_404(ticket_id)
-
-    # Permission check
-    if not can_access_ticket(ticket):
-        flash('You do not have permission to edit this ticket.', 'danger')
-        return redirect(url_for('routes.tickets'))
-
-    form = TicketForm(obj=ticket)
-    titles = Title.query.all()
-    tech_users = User.query.filter(User.role_id.in_([2, 3])).all()
-    form.title_id.choices = [(title.id, title.title_name) for title in titles]
-    form.assigned_to_id.choices = [(user.id, user.get_full_name()) for user in tech_users]
-    form.escalate.data = ticket.escalated
-
-    if form.validate_on_submit():
-        changes_made = False
-
-        # Capture old values before any changes for email notifications
-        old_status = ticket.tck_status
-        old_assigned_to_id = ticket.assigned_to_id
-        old_escalated = bool(ticket.escalated)
-
-        # Check for changes in ticket fields
-        if ticket.title_id != form.title_id.data:
-            ticket.title_id = form.title_id.data
-            changes_made = True
-        if ticket.tck_status != form.tck_status.data:
-            ticket.tck_status = form.tck_status.data
-            changes_made = True
-        if ticket.assigned_to_id != form.assigned_to_id.data:
-            ticket.assigned_to_id = form.assigned_to_id.data
-            changes_made = True
-
-        # Only Admin, Specialist, and Technician can escalate/de-escalate
-        if current_user.role_id in [1, 2, 3]:
-            if 'escalate' in request.form:
-                escalate_value = request.form.get('escalate') == '1'
-            else:
-                escalate_value = False
-
-            if ticket.escalated != escalate_value:
-                ticket.escalated = escalate_value
-                changes_made = True
-                flash(f'Ticket {"escalated" if ticket.escalated else "de-escalated"} successfully!', 'success')
-
-            
-        # Handle file upload
-        uploaded_file = request.files.get('attachment')
-        if uploaded_file and uploaded_file.filename != '':
-            is_valid, error_message = validate_file_upload(uploaded_file)
-            if not is_valid:
-                flash(error_message, 'error')
-                return redirect(request.url)
-
-            file_ext = os.path.splitext(uploaded_file.filename)[1].lower()
-            # Create filename with ticket ID
-            new_filename = f"ticket_{ticket.id}_{datetime.now().strftime('%Y%m%d-%H%M%S')}{file_ext}"
-            filename = secure_filename(new_filename)
-            upload_folder = current_app.config['UPLOAD_ATTACHMENT']
-            os.makedirs(upload_folder, exist_ok=True)
-            filepath = os.path.join(upload_folder, filename)
-            
-            try:
-                uploaded_file.save(filepath)
-                # Verify file was saved
-                if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
-                    raise Exception("File saved as 0 bytes")
-                    
-                new_attachment = Ticket_attachment(
-                    ticket_id=ticket.id,
-                    attach_image=filename,
-                    uploaded_at=datetime.now(timezone.utc),
-                    user_id=current_user.id
-                )
-                db.session.add(new_attachment)
-                changes_made = True
-                flash('Attachment added successfully!', 'success')
-                
-            except Exception as e:
-                current_app.logger.error(f"File save failed for ticket {ticket.id}: {e}", exc_info=True)
-                flash('Failed to save attachment. Please try again.', 'danger')
-                if os.path.exists(filepath):
-                    os.remove(filepath)
-                return redirect(request.url)
-
-        # Add ticket contents (text-based)
-        new_comments = [
-            Ticket_content(
-                ticket_id=ticket.id,
-                content=subform.content.data,
-                cnt_created_at=datetime.now(timezone.utc),
-                user_id=current_user.id
-            ) for subform in form.contents.entries if subform.content.data
-        ]
-
-        if new_comments:
-            db.session.add_all(new_comments)
-            changes_made = True
-
-        if changes_made:
-            ticket.updated_at = datetime.now(timezone.utc)
-            db.session.add(ticket)
-            db.session.commit()
-
-            # Send email notifications for each change
-            if ticket.tck_status != old_status:
-                send_ticket_notification('status', ticket,
-                                         old_status=old_status,
-                                         new_status=ticket.tck_status)
-            if ticket.assigned_to_id != old_assigned_to_id:
-                new_assignee = db.session.get(User, ticket.assigned_to_id) if ticket.assigned_to_id else None
-                send_ticket_notification('assigned', ticket, new_assignee=new_assignee)
-            if bool(ticket.escalated) != old_escalated:
-                send_ticket_notification('escalated', ticket, escalated=bool(ticket.escalated))
-            if new_comments:
-                send_ticket_notification('comment', ticket, commenter=current_user,
-                                         comment_text=new_comments[-1].content)
-
-            flash('Ticket updated successfully!', 'success')
-        else:
-            flash('No changes detected to update.', 'warning')
-
-        return redirect(request.url)  # Stay on the same page after the changes
-    return render_template('edit_ticket.html', form=form, ticket=ticket,
-        current_path=current_path,
-        current_page_name=current_page_name
-        )
-
-
-
-
-# ****************** Add Comment (AJAX) *******************************
-@routes_blueprint.route('/add_comment/<int:ticket_id>', methods=['POST'])
-@limiter.limit("20 per minute", key_func=get_remote_address)
-@login_required
-def add_comment(ticket_id):
-    ticket = Ticket.query.get_or_404(ticket_id)
-
-    if not can_access_ticket(ticket):
-        return jsonify({'success': False, 'message': 'Permission denied'}), 403
-
-    content = request.form.get('content', '').strip()
-    if not content:
-        return jsonify({'success': False, 'message': 'Comment cannot be empty'}), 400
-
-    try:
-        comment = Ticket_content(
-            ticket_id=ticket.id,
-            content=content,
-            cnt_created_at=datetime.now(timezone.utc),
-            user_id=current_user.id
-        )
-        db.session.add(comment)
-        ticket.updated_at = datetime.now(timezone.utc)
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"add_comment failed: {e}")
-        return jsonify({'success': False, 'message': 'Database error saving comment'}), 500
-
-    send_ticket_notification('comment', ticket, commenter=current_user, comment_text=content)
-
-    return jsonify({
-        'success': True,
-        'comment': {
-            'author': current_user.get_full_name(),
-            'date': comment.cnt_created_at.strftime('%m-%d-%Y %H:%M'),
-            'content': content
-        }
-    })
-
-
-# ****************** Delete Ticket Page *******************************
-@routes_blueprint.route('/delete_ticket/<int:ticket_id>', methods=['POST'])
-@login_required
-def delete_ticket(ticket_id):
-    is_admin()  # Ensure only admins can access this route
-    ticket = Ticket.query.get_or_404(ticket_id)
-
-    try:
-        # Log ticket deletion
-        current_app.logger.info(f"Deleting ticket ID: {ticket_id} by user: {current_user.id}")
-        
-        # Get all attachments for this ticket
-        attachments = Ticket_attachment.query.filter_by(ticket_id=ticket_id).all()
-        current_app.logger.debug(f"Found {len(attachments)} attachments to delete for ticket {ticket_id}")
-
-        for attachment in attachments:
-            if attachment.attach_image:
-                # Extract filename safely
-                filename = attachment.attach_image.split('/')[-1] if '/' in attachment.attach_image else attachment.attach_image
-                
-                # Construct full file path
-                file_path = os.path.join(current_app.config['UPLOAD_ATTACHMENT'], filename)
-                current_app.logger.debug(f"Attempting to delete file: {file_path}")
-                
-                # Verify and delete file
-                if os.path.exists(file_path):
-                    try:
-                        os.remove(file_path)
-                        current_app.logger.info(f"File deleted successfully: {file_path}")
-                    except OSError as e:
-                        current_app.logger.error(f"Error deleting file {file_path}: {str(e)}")
-                        raise  # Re-raise to trigger rollback
-                else:
-                    current_app.logger.warning(f"File not found: {file_path} (may have been deleted already)")
-                
-                # Delete attachment record
-                db.session.delete(attachment)
-                current_app.logger.debug(f"Attachment {attachment.id} marked for deletion")
-
-        # Delete the ticket
-        db.session.delete(ticket)
-        db.session.commit()
-        current_app.logger.info(f"Ticket {ticket_id} and attachments deleted successfully")
-        
-        flash('Ticket and all attachments deleted successfully', 'success')
-        return redirect(url_for('routes.tickets'))
-        
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"Error deleting ticket {ticket_id}: {str(e)}", exc_info=True)
-        flash('An error occurred while deleting the ticket. Please try again.', 'danger')
-        return redirect(url_for('routes.tickets'))
-
-
-
-# *********************************************************************
-# ****************** Title Management Page *******************************
-@routes_blueprint.route('/titles')
-@login_required
-def titles():
-        # Mapping paths to page names
-    page_names = {'/titles': 'Manage Ticket Titles'}
-    current_path = request.path
-    current_page_name = page_names.get(current_path, 'Unknown Page')
-    is_admin()  # Ensure only admins can access this route
-    # Get the page number and per_page from the query parameters, default to 10 for per_page
-    page, per_page, offset = get_page_args(page_parameter="page", per_page_parameter="per_page")
-    # Query the users
-    sort = request.args.get('sort', 'asc')
-    order = Title.title_name.desc() if sort == 'desc' else Title.title_name.asc()
-    total = Title.query.count()
-    titles = Title.query.order_by(order).offset(offset).limit(per_page).all()
-    # Set up pagination with Bootstrap 5 styling
-    pagination = Pagination(page=page, per_page=per_page, total=total, css_framework='bootstrap5')
-    return render_template('titles.html', titles=titles, pagination=pagination, per_page=per_page, total=total,
-        sort=sort,
-        current_path=current_path,
-        current_page_name=current_page_name
-    )
-
-
-# ****************** Add Title Page *******************************
-@routes_blueprint.route('/add_title', methods=['GET', 'POST'])
-@login_required
-def add_title():
-        # Mapping paths to page names
-    page_names = {'/add_title': 'New Ticket Title'}
-    current_path = request.path
-    current_page_name = page_names.get(current_path, 'Unknown Page')
-    is_admin()  # Ensure only admins can access this route
-    form = TitleForm()
-    if form.validate_on_submit():
-        # Check if a title with the same name already exists
-        existing_title = Title.query.filter_by(title_name=form.title_name.data).first()
-        if existing_title:
-            flash('This title already exists.', 'danger')
-            return render_template('add_title.html', form=form)  # Re-render form with the error message
-        # Create and add the new title
-        new_title = Title(
-            title_name=form.title_name.data
-        )
-        db.session.add(new_title)
-        db.session.commit()
-        flash('Title added successfully!', 'success')
-        return redirect(url_for('routes.titles'))
-    return render_template('add_title.html', form=form, 
-        current_path=current_path, 
-        current_page_name=current_page_name
-    )
-
-# ****************** Edit Title Page *******************************
-@routes_blueprint.route('/edit_title/<int:title_id>', methods=['GET', 'POST'])
-@login_required
-def edit_title(title_id):
-    is_admin()  # Ensure only admins can access this route
-    title = Title.query.get_or_404(title_id)
-    form = TitleForm(obj=title)
-    if form.validate_on_submit():
-        # Check for duplicate entries
-        existing_title = Title.query.filter(Title.title_name == form.title_name.data, Title.id != title.id).first()
-        if existing_title:
-            flash('This title already exists.', 'danger')
-            return render_template('add_title.html', form=form)  # Re-render form with the error message
-        # Check if there are any changes to the form
-        if (
-            title.title_name == form.title_name.data
-        ):
-            flash('No changes were made.', 'info')
-            return render_template('edit_title.html', form=form, title=title)
-        title.title_name = form.title_name.data
-        db.session.commit()
-        flash('Title updated successfully!', 'success')
-        return redirect(url_for('routes.titles'))
-    return render_template('edit_title.html', form=form, title=title)
-
-# ****************** Delete Title Page *******************************
-@routes_blueprint.route('/delete_title/<int:title_id>', methods=['POST'])
-@login_required
-def delete_title(title_id):
-    is_admin()  # Ensure only admins can access this route
-    title = Title.query.get_or_404(title_id)
-    db.session.delete(title)
-    db.session.commit()
-    flash('Title deleted successfully!', 'warning')
-    return redirect(url_for('routes.titles'))
-
-
-# *********************************************************************
 # ****************** Facilities / Rooms (M&O) **************************
 # *********************************************************************
 # Reference: docs/PROJECT_PLAN.md — Site -> Facility -> Floor -> Room.
@@ -2440,8 +1768,8 @@ def delete_title(title_id):
 def _save_attachment(uploaded_file, entity_label, entity_id, upload_config_key, attachment_model, fk_field, extra=None):
     """
     Validate and persist an uploaded photo/document for a Facility, Room or
-    Asset, mirroring the existing Ticket_attachment flow (validate_file_upload
-    + a per-entity upload folder). `extra` is merged into the attachment row
+    Asset (validate_file_upload + a per-entity upload folder). `extra` is
+    merged into the attachment row
     (e.g. condition_history_id). Returns an error message string, or None on
     success/no-op (no file selected is not an error).
     """
@@ -5059,45 +4387,14 @@ def capital_replacement():
 
 
 # *********************************************************************
-# ****************** M&O Dashboard (Phase 9) ****************************
+# ****************** /dashboard (legacy alias) ****************************
 # *********************************************************************
-# One route, four role views (application/analytics.py). Admins and
-# Specialists may switch between Executive and M&O Manager; Technicians get
-# the Technician view pinned to their own work and site; everyone else gets
-# the School Staff view pinned to their own requests and site. The legacy
-# ticket dashboard at "/" is untouched.
+# The M&O Dashboard moved to "/" (see index() above) when Tickets were
+# removed — this keeps old /dashboard bookmarks/links working.
 @routes_blueprint.route('/dashboard')
 @login_required
 def mo_dashboard():
-    current_page_name = 'M&O Dashboard'
-    allowed = analytics.allowed_views(current_user)
-    view = request.args.get('view') or analytics.default_view(current_user)
-    if view not in allowed:
-        view = analytics.default_view(current_user)
-
-    site_ids = _visible_site_ids()
-    filters = analytics.parse_filters(request.args, site_ids)
-    data = analytics.build_dashboard(view, filters, current_user)
-
-    options = {}
-    if view in ('executive', 'manager'):
-        fac_query = Facility.query.filter_by(is_active=True)
-        if filters['site_ids']:
-            fac_query = fac_query.filter(Facility.site_id.in_(filters['site_ids']))
-        options['sites'] = Site.query.order_by(Site.site_name).all() if site_ids is None else []
-        options['facilities'] = fac_query.order_by(Facility.name).all()
-        options['technicians'] = User.query.filter(User.role_id.in_((2, 3)), User.status == 'Active') \
-                                           .order_by(User.first_name, User.last_name).all()
-        options['teams'] = [t for (t,) in db.session.query(WorkOrder.assigned_team).distinct()
-                                                    .filter(WorkOrder.assigned_team.isnot(None)).order_by(WorkOrder.assigned_team).all()]
-    options['categories'] = Category.query.filter_by(is_active=True).order_by(Category.sort_order, Category.name).all()
-    options['priorities'] = Priority.query.filter_by(is_active=True).order_by(Priority.sort_order).all()
-    options['statuses'] = workflow.ALL_STATUSES
-
-    return render_template('mo_dashboard.html', data=data, view=view, allowed_views=allowed,
-        view_labels=analytics.VIEW_LABELS, filters=filters, presets=analytics.PRESETS,
-        preset_labels=analytics.PRESET_LABELS, options=options, health_factors=analytics.HEALTH_FACTORS,
-        status_badge=workflow.STATUS_BADGE, current_path=request.path, current_page_name=current_page_name)
+    return redirect(url_for('routes.index', **request.args))
 
 
 # *********************************************************************

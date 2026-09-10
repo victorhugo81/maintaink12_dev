@@ -36,7 +36,14 @@ class SiteForm(FlaskForm):
     site_code = StringField('Site Code:', validators=[DataRequired()])
     site_cds = StringField('CDS Code:', validators=[DataRequired()])
     site_address = StringField('Site Address:', validators=[DataRequired()])
+    site_city = StringField('City:', validators=[Optional(), Length(max=100)])
+    site_state = StringField('State:', validators=[Optional(), Length(max=50)])
+    site_zip = StringField('ZIP Code:', validators=[Optional(), Length(max=20)])
     site_type = StringField('Site Type:', validators=[DataRequired()])
+    principal_first_name = StringField('Principal First Name:', validators=[Optional(), Length(max=100)])
+    principal_last_name = StringField('Principal Last Name:', validators=[Optional(), Length(max=100)])
+    principal_email = StringField('Principal Email:', validators=[Optional(), Email(), Length(max=255)])
+    principal_phone = StringField('Principal Phone:', validators=[Optional(), Length(max=30)])
     submit = SubmitField('Save Site')
 
 
@@ -62,26 +69,6 @@ class EmailConfigForm(FlaskForm):
     mail_password = PasswordField('Password', validators=[Optional()])
     mail_default_sender = StringField('Default Sender Email', validators=[Optional(), Email()])
     submit_email = SubmitField('Save Email Settings')
-
-
-class TicketContentForm(FlaskForm):
-    user = StringField('User', render_kw={'readonly': True})  # Add User field
-    content = TextAreaField('Content', validators=[DataRequired()])
-
-
-class TicketForm(FlaskForm):
-    title_id = SelectField('Ticket Title', choices=[], validators=[DataRequired()])
-    contents = FieldList(FormField(TicketContentForm))
-    tck_status = RadioField('Status', choices=[('1-pending', 'Pending'), ('2-progress', 'In Progress'), ('3-completed', 'Completed')], default='1-pending', validators=[DataRequired()])
-    assigned_to_id = SelectField('Assign To', choices=[], coerce=int, validators=[Optional()])
-    attachment = FileField('Attach Image')
-    escalate = BooleanField('Escalate Ticket')
-    submit = SubmitField('Submit')
-
-
-class TitleForm(FlaskForm):
-    title_name = StringField('Ticket Name:', validators=[DataRequired()])
-    submit = SubmitField('Save Ticket Name')
 
 
 class FacilityForm(FlaskForm):

@@ -28,7 +28,7 @@ DATABASE_URL=sqlite:////absolute/path/to/instance/dev.db
 
 (MySQL via `mysql+pymysql://...` is what production uses — see `config.py`.)
 
-Seed roles, a default site, an admin user, and ticket titles:
+Seed roles, a default site, and an admin user:
 
 ```bash
 uv run python installation/seed_data.py

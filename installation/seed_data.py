@@ -8,7 +8,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from main import create_app, db
-from application.models import Organization, User, Title, Role, Site
+from application.models import Organization, User, Role, Site
 
 from werkzeug.security import generate_password_hash
 from sqlalchemy.exc import SQLAlchemyError
@@ -99,32 +99,6 @@ with app.app_context():
             ))
             print("Admin user created.")
 
-        # --- Titles ---
-        titles = [
-            ('1', 'Other'),
-            ('2', 'Badge Access/Key Card Issues'),
-            ('3', 'Computer - Installation/Issues'),
-            ('4', 'Digital Clock/Bell Schedule Sync'),
-            ('5', 'Internet - Service Issues'),
-            ('6', 'New Email Accounts'),
-            ('7', 'Password Reset'),
-            ('8', 'Printers Issues'),
-            ('9', 'Projector/TV Issues'),
-            ('10', 'Security Cameras'),
-            ('11', 'SIS - Student Information System'),
-            ('12', 'Software - Installation/Issues'),
-            ('13', 'Student Website Account'),
-            ('14', 'Telephone Issues (Office or Cell)'),
-            ('15', 'Web Filter - Blacklist/Whitelist')
-        ]
-        for title_id, title_name in titles:
-            if not Title.query.filter_by(title_name=title_name).first():
-                db.session.add(Title(id=int(title_id), title_name=title_name))
-                print(f"Title added: {title_name}")
-            else:
-                print(f"Title already exists: {title_name}")
-
-        db.session.commit()
         # --- Work order priorities & categories (Maintaink12) ---
         from application.reference_data import seed_reference_data
         added = seed_reference_data(db)

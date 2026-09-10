@@ -346,8 +346,3 @@ class TestWorkflow:
         assert b'still use' in r.data
 
 
-class TestTicketsStillWork:
-    """WorkOrder coexists with Ticket — the legacy ticket routes must be untouched."""
-    def test_ticket_list_and_add_still_load(self, user_client):
-        assert user_client.get('/tickets').status_code == 200
-        assert user_client.get('/add_ticket').status_code == 200

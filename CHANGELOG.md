@@ -9,6 +9,26 @@ Maintaink12 started as a copy of the [AssistItK12](https://github.com/victorhugo
 codebase (see docs/PROJECT_PLAN.md) — this changelog covers Maintaink12's own history from
 that point forward, not AssistItK12's.
 
+## [0.13.0] - 2026-09-09
+
+### Removed
+- The entire AssistItK12 ticketing system: `Ticket`, `Title`, `Ticket_content`, `Ticket_attachment`
+  models; the `/tickets`, `/add_ticket`, `/edit_ticket/<id>`, `/add_comment/<id>`,
+  `/delete_ticket/<id>`, `/titles`, `/add_title`, `/edit_title/<id>`, `/delete_title/<id>`,
+  and ticket attachment download/delete routes; `TicketForm`/`TitleForm`/`TicketContentForm`;
+  `send_ticket_notification()`; the `add_ticket.html`/`edit_ticket.html`/`tickets.html`/
+  `add_title.html`/`edit_title.html`/`titles.html` templates; and the "Tickets"/"Ticket
+  Titles" nav links. Requested directly: WorkOrder (Phase 3) had made Tickets fully
+  redundant, and no real ticket data existed to migrate (confirmed empty before removal).
+  Migration `13e58200527c` drops the four tables.
+
+### Changed
+- The M&O Dashboard (Phase 9) moved from `/dashboard` to the app's root `/`, replacing the
+  legacy ticket dashboard as the home page for every role. `/dashboard` is kept as a
+  redirect to `/` (preserving query args) for old bookmarks/links.
+- `installation/seed_data.py` no longer seeds ticket "Titles"; `main.py` no longer creates
+  the `UPLOAD_ATTACHMENT` folder (ticket attachments only, now orphaned).
+
 ## [0.12.0] - 2026-09-09
 
 ### Added
