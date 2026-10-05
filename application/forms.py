@@ -256,7 +256,7 @@ class InspectionForm(FlaskForm):
 
 class InspectionResultItemForm(FlaskForm):
     """One row of the results checklist — subform, not posted standalone."""
-    result = RadioField('Result', choices=[(r, r) for r in ('Pass', 'Fail', 'Needs Attention')], validators=[DataRequired()])
+    result = RadioField('Result', choices=[(r, r) for r in ('Pass', 'Fail', 'Needs Attention', 'N/A')], validators=[DataRequired()])
     notes = StringField('Notes', validators=[Optional(), Length(max=255)])
 
 
@@ -276,6 +276,7 @@ class InspectionCycleForm(FlaskForm):
 
 
 class StartWalkthroughForm(FlaskForm):
+    site_id = SelectField('School / Site:', coerce=int, choices=[], validators=[DataRequired()])
     facility_id = SelectField('School / Building:', coerce=int, choices=[], validators=[DataRequired()])
     cycle_id = SelectField('Inspection Cycle:', coerce=int, choices=[], validators=[DataRequired()])
     template_id = SelectField('Checklist Template:', coerce=int, choices=[], validators=[DataRequired()])

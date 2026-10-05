@@ -3950,6 +3950,11 @@ def add_inspection_cycle():
             is_active=form.is_active.data, created_by_id=current_user.id,
         )
         db.session.add(cycle)
+        if form.is_active.data:
+            db.session.flush()
+            # Only one cycle is ever "active" (the one every dashboard/
+            # picker defaults to) — deactivate every other one.
+            InspectionCycle.query.filter(InspectionCycle.id != cycle.id).update({InspectionCycle.is_active: False})
         db.session.commit()
         flash(f'Cycle "{cycle.name}" created.', 'success')
         return redirect(url_for('routes.inspection_cycles'))
@@ -3972,6 +3977,8 @@ def edit_inspection_cycle(cycle_id):
         cycle.start_date = form.start_date.data
         cycle.end_date = form.end_date.data
         cycle.is_active = form.is_active.data
+        if form.is_active.data:
+            InspectionCycle.query.filter(InspectionCycle.id != cycle.id).update({InspectionCycle.is_active: False})
         db.session.commit()
         flash('Cycle updated successfully!', 'success')
         return redirect(url_for('routes.inspection_cycles'))
@@ -4063,18 +4070,48 @@ def start_walkthrough():
     is_staff()  # bulk-creating one Inspection per room — same access level as add_inspection (one at a time)
     form = StartWalkthroughForm()
     site_ids = _visible_site_ids()
+    site_query = Site.query.order_by(Site.site_name)
+    if site_ids:
+        site_query = site_query.filter(Site.id.in_(site_ids))
+    form.site_id.choices = [(s.id, s.site_name) for s in site_query.all()]
     fq = Facility.query.filter_by(is_active=True)
     if site_ids:
         fq = fq.filter(Facility.site_id.in_(site_ids))
-    form.facility_id.choices = [(fac.id, fac.name) for fac in fq.order_by(Facility.name).all()]
+    facilities = fq.order_by(Facility.name).all()
+
+    # Only list buildings with a pending audit for the active cycle — fully
+    # completed ones (every active room Completed) have nothing left to
+    # walk through. Before any cycle exists, nothing has been audited yet,
+    # so every building is still "pending" and none are filtered out.
+    active_cycle = InspectionCycle.query.filter_by(is_active=True).order_by(InspectionCycle.id.desc()).first()
+    if active_cycle and facilities:
+        progress = inspections_module.inspection_progress(active_cycle.id, facility_ids=[fac.id for fac in facilities])
+        pending_ids = {row['facility'].id for row in progress['facilities']
+                       if row['rooms_total'] > 0 and row['pct'] != 100.0}
+        facilities = [fac for fac in facilities if fac.id in pending_ids]
+
+    form.facility_id.choices = [(fac.id, fac.name) for fac in facilities]
+    facility_sites = {fac.id: fac.site_id for fac in facilities}
     form.cycle_id.choices = [(c.id, c.name) for c in InspectionCycle.query.order_by(InspectionCycle.id.desc()).all()]
     form.template_id.choices = [(t.id, t.name) for t in InspectionTemplate.query.filter_by(is_active=True).order_by(InspectionTemplate.name).all()]
+    if request.method == 'GET' and current_user.site_id in dict(form.site_id.choices):
+        form.site_id.data = current_user.site_id
 
-    if not form.facility_id.choices or not form.cycle_id.choices or not form.template_id.choices:
-        flash('You need at least one active facility, inspection cycle, and checklist template before starting a facilities audit.', 'danger')
+    if not form.cycle_id.choices or not form.template_id.choices:
+        flash('You need at least one inspection cycle and checklist template before starting a facilities audit.', 'danger')
         return redirect(url_for('routes.inspections'))
+    if not form.facility_id.choices:
+        if active_cycle:
+            flash(f'Every building has a completed facilities audit for "{active_cycle.name}" already.', 'info')
+        else:
+            flash('You need at least one active facility before starting a facilities audit.', 'danger')
+        return redirect(url_for('routes.facilities'))
 
     if form.validate_on_submit():
+        if facility_sites.get(form.facility_id.data) != form.site_id.data:
+            flash('Selected building does not belong to the selected site.', 'danger')
+            return render_template('start_walkthrough.html', form=form,
+                current_path=request.path, current_page_name=current_page_name, facility_sites=facility_sites)
         facility = Facility.query.get_or_404(form.facility_id.data)
         if not can_access_site(facility.site_id):
             abort(403)
@@ -4095,7 +4132,7 @@ def start_walkthrough():
               'success' if created else 'info')
         return redirect(url_for('routes.walkthrough_room', inspection_id=first.id))
 
-    return render_template('start_walkthrough.html', form=form,
+    return render_template('start_walkthrough.html', form=form, facility_sites=facility_sites,
         current_path=request.path, current_page_name=current_page_name)
 
 

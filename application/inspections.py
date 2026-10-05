@@ -136,8 +136,9 @@ def inspection_progress(cycle_id, f=None, facility_ids=None):
     Per-facility walkthrough completion for one InspectionCycle: rooms_total
     (active rooms in the facility), rooms_inspected (room-targeted
     Inspections in this cycle with status='Completed'), pct, issues_open
-    (non-Pass results on this cycle's inspections), critical_count (Fail
-    results) — plus a district-level rollup. Mirrors analytics.
+    (Fail or Needs Attention results on this cycle's inspections — N/A is
+    excluded, same as Pass), critical_count (Fail results) — plus a
+    district-level rollup. Mirrors analytics.
     facility_health_scores()'s one-GROUP-BY-per-factor shape; f is the same
     filter dict analytics.parse_filters() builds (site_ids/facility_id only).
     """
@@ -178,7 +179,7 @@ def inspection_progress(cycle_id, f=None, facility_ids=None):
     issue_rows = (
         db.session.query(
             Room.facility_id,
-            func.sum(case((InspectionResult.result != 'Pass', 1), else_=0)),
+            func.sum(case((InspectionResult.result.in_(('Fail', 'Needs Attention')), 1), else_=0)),
             func.sum(case((InspectionResult.result == 'Fail', 1), else_=0)),
         )
         .select_from(InspectionResult)

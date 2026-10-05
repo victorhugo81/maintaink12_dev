@@ -315,6 +315,33 @@ class TestFailedItemWorkOrderGeneration:
             from main import db
             assert db.session.get(Inspection, insp_id).generated_work_order_id is None
 
+    def test_na_result_accepted_and_generates_no_work_order(self, app, admin_client):
+        """N/A ('doesn't apply to this room') is a valid result, counts as
+        neither a pass nor a failure, and never triggers generation."""
+        template_id = _make_template(app, name='NA Template', questions=['Plumbing?', 'HVAC?'])
+        facility_id, _, _ = _facility_room_asset(app)
+        admin_client.post('/add_inspection', data={
+            'template_id': str(template_id), 'facility_id': str(facility_id), 'room_id': '0', 'asset_id': '0',
+            'due_date': '2026-11-08',
+        }, follow_redirects=True)
+        with app.app_context():
+            from application.models import Inspection
+            insp_id = Inspection.query.filter_by(template_id=template_id).first().id
+
+        r = admin_client.post(f'/record_inspection_results/{insp_id}', data={
+            'items-0-result': 'N/A', 'items-1-result': 'Pass', 'generate_work_order': 'y',
+        }, follow_redirects=True)
+        assert r.status_code == 200
+        with app.app_context():
+            from application.models import Inspection, InspectionResult
+            from main import db
+            insp = db.session.get(Inspection, insp_id)
+            assert insp.status == 'Completed'
+            assert insp.generated_work_order_id is None
+            assert insp.failed_item_count == 0
+            results = {r.inspection_item_id: r.result for r in InspectionResult.query.filter_by(inspection_id=insp_id).all()}
+            assert 'N/A' in results.values()
+
     def test_opt_out_of_generation_leaves_failure_unaddressed(self, app, admin_client):
         template_id = _make_template(app, name='Opt Out Template', questions=['Only Q?'])
         facility_id, _, _ = _facility_room_asset(app)
@@ -466,6 +493,11 @@ def _walkthrough_facility(app, name='Walkthrough Building', active_rooms=2, inac
 
 
 def _make_cycle(app, name='2026-27 Summer Inspection'):
+    """Only one InspectionCycle is ever meant to be is_active (every
+    dashboard/picker's "active cycle" lookup assumes a singleton) — tests
+    share one session-scoped DB with many cycles created across files, so
+    deactivate every other one each time, matching what add_inspection_cycle/
+    edit_inspection_cycle do for real users."""
     with app.app_context():
         from application.models import InspectionCycle
         from main import db
@@ -473,6 +505,8 @@ def _make_cycle(app, name='2026-27 Summer Inspection'):
         if c is None:
             c = InspectionCycle(name=name)
             db.session.add(c)
+            db.session.flush()
+            InspectionCycle.query.filter(InspectionCycle.id != c.id).update({InspectionCycle.is_active: False})
             db.session.commit()
         return c.id
 
@@ -504,7 +538,7 @@ class TestStartWalkthrough:
         template_id = _make_template(app, name='Walkthrough Template', questions=['Lights OK?', 'HVAC OK?'])
 
         r = admin_client.post('/start_walkthrough', data={
-            'facility_id': str(facility_id), 'cycle_id': str(cycle_id), 'template_id': str(template_id),
+            'site_id': '1', 'facility_id': str(facility_id), 'cycle_id': str(cycle_id), 'template_id': str(template_id),
         }, follow_redirects=True)
         assert r.status_code == 200
 
@@ -522,12 +556,41 @@ class TestStartWalkthrough:
 
         for _ in range(2):
             admin_client.post('/start_walkthrough', data={
-                'facility_id': str(facility_id), 'cycle_id': str(cycle_id), 'template_id': str(template_id),
+                'site_id': '1', 'facility_id': str(facility_id), 'cycle_id': str(cycle_id), 'template_id': str(template_id),
             }, follow_redirects=True)
 
         with app.app_context():
             from application.models import Inspection
             assert Inspection.query.filter_by(cycle_id=cycle_id, template_id=template_id).count() == 2
+
+    def test_building_dropdown_excludes_fully_audited_facility(self, app, admin_client):
+        done_id = _walkthrough_facility(app, name='Fully Audited Building', active_rooms=1)
+        pending_id = _walkthrough_facility(app, name='Pending Audit Building', active_rooms=1)
+        cycle_id = _make_cycle(app, name='Dropdown Filter Cycle')
+        template_id = _make_template(app, name='Dropdown Filter Template', questions=['Q?'])
+
+        admin_client.post('/start_walkthrough', data={
+            'site_id': '1', 'facility_id': str(done_id), 'cycle_id': str(cycle_id), 'template_id': str(template_id),
+        }, follow_redirects=True)
+        admin_client.post('/start_walkthrough', data={
+            'site_id': '1', 'facility_id': str(pending_id), 'cycle_id': str(cycle_id), 'template_id': str(template_id),
+        }, follow_redirects=True)
+
+        with app.app_context():
+            from application.models import Inspection, InspectionResult, Room
+            from main import db
+            done_insp = Inspection.query.join(Room, Inspection.room_id == Room.id) \
+                .filter(Room.facility_id == done_id, Inspection.cycle_id == cycle_id,
+                        Inspection.template_id == template_id).first()
+            done_insp.status = 'Completed'
+            db.session.add(InspectionResult(inspection_id=done_insp.id,
+                inspection_item_id=done_insp.template.items[0].id, result='Pass'))
+            db.session.commit()
+
+        r = admin_client.get('/start_walkthrough')
+        body = r.get_data(as_text=True)
+        assert 'Pending Audit Building' in body
+        assert 'Fully Audited Building' not in body
 
 
 class TestWalkthroughRoomFlow:
@@ -536,7 +599,7 @@ class TestWalkthroughRoomFlow:
         cycle_id = _make_cycle(app, name='Fast Mode Cycle')
         template_id = _make_template(app, name='Fast Mode Template', questions=['Only Q?'])
         admin_client.post('/start_walkthrough', data={
-            'facility_id': str(facility_id), 'cycle_id': str(cycle_id), 'template_id': str(template_id),
+            'site_id': '1', 'facility_id': str(facility_id), 'cycle_id': str(cycle_id), 'template_id': str(template_id),
         }, follow_redirects=True)
 
         with app.app_context():
@@ -632,3 +695,33 @@ class TestInspectionProgress:
             assert row['critical_count'] == 1
             assert progress['district']['rooms_total'] == 2
             assert progress['district']['rooms_inspected'] == 1
+
+    def test_na_results_excluded_from_issues_open(self, app):
+        """N/A ('doesn't apply to this room') must not inflate issues_open —
+        only Fail/Needs Attention count, same as the health-score factor."""
+        facility_id = _walkthrough_facility(app, name='NA Progress Building', active_rooms=1)
+        cycle_id = _make_cycle(app, name='NA Progress Cycle')
+        template_id = _make_template(app, name='NA Progress Template', questions=['Plumbing?', 'HVAC?'])
+
+        with app.app_context():
+            from application.models import Facility, Inspection, InspectionCycle, InspectionTemplate, InspectionResult, Room
+            from application import inspections as inspections_module
+            from main import db
+            facility = db.session.get(Facility, facility_id)
+            cycle_obj = db.session.get(InspectionCycle, cycle_id)
+            template_obj = db.session.get(InspectionTemplate, template_id)
+            inspections_module.start_walkthrough(facility, cycle_obj, template_obj)
+            db.session.commit()
+
+            room = Room.query.filter_by(facility_id=facility_id).first()
+            inspection = Inspection.query.filter_by(room_id=room.id, cycle_id=cycle_id).first()
+            inspection.status = 'Completed'
+            db.session.add(InspectionResult(inspection_id=inspection.id, inspection_item_id=template_obj.items[0].id, result='N/A'))
+            db.session.add(InspectionResult(inspection_id=inspection.id, inspection_item_id=template_obj.items[1].id, result='Pass'))
+            db.session.commit()
+
+            progress = inspections_module.inspection_progress(cycle_id, {'facility_id': facility_id})
+            row = progress['facilities'][0]
+            assert row['rooms_inspected'] == 1
+            assert row['issues_open'] == 0
+            assert row['critical_count'] == 0

@@ -1502,10 +1502,12 @@ h3.bg-gradient-main.custom-title-card .text-uppercase { color: var(--color-text-
 .result-btn-good:hover     { border-color: var(--color-success); color: var(--color-success-dark); }
 .result-btn-issue:hover    { border-color: var(--color-warning); color: var(--color-warning-dark); }
 .result-btn-critical:hover { border-color: var(--color-danger);  color: var(--color-danger-dark); }
+.result-btn-na:hover       { border-color: var(--color-text-subtle); color: var(--color-text); }
 
 .result-radio:checked + .result-btn-good     { background-color: var(--color-success-tint); border-color: var(--color-success); color: var(--color-success-dark); }
 .result-radio:checked + .result-btn-issue    { background-color: var(--color-warning-tint); border-color: var(--color-warning); color: var(--color-warning-dark); }
 .result-radio:checked + .result-btn-critical { background-color: var(--color-danger-tint);  border-color: var(--color-danger);  color: var(--color-danger-dark); }
+.result-radio:checked + .result-btn-na       { background-color: var(--color-surface-sunken); border-color: var(--color-text-subtle); color: var(--color-text); }
 
 .walkthrough-item-row { padding: 1rem 0; border-bottom: 1px solid var(--color-border); }
 .walkthrough-item-row:last-child { border-bottom: none; }

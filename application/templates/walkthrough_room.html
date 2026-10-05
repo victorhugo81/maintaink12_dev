@@ -43,7 +43,7 @@
                         <div class="result-btn-group">
                             {% set radios = {} %}
                             {% for subfield in entry.form.result %}{% if radios.update({subfield.label.text: subfield}) %}{% endif %}{% endfor %}
-                            {% for key, label, cls, icon in [('Pass', 'Good', 'good', 'check_circle'), ('Needs Attention', 'Issue', 'issue', 'warning'), ('Fail', 'Critical', 'critical', 'error')] %}
+                            {% for key, label, cls, icon in [('Pass', 'Good', 'good', 'check_circle'), ('Needs Attention', 'Issue', 'issue', 'warning'), ('Fail', 'Critical', 'critical', 'error'), ('N/A', 'N/A', 'na', 'block')] %}
                             {% set subfield = radios[key] %}
                             {{ subfield(class="result-radio") }}
                             <label class="result-btn result-btn-{{ cls }}" for="{{ subfield.id }}">

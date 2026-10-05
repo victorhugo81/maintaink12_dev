@@ -17,8 +17,12 @@
                     {{ form.hidden_tag() }}
                     <div class="row g-3 mt-2">
                         <div class="col-12">
+                            {{ form.site_id.label(class="form-label") }}
+                            {{ form.site_id(class="form-select-box form-select form-select-lg", id="audit-site") }}
+                        </div>
+                        <div class="col-12">
                             {{ form.facility_id.label(class="form-label") }}
-                            {{ form.facility_id(class="form-select-box form-select form-select-lg") }}
+                            {{ form.facility_id(class="form-select-box form-select form-select-lg", id="audit-facility") }}
                         </div>
                         <div class="col-12 col-sm-6">
                             {{ form.cycle_id.label(class="form-label") }}
@@ -38,5 +42,34 @@
         </div>
     </div>
 </div>
+
+<script nonce="{{ g.csp_nonce }}">
+(function () {
+  var facilitySites = {{ facility_sites|tojson }};
+  var siteSelect = document.getElementById('audit-site');
+  var facilitySelect = document.getElementById('audit-facility');
+  if (!siteSelect || !facilitySelect) { return; }
+
+  function applyFilter() {
+    var siteId = parseInt(siteSelect.value, 10);
+    var sawSelected = false;
+    Array.prototype.forEach.call(facilitySelect.options, function (opt) {
+      var match = facilitySites[opt.value] === siteId;
+      opt.hidden = !match;
+      opt.disabled = !match;
+      if (match && opt.selected) { sawSelected = true; }
+    });
+    if (!sawSelected) {
+      var firstMatch = Array.prototype.find.call(facilitySelect.options, function (opt) {
+        return facilitySites[opt.value] === siteId;
+      });
+      if (firstMatch) { facilitySelect.value = firstMatch.value; }
+    }
+  }
+
+  siteSelect.addEventListener('change', applyFilter);
+  applyFilter();
+})();
+</script>
 
 {% endblock %}

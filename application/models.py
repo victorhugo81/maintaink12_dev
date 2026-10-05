@@ -575,7 +575,7 @@ class MaintenanceSchedule(db.Model):
 # exist yet, no migration touching the work_order table was needed here.
 # ---------------------------------------------------------------------------
 
-INSPECTION_RESULTS = ('Pass', 'Fail', 'Needs Attention')
+INSPECTION_RESULTS = ('Pass', 'Fail', 'Needs Attention', 'N/A')
 
 
 class InspectionCycle(db.Model):
@@ -690,7 +690,7 @@ class InspectionResult(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint('inspection_id', 'inspection_item_id', name='uq_inspection_result_item'),
-        db.CheckConstraint("result IN ('Pass', 'Fail', 'Needs Attention')", name='ck_inspection_result_value'),
+        db.CheckConstraint("result IN ('Pass', 'Fail', 'Needs Attention', 'N/A')", name='ck_inspection_result_value'),
     )
 
 

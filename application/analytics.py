@@ -840,12 +840,16 @@ def facility_health_scores(f, recurring_groups=(), today=None, facility_ids=None
 
     start_dt, end_dt = _range_bounds(f)
     fac_expr = func.coalesce(Inspection.facility_id, Room.facility_id, Asset.facility_id)
+    # N/A is excluded entirely (not just from the Fail count) — it means
+    # "doesn't apply to this room", not a checked-and-passed item, so it
+    # shouldn't dilute the failure rate's denominator either.
     insp_rows = db.session.query(fac_expr, func.count(InspectionResult.id), flag(InspectionResult.result == 'Fail')) \
         .select_from(InspectionResult) \
         .join(Inspection, InspectionResult.inspection_id == Inspection.id) \
         .outerjoin(Room, Inspection.room_id == Room.id) \
         .outerjoin(Asset, Inspection.asset_id == Asset.id) \
-        .filter(Inspection.status == 'Completed', Inspection.completed_at >= start_dt, Inspection.completed_at < end_dt) \
+        .filter(Inspection.status == 'Completed', Inspection.completed_at >= start_dt, Inspection.completed_at < end_dt,
+                InspectionResult.result != 'N/A') \
         .group_by(fac_expr).all()
     insp_stats = {fid: (int(n), int(fails)) for fid, n, fails in insp_rows if fid in ids}
 
