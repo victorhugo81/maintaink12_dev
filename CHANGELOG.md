@@ -9,7 +9,36 @@ Maintaink12 started as a copy of the [AssistItK12](https://github.com/victorhugo
 codebase (see docs/PROJECT_PLAN.md) — this changelog covers Maintaink12's own history from
 that point forward, not AssistItK12's.
 
-## [0.13.0] - 2026-09-09
+## [0.14.0] - 2026-10-04
+
+### Added
+- **Summer Walkthrough (Phase 14)**: `InspectionCycle` (e.g. "2026-27 Summer Inspection") groups
+  the Inspections a bulk walkthrough creates, so completion % can be rolled up per cycle and
+  compared across years; `Inspection.cycle_id` (nullable — existing Inspections predate this)
+  links them. `InspectionAttachment` adds photo support to Inspections, mirroring
+  Facility/Room/Asset's existing one-table-per-entity attachment pattern.
+  `inspections.start_walkthrough()` bulk-creates one Scheduled Inspection per active Room in a
+  facility for a given (cycle, template) pair — idempotent, skipping rooms already scheduled.
+  `inspections.inspection_progress()` computes per-facility and district-wide rooms-inspected /
+  issues-open / critical-count rollups for a cycle. A new fast mobile "walkthrough" screen
+  (`/start_walkthrough`, `/walkthrough/<inspection_id>`) lets staff step room-by-room with large
+  Good/Issue/Critical buttons (mapped onto the existing Pass/Needs Attention/Fail
+  `InspectionResult` values — no new triage model), auto-advancing to the next incomplete room
+  on save and reusing `record_inspection_results()`'s write path unchanged. Admin CRUD for
+  cycles at `/inspection_cycles`.
+- Main dashboard: a district-wide completion gauge, Schools Completed/In Progress/Not Started
+  KPI tiles, and a per-school progress-bar list (color-coded on the spec's 90/75/50/25%
+  thresholds), driven by the active (or filter-selected) InspectionCycle.
+- Facilities list: converted from a plain table to a card grid showing each facility's
+  walkthrough completion %, rooms inspected, and open/critical issue counts; the same block
+  was added to the facility detail page.
+
+### Changed
+- `application/static/css/style.css`: primary/accent palette swapped to a deep brick-red
+  (`#7a0c0c`) + amber-orange (`#d46205`) + cream (`#fff0d5`) scheme; shadow scale upgraded to
+  layered/softer elevation; cards gain a subtle hover elevation; thin themed scrollbars.
+
+
 
 ### Removed
 - The entire AssistItK12 ticketing system: `Ticket`, `Title`, `Ticket_content`, `Ticket_attachment`

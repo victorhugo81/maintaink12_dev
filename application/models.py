@@ -578,6 +578,22 @@ class MaintenanceSchedule(db.Model):
 INSPECTION_RESULTS = ('Pass', 'Fail', 'Needs Attention')
 
 
+class InspectionCycle(db.Model):
+    """A named inspection period (e.g. "2026-27 Summer Inspection") that
+    walkthrough-created Inspections are grouped under, so completion % can
+    be rolled up per cycle and compared across years. Existing Inspections
+    predate this model and simply have cycle_id=None."""
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(150), nullable=False, unique=True)
+    start_date = db.Column(db.Date, nullable=True)
+    end_date = db.Column(db.Date, nullable=True)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+
+
 class InspectionTemplate(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(150), nullable=False, unique=True)
@@ -608,6 +624,9 @@ class InspectionItem(db.Model):
 class Inspection(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     template_id = db.Column(db.Integer, db.ForeignKey('inspection_template.id'), nullable=False, index=True)
+    # Nullable: set by the bulk walkthrough flow (inspections.start_walkthrough);
+    # one-off inspections created via add_inspection predate this and leave it None.
+    cycle_id = db.Column(db.Integer, db.ForeignKey('inspection_cycle.id'), nullable=True, index=True)
     site_id = db.Column(db.Integer, db.ForeignKey('site.id', ondelete='CASCADE'), nullable=False, index=True)
     facility_id = db.Column(db.Integer, db.ForeignKey('facility.id', ondelete='CASCADE'), nullable=True, index=True)
     room_id = db.Column(db.Integer, db.ForeignKey('room.id', ondelete='CASCADE'), nullable=True, index=True)
@@ -622,6 +641,7 @@ class Inspection(db.Model):
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
     template = db.relationship('InspectionTemplate')
+    cycle = db.relationship('InspectionCycle')
     site = db.relationship('Site')
     facility = db.relationship('Facility')
     room = db.relationship('Room')
@@ -630,6 +650,7 @@ class Inspection(db.Model):
     created_by = db.relationship('User', foreign_keys=[created_by_id])
     generated_work_order = db.relationship('WorkOrder')
     results = db.relationship('InspectionResult', backref='inspection', cascade='all, delete-orphan')
+    attachments = db.relationship('InspectionAttachment', backref='inspection', cascade='all, delete-orphan')
 
     __table_args__ = (
         db.CheckConstraint(
@@ -671,6 +692,16 @@ class InspectionResult(db.Model):
         db.UniqueConstraint('inspection_id', 'inspection_item_id', name='uq_inspection_result_item'),
         db.CheckConstraint("result IN ('Pass', 'Fail', 'Needs Attention')", name='ck_inspection_result_value'),
     )
+
+
+class InspectionAttachment(db.Model):
+    """Mirrors FacilityAttachment/RoomAttachment/AssetAttachment exactly —
+    one attachment table per entity rather than a polymorphic one."""
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    inspection_id = db.Column(db.Integer, db.ForeignKey('inspection.id', ondelete='CASCADE'), nullable=False)
+    attach_file = db.Column(db.String(255), nullable=False)
+    uploaded_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
 
 # ---------------------------------------------------------------------------

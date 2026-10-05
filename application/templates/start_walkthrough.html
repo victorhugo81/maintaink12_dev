@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-7">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 z-index-2">
+                <div class="bg-gradient-main shadow-dark border-radius-lg pt-4 pb-3">
+                    <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">fact_check</i> Start Facilities Audit</h2>
+                </div>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <p class="text-secondary text-sm">Pick a school/building, a cycle, and a checklist template. One
+                    inspection is created per active room — resuming an in-progress walkthrough just skips rooms
+                    already scheduled.</p>
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    <div class="row g-3 mt-2">
+                        <div class="col-12">
+                            {{ form.facility_id.label(class="form-label") }}
+                            {{ form.facility_id(class="form-select-box form-select form-select-lg") }}
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            {{ form.cycle_id.label(class="form-label") }}
+                            {{ form.cycle_id(class="form-select-box form-select form-select-lg") }}
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            {{ form.template_id.label(class="form-label") }}
+                            {{ form.template_id(class="form-select-box form-select form-select-lg") }}
+                        </div>
+                        <div class="col-12 d-grid gap-2 mt-4">
+                            {{ form.submit(class="btn btn-lg bg-gradient-main") }}
+                            <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.inspections') }}">Cancel</a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

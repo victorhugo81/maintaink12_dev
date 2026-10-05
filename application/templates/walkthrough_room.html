@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-8">
+        <div class="main-card-box card my-4 walkthrough-card">
+            <div class="card-header p-0 position-relative mt-n4 z-index-2">
+                <div class="bg-gradient-main shadow-dark border-radius-lg pt-4 pb-3">
+                    <h2 class="text-white text-capitalize ps-3 mb-0">
+                        <i class="material-symbols-rounded opacity-5">meeting_room</i>
+                        Room {{ inspection.room.room_number }}{% if inspection.room.room_name %} &mdash; {{ inspection.room.room_name }}{% endif %}
+                    </h2>
+                    <p class="text-white ps-3 mb-0 opacity-8">
+                        {{ facility.name }}{% if inspection.room.room_type %} &middot; {{ inspection.room.room_type }}{% endif %}
+                    </p>
+                </div>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="text-xs text-uppercase text-muted fw-bold">{{ inspection.template.name }}</span>
+                    <span class="text-xs text-uppercase text-muted fw-bold">{{ remaining }} room{{ 's' if remaining != 1 else '' }} left of {{ total_rooms }}</span>
+                </div>
+                <div class="progress mb-4" style="height:6px;">
+                    <div class="progress-bar" role="progressbar"
+                         style="width: {{ ((total_rooms - remaining) / total_rooms * 100) if total_rooms else 0 }}%;"></div>
+                </div>
+
+                {% if not active_items %}
+                <p class="text-secondary text-sm">This template has no active checklist items.</p>
+                {% else %}
+                <form method="POST" action="{{ url_for('routes.record_inspection_results', inspection_id=inspection.id) }}" enctype="multipart/form-data" id="walkthrough-form">
+                    {{ results_form.hidden_tag() }}
+                    <input type="hidden" name="walkthrough" value="1">
+
+                    <button type="button" id="mark-room-complete" class="btn btn-lg btn-success w-100 mb-4">
+                        <i class="material-symbols-rounded">check_circle</i> Mark Room Complete (all good)
+                    </button>
+
+                    {% for entry in results_form.items.entries %}
+                    {% set item = active_items[loop.index0] %}
+                    <div class="walkthrough-item-row">
+                        <p class="walkthrough-item-question">{{ item.question }}</p>
+                        <div class="result-btn-group">
+                            {% set radios = {} %}
+                            {% for subfield in entry.form.result %}{% if radios.update({subfield.label.text: subfield}) %}{% endif %}{% endfor %}
+                            {% for key, label, cls, icon in [('Pass', 'Good', 'good', 'check_circle'), ('Needs Attention', 'Issue', 'issue', 'warning'), ('Fail', 'Critical', 'critical', 'error')] %}
+                            {% set subfield = radios[key] %}
+                            {{ subfield(class="result-radio") }}
+                            <label class="result-btn result-btn-{{ cls }}" for="{{ subfield.id }}">
+                                <i class="material-symbols-rounded">{{ icon }}</i> {{ label }}
+                            </label>
+                            {% endfor %}
+                        </div>
+                        {{ entry.form.notes(class="form-control form-control-sm mt-2", placeholder="Add a note (optional)") }}
+                    </div>
+                    {% endfor %}
+
+                    <div class="row g-3 mt-3">
+                        <div class="col-12 col-sm-6">
+                            {{ results_form.generate_work_order.label(class="form-label") }}
+                            <div class="form-check">
+                                {{ results_form.generate_work_order(class="form-check-input") }}
+                                <label class="form-check-label" for="{{ results_form.generate_work_order.id }}">Generate a work order for any Critical item</label>
+                            </div>
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            <label class="form-label" for="walkthrough-photo">Photo (optional)</label>
+                            <input type="file" class="form-control" id="walkthrough-photo" name="photo" accept="image/jpeg,image/png" capture="environment">
+                        </div>
+                    </div>
+
+                    <div class="walkthrough-sticky-bar mt-4">
+                        <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.edit_facility', facility_id=facility.id) }}">Exit Facilities Audit</a>
+                        <button type="submit" class="btn btn-lg bg-gradient-main flex-grow-1">Save &amp; Next Room <i class="material-symbols-rounded">arrow_forward</i></button>
+                    </div>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ g.csp_nonce }}">
+document.getElementById('mark-room-complete')?.addEventListener('click', function () {
+    document.querySelectorAll('.result-radio[value="Pass"]').forEach(function (r) { r.checked = true; });
+    document.getElementById('walkthrough-form').submit();
+});
+</script>
+
+{% endblock %}

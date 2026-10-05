@@ -444,3 +444,191 @@ class TestDueOverdueLogic:
             assert r.status_code == 200
             assert b'Site Scoped Inspection Template' not in r.data
             assert c.get(f'/edit_inspection/{insp_id}').status_code == 403
+
+
+def _walkthrough_facility(app, name='Walkthrough Building', active_rooms=2, inactive_rooms=0):
+    """A facility with `active_rooms` active Rooms (+ optional inactive ones,
+    which start_walkthrough must skip), reused across walkthrough tests."""
+    with app.app_context():
+        from application.models import Facility, Room
+        from main import db
+        f = Facility.query.filter_by(name=name).first()
+        if f is None:
+            f = Facility(site_id=1, name=name)
+            db.session.add(f)
+            db.session.flush()
+            for i in range(active_rooms):
+                db.session.add(Room(site_id=1, facility_id=f.id, room_number=f'W-{i+1}'))
+            for i in range(inactive_rooms):
+                db.session.add(Room(site_id=1, facility_id=f.id, room_number=f'W-INACTIVE-{i+1}', is_active=False))
+            db.session.commit()
+        return f.id
+
+
+def _make_cycle(app, name='2026-27 Summer Inspection'):
+    with app.app_context():
+        from application.models import InspectionCycle
+        from main import db
+        c = InspectionCycle.query.filter_by(name=name).first()
+        if c is None:
+            c = InspectionCycle(name=name)
+            db.session.add(c)
+            db.session.commit()
+        return c.id
+
+
+class TestInspectionCycleCRUD:
+    def test_regular_user_cannot_view_cycles(self, user_client):
+        assert user_client.get('/inspection_cycles').status_code == 403
+
+    def test_add_and_edit_cycle(self, admin_client):
+        r = admin_client.post('/add_inspection_cycle', data={
+            'name': 'CRUD Test Cycle', 'is_active': 'y',
+        }, follow_redirects=True)
+        assert r.status_code == 200
+        assert b'CRUD Test Cycle' in r.data
+
+    def test_duplicate_cycle_name_rejected(self, admin_client):
+        admin_client.post('/add_inspection_cycle', data={'name': 'Dup Cycle', 'is_active': 'y'}, follow_redirects=True)
+        r = admin_client.post('/add_inspection_cycle', data={'name': 'Dup Cycle', 'is_active': 'y'}, follow_redirects=True)
+        assert b'already exists' in r.data
+
+
+class TestStartWalkthrough:
+    def test_regular_user_cannot_start(self, user_client):
+        assert user_client.get('/start_walkthrough').status_code == 403
+
+    def test_start_creates_one_inspection_per_active_room(self, app, admin_client):
+        facility_id = _walkthrough_facility(app, name='Start Walkthrough Building', active_rooms=3, inactive_rooms=1)
+        cycle_id = _make_cycle(app, name='Start Walkthrough Cycle')
+        template_id = _make_template(app, name='Walkthrough Template', questions=['Lights OK?', 'HVAC OK?'])
+
+        r = admin_client.post('/start_walkthrough', data={
+            'facility_id': str(facility_id), 'cycle_id': str(cycle_id), 'template_id': str(template_id),
+        }, follow_redirects=True)
+        assert r.status_code == 200
+
+        with app.app_context():
+            from application.models import Inspection, Room
+            room_ids = {rm.id for rm in Room.query.filter_by(facility_id=facility_id, is_active=True).all()}
+            created = Inspection.query.filter_by(cycle_id=cycle_id, template_id=template_id).all()
+            assert {insp.room_id for insp in created} == room_ids
+            assert len(created) == 3  # the inactive room is skipped
+
+    def test_start_is_idempotent(self, app, admin_client):
+        facility_id = _walkthrough_facility(app, name='Idempotent Walkthrough Building', active_rooms=2)
+        cycle_id = _make_cycle(app, name='Idempotent Walkthrough Cycle')
+        template_id = _make_template(app, name='Idempotent Walkthrough Template', questions=['Q?'])
+
+        for _ in range(2):
+            admin_client.post('/start_walkthrough', data={
+                'facility_id': str(facility_id), 'cycle_id': str(cycle_id), 'template_id': str(template_id),
+            }, follow_redirects=True)
+
+        with app.app_context():
+            from application.models import Inspection
+            assert Inspection.query.filter_by(cycle_id=cycle_id, template_id=template_id).count() == 2
+
+
+class TestWalkthroughRoomFlow:
+    def test_fast_mode_submission_advances_to_next_room_and_only_fail_generates_wo(self, app, admin_client):
+        facility_id = _walkthrough_facility(app, name='Fast Mode Building', active_rooms=2)
+        cycle_id = _make_cycle(app, name='Fast Mode Cycle')
+        template_id = _make_template(app, name='Fast Mode Template', questions=['Only Q?'])
+        admin_client.post('/start_walkthrough', data={
+            'facility_id': str(facility_id), 'cycle_id': str(cycle_id), 'template_id': str(template_id),
+        }, follow_redirects=True)
+
+        with app.app_context():
+            from application.models import Inspection, Room, Floor
+            from main import db
+            first = Inspection.query.join(Room, Inspection.room_id == Room.id) \
+                .filter(Room.facility_id == facility_id, Inspection.cycle_id == cycle_id) \
+                .order_by(Room.room_number).first()
+            first_id = first.id
+
+        # First room: a Needs Attention result — informational, no work order.
+        r = admin_client.post(f'/record_inspection_results/{first_id}', data={
+            'items-0-result': 'Needs Attention', 'generate_work_order': 'y', 'walkthrough': '1',
+        })
+        assert r.status_code == 302
+        assert '/walkthrough/' in r.headers['Location']
+
+        with app.app_context():
+            from application.models import Inspection
+            from main import db
+            insp = db.session.get(Inspection, first_id)
+            assert insp.status == 'Completed'
+            assert insp.generated_work_order_id is None
+            second_id = Inspection.query.filter_by(cycle_id=cycle_id, template_id=template_id, status='Scheduled').first().id
+
+        # Second (last) room: a Fail result — generates a work order, and the
+        # walkthrough is now finished (no more Scheduled rooms to advance to).
+        r2 = admin_client.post(f'/record_inspection_results/{second_id}', data={
+            'items-0-result': 'Fail', 'items-0-notes': 'Broken', 'generate_work_order': 'y', 'walkthrough': '1',
+        }, follow_redirects=True)
+        assert r2.status_code == 200
+        assert b'Facilities audit complete' in r2.data
+
+        with app.app_context():
+            from application.models import Inspection
+            from main import db
+            insp2 = db.session.get(Inspection, second_id)
+            assert insp2.status == 'Completed'
+            assert insp2.generated_work_order_id is not None
+
+    def test_non_walkthrough_submission_unaffected(self, app, admin_client):
+        """A plain (non-walkthrough) record_inspection_results POST still
+        redirects to edit_inspection, matching pre-existing behavior."""
+        template_id = _make_template(app, name='Plain Submission Template', questions=['Only Q?'])
+        facility_id, _, _ = _facility_room_asset(app)
+        admin_client.post('/add_inspection', data={
+            'template_id': str(template_id), 'facility_id': str(facility_id), 'room_id': '0', 'asset_id': '0',
+            'due_date': '2026-11-10',
+        }, follow_redirects=True)
+        with app.app_context():
+            from application.models import Inspection
+            insp_id = Inspection.query.filter_by(template_id=template_id).first().id
+
+        r = admin_client.post(f'/record_inspection_results/{insp_id}', data={
+            'items-0-result': 'Pass', 'generate_work_order': 'y',
+        })
+        assert r.status_code == 302
+        assert r.headers['Location'] == f'/edit_inspection/{insp_id}'
+
+
+class TestInspectionProgress:
+    def test_progress_math_across_facilities(self, app):
+        facility_id = _walkthrough_facility(app, name='Progress Math Building', active_rooms=2)
+        cycle_id = _make_cycle(app, name='Progress Math Cycle')
+        template_id = _make_template(app, name='Progress Math Template', questions=['Q1?'])
+
+        with app.app_context():
+            from application.models import Facility, Inspection, InspectionCycle, InspectionTemplate, InspectionResult, Room
+            from application import inspections as inspections_module
+            from main import db
+            facility = db.session.get(Facility, facility_id)
+            cycle_obj = db.session.get(InspectionCycle, cycle_id)
+            template_obj = db.session.get(InspectionTemplate, template_id)
+            inspections_module.start_walkthrough(facility, cycle_obj, template_obj)
+            db.session.commit()
+
+            rooms = Room.query.filter_by(facility_id=facility_id).order_by(Room.room_number).all()
+            one_inspection = Inspection.query.filter_by(room_id=rooms[0].id, cycle_id=cycle_id).first()
+            one_inspection.status = 'Completed'
+            db.session.add(InspectionResult(
+                inspection_id=one_inspection.id,
+                inspection_item_id=template_obj.items[0].id,
+                result='Fail',
+            ))
+            db.session.commit()
+
+            progress = inspections_module.inspection_progress(cycle_id, {'facility_id': facility_id})
+            row = progress['facilities'][0]
+            assert row['rooms_total'] == 2
+            assert row['rooms_inspected'] == 1
+            assert row['pct'] == 50.0
+            assert row['issues_open'] == 1
+            assert row['critical_count'] == 1
+            assert progress['district']['rooms_total'] == 2
+            assert progress['district']['rooms_inspected'] == 1

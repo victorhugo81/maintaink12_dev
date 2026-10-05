@@ -35,13 +35,18 @@
 {% macro days(value) %}{% if value is none %}&mdash;{% else %}{{ value }} d{% endif %}{% endmacro %}
 {% macro money(value) %}${{ '{:,.2f}'.format(value|float) }}{% endmacro %}
 
+{# Spec's suggested completion-color buckets, shared by the district gauge
+   (mo_dashboard.js) and every per-school progress bar below. #}
+{% macro pct_tone(value) %}{% if value is none %}secondary{% elif value >= 90 %}success{% elif value >= 75 %}info{% elif value >= 50 %}warning{% elif value >= 25 %}accent{% else %}danger{% endif %}{% endmacro %}
+{% macro pct_status_label(value) %}{% if value is none %}No Data{% elif value >= 90 %}On Track{% elif value >= 75 %}Nearly There{% elif value >= 50 %}At Risk{% elif value >= 25 %}Behind{% else %}Critical{% endif %}{% endmacro %}
+
 {% set wo = data.wo %}
 {% set f = filters %}
 
 <div class="row">
   <div class="col-12">
     <div class="main-card-box card my-4">
-      <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+      <div class="card-header p-0 position-relative mt-n4 z-index-2">
         <div class="bg-gradient-main custom-title-card d-flex justify-content-between align-items-center pe-3">
           <h2 class="text-white text-capitalize ps-3 mb-0"><i class="material-symbols-rounded opacity-5">insights</i> {{ current_page_name }} &mdash; {{ view_labels[view] }}</h2>
           {% if allowed_views|length > 1 %}
@@ -67,6 +72,15 @@
                 {% for p in presets %}<option value="{{ p }}" {% if f.preset == p %}selected{% endif %}>{{ preset_labels[p] }}</option>{% endfor %}
               </select>
             </div>
+            {% if options.cycles is defined %}
+            <div class="col-md-3 col-6">
+              <label class="filter-labels text-sm mb-0">Inspection Cycle</label>
+              <select class="form-select-box form-select" name="cycle_id">
+                <option value="">Current / Active Cycle</option>
+                {% for c in options.cycles %}<option value="{{ c.id }}" {% if f.cycle_id == c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+              </select>
+            </div>
+            {% endif %}
             <div class="col-md-4 col-12" id="custom-range" {% if f.preset != 'custom' %}hidden{% endif %}>
               <label class="filter-labels text-sm mb-0">Custom range</label>
               <div class="input-group input-group-sm">
@@ -136,6 +150,55 @@
         {# ============================ EXECUTIVE / MANAGER ============================ #}
         {% if view in ('executive', 'manager') %}
         {% set fac = data.facility %}{% set m = data.maintenance %}{% set cost = data.cost %}
+        {% set prog = data.progress %}{% set cyc = data.cycle %}
+
+        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">
+          Facilities Audit{% if cyc %} &mdash; {{ cyc.name }}{% endif %}
+        </h6>
+        <div class="row align-items-stretch mb-2">
+          <div class="col-12 col-lg-4 mb-4">
+            <div class="card h-100 d-flex flex-column align-items-center justify-content-center py-4">
+              <div class="district-gauge-wrap">
+                <canvas data-chart="district_gauge" data-type="gauge" height="200"></canvas>
+              </div>
+              <p class="text-sm text-secondary mt-2 mb-0">{{ prog.district.rooms_inspected }} / {{ prog.district.rooms_total }} rooms inspected</p>
+              {% if not cyc %}
+              <p class="text-xs text-danger mt-1 mb-0 px-3 text-center">No inspection cycle yet &mdash; <a href="{{ url_for('routes.add_inspection_cycle') }}">create one</a> to start tracking the summer walkthrough.</p>
+              {% endif %}
+            </div>
+          </div>
+          <div class="col-12 col-lg-8">
+            <div class="row">
+              {{ kpi_card('Schools Completed', prog.completed_count, 'verified', url_for('routes.facilities')) }}
+              {{ kpi_card('Schools In Progress', prog.in_progress_count, 'autorenew') }}
+              {{ kpi_card('Schools Not Started', prog.not_started_count, 'radio_button_unchecked') }}
+              {{ kpi_card('Rooms Inspected / Total', prog.district.rooms_inspected ~ ' / ' ~ prog.district.rooms_total, 'meeting_room') }}
+              {{ kpi_card('Open Audit Issues', prog.district.issues_open, 'report', None, 'text-warning' if prog.district.issues_open else '') }}
+              {{ kpi_card('Critical Audit Issues', prog.district.critical_count, 'emergency', None, 'text-danger' if prog.district.critical_count else '') }}
+            </div>
+          </div>
+        </div>
+
+        {% if prog.facilities %}
+        <div class="card mb-4">
+          <div class="card-body px-4 py-3">
+            <h6 class="mb-3">School Progress</h6>
+            {% for row in prog.facilities %}
+            <div class="d-flex align-items-center justify-content-between mb-1">
+              <a href="{{ url_for('routes.edit_facility', facility_id=row.facility.id) }}" class="text-sm fw-bold text-dark">{{ row.facility.name }}</a>
+              <span class="text-xs text-secondary">
+                {{ row.rooms_inspected }} / {{ row.rooms_total }} rooms &middot;
+                {% if row.pct is none %}&mdash;{% else %}{{ row.pct }}%{% endif %} &middot;
+                <span class="badge bg-{{ pct_tone(row.pct) }}">{{ pct_status_label(row.pct) }}</span>
+              </span>
+            </div>
+            <div class="progress mb-3" style="height:8px;" role="progressbar" aria-valuenow="{{ row.pct or 0 }}" aria-valuemin="0" aria-valuemax="100" aria-label="{{ row.facility.name }} inspection progress">
+              <div class="progress-bar bg-{{ pct_tone(row.pct) }}" style="width: {{ row.pct or 0 }}%;"></div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
 
         <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">Work Orders &mdash; current</h6>
         <div class="row">

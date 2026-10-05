@@ -2,9 +2,9 @@
 {% block content %}
 
 <div class="row justify-content-center">
-    <div class="col-12 col-lg-8">
+    <div class="col-12 col-lg-8 col-width-95">
         <div class="main-card-box card my-4">
-            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+            <div class="card-header p-0 position-relative mt-n4 z-index-2">
                 <div class="bg-gradient-main shadow-dark border-radius-lg pt-4 pb-3">
                     <h2 class="text-white text-capitalize ps-3">Request Maintenance</h2>
                 </div>
@@ -23,12 +23,17 @@
                         </div>
                         <div class="col-12 col-sm-6">
                             <span aria-hidden="true" class="text-danger ms-1">*</span>
+                            {{ form.site_id.label(class="form-label") }}
+                            {{ form.site_id(class="form-select-box form-select form-select-lg", id="request-site") }}
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            <span aria-hidden="true" class="text-danger ms-1">*</span>
                             {{ form.facility_id.label(class="form-label") }}
-                            {{ form.facility_id(class="form-select-box form-select form-select-lg") }}
+                            {{ form.facility_id(class="form-select-box form-select form-select-lg", id="request-facility") }}
                         </div>
                         <div class="col-12 col-sm-6">
                             {{ form.room_id.label(class="form-label") }}
-                            {{ form.room_id(class="form-select-box form-select form-select-lg") }}
+                            {{ form.room_id(class="form-select-box form-select form-select-lg", id="request-room") }}
                         </div>
                         <div class="col-12 col-sm-6">
                             <span aria-hidden="true" class="text-danger ms-1">*</span>
@@ -58,5 +63,62 @@
         </div>
     </div>
 </div>
+
+<script nonce="{{ g.csp_nonce }}">
+(function () {
+  var facilitySites = {{ facility_sites|tojson }};
+  var roomFacilities = {{ room_facilities|tojson }};
+  var siteSelect = document.getElementById('request-site');
+  var facilitySelect = document.getElementById('request-facility');
+  var roomSelect = document.getElementById('request-room');
+  if (!siteSelect || !facilitySelect || !roomSelect) { return; }
+
+  // Site -> Building: hide/disable buildings at a different site, and if the
+  // currently-selected building no longer matches, jump to the first one
+  // that does (Building is required, so it must always point at something).
+  function applyFacilityFilter() {
+    var siteId = parseInt(siteSelect.value, 10);
+    var sawSelected = false;
+    Array.prototype.forEach.call(facilitySelect.options, function (opt) {
+      var match = facilitySites[opt.value] === siteId;
+      opt.hidden = !match;
+      opt.disabled = !match;
+      if (match && opt.selected) { sawSelected = true; }
+    });
+    if (!sawSelected) {
+      var firstMatch = Array.prototype.find.call(facilitySelect.options, function (opt) {
+        return facilitySites[opt.value] === siteId;
+      });
+      if (firstMatch) { facilitySelect.value = firstMatch.value; }
+    }
+  }
+
+  // Building -> Room: same idea, but Room is optional (the "-- No room --"
+  // sentinel, value "0", has no entry in roomFacilities and always stays
+  // visible) so a non-matching room resets to "-- No room --" rather than
+  // jumping to an arbitrary one.
+  function applyRoomFilter() {
+    var facilityId = parseInt(facilitySelect.value, 10);
+    var sawSelected = false;
+    Array.prototype.forEach.call(roomSelect.options, function (opt) {
+      var isSentinel = opt.value === '0';
+      var match = isSentinel || roomFacilities[opt.value] === facilityId;
+      opt.hidden = !match;
+      opt.disabled = !match;
+      if (match && opt.selected) { sawSelected = true; }
+    });
+    if (!sawSelected) { roomSelect.value = '0'; }
+  }
+
+  siteSelect.addEventListener('change', function () {
+    applyFacilityFilter();
+    applyRoomFilter();
+  });
+  facilitySelect.addEventListener('change', applyRoomFilter);
+
+  applyFacilityFilter();
+  applyRoomFilter();
+})();
+</script>
 
 {% endblock %}

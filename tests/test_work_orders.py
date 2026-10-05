@@ -121,7 +121,7 @@ class TestRequesterFlow:
         facility_id, room_id = _seed_facility(app)
         pri, cat = _ids(app)
         r = user_client.post('/request_work_order', data={
-            'title': 'Room W-12 is too hot',
+            'title': 'Room W-12 is too hot', 'site_id': '1',
             'facility_id': str(facility_id), 'room_id': str(room_id),
             'category_id': str(cat), 'priority_id': str(pri),
             'description': 'Thermostat reads 84F all day.',
@@ -154,7 +154,7 @@ class TestRequesterFlow:
             db.session.commit()
             other_id = other.id
         r = user_client.post('/request_work_order', data={
-            'title': 'Mismatch', 'facility_id': str(other_id), 'room_id': str(room_id),
+            'title': 'Mismatch', 'site_id': '1', 'facility_id': str(other_id), 'room_id': str(room_id),
             'category_id': str(cat), 'priority_id': str(pri),
         }, follow_redirects=True)
         assert b'does not belong' in r.data

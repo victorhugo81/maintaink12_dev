@@ -305,6 +305,7 @@ class TestPrivilegeEscalation:
         ('GET', '/add_project'), ('POST', '/delete_project/1'), ('GET', '/sla_rules'), ('GET', '/csv_import'),
         ('GET', '/csv_import/facilities/template'), ('GET', '/audit_log'), ('POST', '/run_pm_generation'),
         ('POST', '/update_asset_risk_fields/1'), ('GET', '/asset_types'),
+        ('GET', '/inspection_cycles'), ('GET', '/add_inspection_cycle'),
     ])
     def test_technician_cannot_reach_admin_routes(self, app, method, url):
         tech = _user(app, 'priv-tech@test.com', 3, first='PrivTech')
@@ -315,7 +316,7 @@ class TestPrivilegeEscalation:
     @pytest.mark.parametrize('method, url', [
         ('GET', '/add_work_order'), ('GET', '/pm_dashboard'), ('GET', '/inspections'), ('GET', '/cost_rollups'),
         ('GET', '/technician_workload'), ('GET', '/capital_replacement'), ('GET', '/reports'), ('GET', '/projects'),
-        ('GET', '/vendor_performance'),
+        ('GET', '/vendor_performance'), ('GET', '/start_walkthrough'),
     ])
     def test_school_staff_cannot_reach_staff_routes(self, user_client, method, url):
         r = user_client.post(url, data={}) if method == 'POST' else user_client.get(url)

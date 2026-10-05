@@ -165,6 +165,7 @@ class SubcategoryForm(FlaskForm):
 class WorkOrderRequestForm(FlaskForm):
     """The requester-facing 'what / where / type / urgency / description / photo' flow."""
     title = StringField('What needs attention?', validators=[DataRequired(), Length(max=200)])
+    site_id = SelectField('School / Site', coerce=int, choices=[], validators=[DataRequired()])
     facility_id = SelectField('Where? (building)', coerce=int, choices=[], validators=[DataRequired()])
     room_id = SelectField('Room', coerce=int, choices=[], validators=[Optional()])
     category_id = SelectField('Type of issue', coerce=int, choices=[], validators=[DataRequired()])
@@ -263,6 +264,22 @@ class InspectionResultsForm(FlaskForm):
     items = FieldList(FormField(InspectionResultItemForm))
     generate_work_order = BooleanField('Generate a work order for any failed items', default=True)
     submit = SubmitField('Submit Inspection Results')
+
+
+class InspectionCycleForm(FlaskForm):
+    name = StringField('Cycle Name:', validators=[DataRequired(), Length(max=150)],
+                        render_kw={'placeholder': 'e.g. 2026-27 Summer Inspection'})
+    start_date = DateField('Start Date:', validators=[Optional()])
+    end_date = DateField('End Date:', validators=[Optional()])
+    is_active = BooleanField('Active (selectable for new walkthroughs)', default=True)
+    submit = SubmitField('Save Cycle')
+
+
+class StartWalkthroughForm(FlaskForm):
+    facility_id = SelectField('School / Building:', coerce=int, choices=[], validators=[DataRequired()])
+    cycle_id = SelectField('Inspection Cycle:', coerce=int, choices=[], validators=[DataRequired()])
+    template_id = SelectField('Checklist Template:', coerce=int, choices=[], validators=[DataRequired()])
+    submit = SubmitField('Start Walkthrough')
 
 
 class ProjectForm(FlaskForm):

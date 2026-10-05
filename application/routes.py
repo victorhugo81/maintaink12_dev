@@ -4,8 +4,8 @@ from flask_login import login_user, login_required, logout_user, current_user
 from flask_paginate import Pagination, get_page_args
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from .models import User, Role, Site, Notification, Organization, BulkUploadLog, Facility, Floor, Room, FacilityAttachment, RoomAttachment, AssetType, Asset, AssetConditionHistory, AssetAttachment, condition_label_for_score, CONDITION_SCALE, Priority, Category, Subcategory, WorkOrder, WorkOrderComment, WorkOrderAttachment, WorkOrderStatusHistory, MaintenancePlan, MaintenanceSchedule, InspectionTemplate, InspectionItem, Inspection, InspectionResult, INSPECTION_RESULTS, Vendor, WorkOrderMaterial, WorkOrderLabor, CostRecord, Project, ProjectTask, ProjectCost, ProjectDocument, PROJECT_STATUSES, SLARule, NotificationPreference, NotificationLog, NOTIFICATION_EVENTS, NOTIFICATION_EVENT_LABELS, CsvImportLog, AuditLog
-from .forms import LoginForm, UserForm, RoleForm, SiteForm, NotificationForm, OrganizationForm, EmailConfigForm, FacilityForm, FloorForm, RoomForm, AssetTypeForm, AssetForm, AssetConditionForm, PriorityForm, CategoryForm, SubcategoryForm, WorkOrderRequestForm, WorkOrderForm, WorkOrderStatusForm, WorkOrderCommentForm, MaintenancePlanForm, InspectionTemplateForm, InspectionItemForm, InspectionForm, InspectionResultsForm, InspectionResultItemForm, VendorForm, WorkOrderLaborForm, WorkOrderMaterialForm, CostRecordForm, ProjectForm, ProjectTaskForm, ProjectCostForm, ProjectVendorForm, AssetRiskFieldsForm, SLARuleForm, NotificationPreferenceForm, CsvImportUploadForm
+from .models import User, Role, Site, Notification, Organization, BulkUploadLog, Facility, Floor, Room, FacilityAttachment, RoomAttachment, AssetType, Asset, AssetConditionHistory, AssetAttachment, condition_label_for_score, CONDITION_SCALE, Priority, Category, Subcategory, WorkOrder, WorkOrderComment, WorkOrderAttachment, WorkOrderStatusHistory, MaintenancePlan, MaintenanceSchedule, InspectionTemplate, InspectionItem, Inspection, InspectionResult, INSPECTION_RESULTS, InspectionCycle, InspectionAttachment, Vendor, WorkOrderMaterial, WorkOrderLabor, CostRecord, Project, ProjectTask, ProjectCost, ProjectDocument, PROJECT_STATUSES, SLARule, NotificationPreference, NotificationLog, NOTIFICATION_EVENTS, NOTIFICATION_EVENT_LABELS, CsvImportLog, AuditLog
+from .forms import LoginForm, UserForm, RoleForm, SiteForm, NotificationForm, OrganizationForm, EmailConfigForm, FacilityForm, FloorForm, RoomForm, AssetTypeForm, AssetForm, AssetConditionForm, PriorityForm, CategoryForm, SubcategoryForm, WorkOrderRequestForm, WorkOrderForm, WorkOrderStatusForm, WorkOrderCommentForm, MaintenancePlanForm, InspectionTemplateForm, InspectionItemForm, InspectionForm, InspectionResultsForm, InspectionResultItemForm, InspectionCycleForm, StartWalkthroughForm, VendorForm, WorkOrderLaborForm, WorkOrderMaterialForm, CostRecordForm, ProjectForm, ProjectTaskForm, ProjectCostForm, ProjectVendorForm, AssetRiskFieldsForm, SLARuleForm, NotificationPreferenceForm, CsvImportUploadForm
 from .utils import validate_password, validate_file_upload, encrypt_mail_password, decrypt_mail_password, hash_email, get_app_version
 from .email_utils import send_temp_password_email, send_password_updated_email, send_work_order_notification
 from . import workflow
@@ -469,6 +469,8 @@ def index():
     options['categories'] = Category.query.filter_by(is_active=True).order_by(Category.sort_order, Category.name).all()
     options['priorities'] = Priority.query.filter_by(is_active=True).order_by(Priority.sort_order).all()
     options['statuses'] = workflow.ALL_STATUSES
+    if view in ('executive', 'manager'):
+        options['cycles'] = InspectionCycle.query.order_by(InspectionCycle.id.desc()).all()
 
     return render_template('mo_dashboard.html', data=data, view=view, allowed_views=allowed,
         view_labels=analytics.VIEW_LABELS, filters=filters, presets=analytics.PRESETS,
@@ -1617,6 +1619,49 @@ def delete_site(site_id):
     return redirect(url_for('routes.sites'))
 
 
+# ****************** Site Details (school-level dashboard) ****************
+# Spec's "School Facility Dashboard" — a read-only rollup one level above
+# edit_facility.html's per-building page: school info, a completion gauge
+# and Building Areas table (both from inspections.inspection_progress(),
+# scoped to this site's facility_ids), and the same Facility Health Score
+# table as the main dashboard, scoped the same way.
+@routes_blueprint.route('/site_details/<int:site_id>')
+@login_required
+def site_details(site_id):
+    current_page_name = 'Site Details'
+    site = Site.query.get_or_404(site_id)
+    if not can_access_site(site_id):
+        abort(403)
+
+    from werkzeug.datastructures import MultiDict
+
+    facility_ids = [f.id for f in Facility.query.filter_by(site_id=site_id, is_active=True).all()]
+    active_cycle = InspectionCycle.query.filter_by(is_active=True).order_by(InspectionCycle.id.desc()).first()
+    progress = inspections_module.inspection_progress(active_cycle.id if active_cycle else None,
+                                                       facility_ids=facility_ids)
+
+    today = datetime.now(timezone.utc).date()
+    filters = analytics.parse_filters(MultiDict(), [site_id])
+    wo = analytics.work_order_kpis(filters, today)
+    groups = analytics.detect_recurring_issues(analytics.recurring_rows(filters))
+    health = analytics.facility_health_scores(filters, groups, today=today, facility_ids=facility_ids) if facility_ids else []
+
+    # Open / Pending / Closed — a mutually-exclusive 3-way split of every
+    # status (unlike wo['total_open'], which still includes the Waiting/
+    # On-Hold statuses as "open"), all-time (not period-scoped), for this site.
+    status_counts = dict(db.session.query(WorkOrder.status, func.count(WorkOrder.id))
+                         .filter(WorkOrder.site_id == site_id).group_by(WorkOrder.status).all())
+    wo_status = {
+        'open': sum(status_counts.get(s, 0) for s in workflow.OPEN_STATUSES if s not in workflow.WAITING_STATUSES),
+        'pending': sum(status_counts.get(s, 0) for s in workflow.WAITING_STATUSES),
+        'closed': sum(status_counts.get(s, 0) for s in workflow.TERMINAL_STATUSES),
+    }
+
+    return render_template('site_details.html', site=site, progress=progress, cycle=active_cycle,
+        wo=wo, wo_status=wo_status, health=health, health_factors=analytics.HEALTH_FACTORS,
+        current_path=request.path, current_page_name=current_page_name)
+
+
 # *********************************************************************
 # ****************** Notification Management Page *********************
 @routes_blueprint.route('/notifications', methods=['GET'])
@@ -1835,6 +1880,12 @@ def facilities():
     facility_list = query.order_by(Facility.name.asc()).offset(offset).limit(per_page).all()
     pagination = Pagination(page=page, per_page=per_page, total=total, css_framework='bootstrap5')
 
+    active_cycle = InspectionCycle.query.filter_by(is_active=True).order_by(InspectionCycle.id.desc()).first()
+    progress_rows = inspections_module.inspection_progress(
+        active_cycle.id if active_cycle else None, facility_ids=[f.id for f in facility_list]
+    )
+    progress_by_facility = {row['facility'].id: row for row in progress_rows['facilities']}
+
     return render_template(
         'facilities.html',
         facilities=facility_list,
@@ -1845,6 +1896,8 @@ def facilities():
         current_page_name=current_page_name,
         sites=sites,
         status_filter=status_filter,
+        active_cycle=active_cycle,
+        progress_by_facility=progress_by_facility,
     )
 
 
@@ -1910,6 +1963,7 @@ def edit_facility(facility_id):
     form = FacilityForm(obj=facility)
     form.site_id.choices = [(s.id, s.site_name) for s in Site.query.order_by(Site.site_name).all()]
     floor_form = FloorForm()
+    progress = _facility_progress_for(facility)
 
     if request.method == 'POST':
         is_admin()  # Editing facility data is admin only, matching Site management
@@ -1922,7 +1976,8 @@ def edit_facility(facility_id):
             if existing:
                 flash('A facility with this name already exists at that site.', 'danger')
                 return render_template('edit_facility.html', form=form, floor_form=floor_form,
-                    facility=facility, current_page_name=current_page_name)
+                    facility=facility, current_page_name=current_page_name, progress=progress,
+                    health=_facility_health_for(facility), health_factors=analytics.HEALTH_FACTORS)
 
             facility.site_id = form.site_id.data
             facility.name = form.name.data
@@ -1946,7 +2001,7 @@ def edit_facility(facility_id):
             return redirect(url_for('routes.edit_facility', facility_id=facility.id))
 
     return render_template('edit_facility.html', form=form, floor_form=floor_form,
-        facility=facility, current_page_name=current_page_name,
+        facility=facility, current_page_name=current_page_name, progress=progress,
         health=_facility_health_for(facility), health_factors=analytics.HEALTH_FACTORS)
 
 
@@ -1960,6 +2015,16 @@ def _facility_health_for(facility, days=90):
     groups = analytics.detect_recurring_issues(analytics.recurring_rows(f))
     rows = analytics.facility_health_scores(f, groups, facility_ids=[facility.id], today=today)
     return rows[0]['health'] if rows else None
+
+
+def _facility_progress_for(facility):
+    """Summer walkthrough completion for one facility's detail page, under
+    the currently active InspectionCycle. None if there isn't one."""
+    active_cycle = InspectionCycle.query.filter_by(is_active=True).order_by(InspectionCycle.id.desc()).first()
+    if not active_cycle:
+        return None
+    rows = inspections_module.inspection_progress(active_cycle.id, facility_ids=[facility.id])['facilities']
+    return rows[0] if rows else None
 
 
 # ****************** Delete (Deactivate) Facility *******************************
@@ -3038,6 +3103,10 @@ def work_orders():
 
     if status_filter == 'open':
         query = query.filter(WorkOrder.status.in_(workflow.OPEN_STATUSES))
+    elif status_filter == 'pending':
+        query = query.filter(WorkOrder.status.in_(workflow.WAITING_STATUSES))
+    elif status_filter == 'closed':
+        query = query.filter(WorkOrder.status.in_(workflow.TERMINAL_STATUSES))
     elif status_filter and status_filter != 'all':
         query = query.filter(WorkOrder.status == status_filter)
 
@@ -3089,17 +3158,41 @@ def work_orders():
 def request_work_order():
     current_page_name = 'New Request'
     form = WorkOrderRequestForm()
-    facility_choices, room_choices, _ = _location_choices(_visible_site_ids(), with_none=False)
+    site_ids = _visible_site_ids()
+    site_query = Site.query.order_by(Site.site_name)
+    if site_ids:
+        site_query = site_query.filter(Site.id.in_(site_ids))
+    form.site_id.choices = [(s.id, s.site_name) for s in site_query.all()]
+    facility_choices, room_choices, _ = _location_choices(site_ids, with_none=False)
     form.facility_id.choices = facility_choices
     form.room_id.choices = room_choices
     form.category_id.choices, _, form.priority_id.choices = _classification_choices()
+    if request.method == 'GET' and current_user.site_id in dict(form.site_id.choices):
+        form.site_id.data = current_user.site_id
+
+    # Site is a pure UI narrowing aid (the JS below filters the Building list
+    # by it) — the WorkOrder's real site_id still comes from the chosen
+    # facility via _validate_work_order_links, same as before this field
+    # existed. Just catch an inconsistent pairing (stale JS, tampered POST).
+    fac_query = Facility.query.filter_by(is_active=True)
+    if site_ids:
+        fac_query = fac_query.filter(Facility.site_id.in_(site_ids))
+    facility_sites = {f.id: f.site_id for f in fac_query.all()}
+    room_facilities = {r.id: r.facility_id for r in
+                        Room.query.filter(Room.facility_id.in_(facility_sites.keys()),
+                                          Room.is_active.is_(True)).all()}
 
     if form.validate_on_submit():
+        if facility_sites.get(form.facility_id.data) != form.site_id.data:
+            flash('Selected building does not belong to the selected site.', 'danger')
+            return render_template('new_work_order.html', form=form, current_page_name=current_page_name,
+                facility_sites=facility_sites, room_facilities=room_facilities)
         site_id, error = _validate_work_order_links(
             form.facility_id.data, form.room_id.data or None, None, form.category_id.data, None)
         if error:
             flash(error, 'danger')
-            return render_template('request_work_order.html', form=form, current_page_name=current_page_name)
+            return render_template('new_work_order.html', form=form, current_page_name=current_page_name,
+                facility_sites=facility_sites, room_facilities=room_facilities)
         if not can_access_site(site_id):
             abort(403)
 
@@ -3131,7 +3224,8 @@ def request_work_order():
         flash(f'Request {wo.wo_number} submitted. The M&O team will review it.', 'success')
         return redirect(url_for('routes.edit_work_order', work_order_id=wo.id))
 
-    return render_template('request_work_order.html', form=form, current_page_name=current_page_name)
+    return render_template('new_work_order.html', form=form, current_page_name=current_page_name,
+        facility_sites=facility_sites, room_facilities=room_facilities)
 
 
 def _fill_staff_form_choices(form, current=None):
@@ -3826,6 +3920,64 @@ def delete_inspection_item(item_id):
     return redirect(url_for('routes.edit_inspection_template', template_id=template_id))
 
 
+# ****************** Inspection Cycles (admin reference data) *************
+# A cycle (e.g. "2026-27 Summer Inspection") groups the Inspections a bulk
+# walkthrough creates so completion % can be rolled up per cycle and
+# compared across years. CRUD mirrors Priority/Category — admin-only,
+# soft via is_active rather than a hard delete once a cycle has inspections.
+@routes_blueprint.route('/inspection_cycles')
+@login_required
+def inspection_cycles():
+    current_page_name = 'Inspection Cycles'
+    is_admin()
+    cycles = InspectionCycle.query.order_by(InspectionCycle.id.desc()).all()
+    return render_template('inspection_cycles.html', cycles=cycles,
+        current_path=request.path, current_page_name=current_page_name)
+
+
+@routes_blueprint.route('/add_inspection_cycle', methods=['GET', 'POST'])
+@login_required
+def add_inspection_cycle():
+    current_page_name = 'New Inspection Cycle'
+    is_admin()
+    form = InspectionCycleForm()
+    if form.validate_on_submit():
+        if InspectionCycle.query.filter_by(name=form.name.data).first():
+            flash('A cycle with this name already exists.', 'danger')
+            return render_template('add_inspection_cycle.html', form=form, current_path=request.path, current_page_name=current_page_name)
+        cycle = InspectionCycle(
+            name=form.name.data, start_date=form.start_date.data, end_date=form.end_date.data,
+            is_active=form.is_active.data, created_by_id=current_user.id,
+        )
+        db.session.add(cycle)
+        db.session.commit()
+        flash(f'Cycle "{cycle.name}" created.', 'success')
+        return redirect(url_for('routes.inspection_cycles'))
+    return render_template('add_inspection_cycle.html', form=form,
+        current_path=request.path, current_page_name=current_page_name)
+
+
+@routes_blueprint.route('/edit_inspection_cycle/<int:cycle_id>', methods=['GET', 'POST'])
+@login_required
+def edit_inspection_cycle(cycle_id):
+    current_page_name = 'Edit Inspection Cycle'
+    is_admin()
+    cycle = InspectionCycle.query.get_or_404(cycle_id)
+    form = InspectionCycleForm(obj=cycle)
+    if form.validate_on_submit():
+        if InspectionCycle.query.filter(InspectionCycle.name == form.name.data, InspectionCycle.id != cycle.id).first():
+            flash('A cycle with this name already exists.', 'danger')
+            return render_template('edit_inspection_cycle.html', form=form, cycle=cycle, current_page_name=current_page_name)
+        cycle.name = form.name.data
+        cycle.start_date = form.start_date.data
+        cycle.end_date = form.end_date.data
+        cycle.is_active = form.is_active.data
+        db.session.commit()
+        flash('Cycle updated successfully!', 'success')
+        return redirect(url_for('routes.inspection_cycles'))
+    return render_template('edit_inspection_cycle.html', form=form, cycle=cycle, current_page_name=current_page_name)
+
+
 # ****************** Scheduling & performing inspections ******************
 def _validate_inspection_target(form):
     """Exactly one of facility_id/room_id/asset_id must be chosen. Returns (site_id, error)."""
@@ -3898,6 +4050,89 @@ def add_inspection():
         current_path=request.path, current_page_name=current_page_name)
 
 
+# ****************** Summer Walkthrough (bulk, fast mode) *****************
+# start_walkthrough bulk-creates one Inspection per active Room in a facility
+# (admin-only, like other bulk admin actions); walkthrough_room is the fast
+# mobile screen staff actually use room-by-room. Both reuse the existing
+# Inspection/InspectionResult/record_inspection_results write path untouched
+# — only the entry point and the "what's next" navigation are new.
+@routes_blueprint.route('/start_walkthrough', methods=['GET', 'POST'])
+@login_required
+def start_walkthrough():
+    current_page_name = 'Start Facilities Audit'
+    is_staff()  # bulk-creating one Inspection per room — same access level as add_inspection (one at a time)
+    form = StartWalkthroughForm()
+    site_ids = _visible_site_ids()
+    fq = Facility.query.filter_by(is_active=True)
+    if site_ids:
+        fq = fq.filter(Facility.site_id.in_(site_ids))
+    form.facility_id.choices = [(fac.id, fac.name) for fac in fq.order_by(Facility.name).all()]
+    form.cycle_id.choices = [(c.id, c.name) for c in InspectionCycle.query.order_by(InspectionCycle.id.desc()).all()]
+    form.template_id.choices = [(t.id, t.name) for t in InspectionTemplate.query.filter_by(is_active=True).order_by(InspectionTemplate.name).all()]
+
+    if not form.facility_id.choices or not form.cycle_id.choices or not form.template_id.choices:
+        flash('You need at least one active facility, inspection cycle, and checklist template before starting a facilities audit.', 'danger')
+        return redirect(url_for('routes.inspections'))
+
+    if form.validate_on_submit():
+        facility = Facility.query.get_or_404(form.facility_id.data)
+        if not can_access_site(facility.site_id):
+            abort(403)
+        cycle = InspectionCycle.query.get_or_404(form.cycle_id.data)
+        template = InspectionTemplate.query.get_or_404(form.template_id.data)
+        created = inspections_module.start_walkthrough(facility, cycle, template, current_user)
+        db.session.commit()
+
+        first = Inspection.query.join(Room, Inspection.room_id == Room.id) \
+            .outerjoin(Floor, Room.floor_id == Floor.id) \
+            .filter(Room.facility_id == facility.id, Inspection.cycle_id == cycle.id,
+                    Inspection.template_id == template.id, Inspection.status == 'Scheduled') \
+            .order_by(db.func.coalesce(Floor.sort_order, 0), Room.room_number).first()
+        if not first:
+            flash(f'{facility.name} has no active rooms to inspect.', 'warning')
+            return redirect(url_for('routes.facilities'))
+        flash(f'Facilities audit started: {created} room(s) scheduled.' if created else 'Resuming an already-started facilities audit.',
+              'success' if created else 'info')
+        return redirect(url_for('routes.walkthrough_room', inspection_id=first.id))
+
+    return render_template('start_walkthrough.html', form=form,
+        current_path=request.path, current_page_name=current_page_name)
+
+
+@routes_blueprint.route('/walkthrough/<int:inspection_id>')
+@login_required
+def walkthrough_room(inspection_id):
+    current_page_name = 'Facilities Audit'
+    is_staff()
+    inspection = Inspection.query.get_or_404(inspection_id)
+    if not can_access_inspection(inspection):
+        abort(403)
+    if not inspection.room_id:
+        abort(404)
+
+    if inspection.status == 'Completed':
+        nxt = inspections_module.next_incomplete_room_inspection(inspection)
+        if nxt:
+            return redirect(url_for('routes.walkthrough_room', inspection_id=nxt.id))
+        flash('This room was already inspected and the facilities audit is complete.', 'info')
+        return redirect(url_for('routes.edit_facility', facility_id=inspection.room.facility_id))
+
+    results_form = InspectionResultsForm()
+    active_items = [i for i in inspection.template.items if i.is_active]
+    for _ in active_items:
+        results_form.items.append_entry()
+
+    facility = inspection.room.facility
+    total_rooms = Room.query.filter_by(facility_id=facility.id, is_active=True).count()
+    remaining = Inspection.query.join(Room, Inspection.room_id == Room.id) \
+        .filter(Room.facility_id == facility.id, Inspection.cycle_id == inspection.cycle_id,
+                Inspection.template_id == inspection.template_id, Inspection.status == 'Scheduled').count()
+
+    return render_template('walkthrough_room.html', inspection=inspection, results_form=results_form,
+        active_items=active_items, facility=facility, total_rooms=total_rooms, remaining=remaining,
+        current_page_name=current_page_name)
+
+
 @routes_blueprint.route('/edit_inspection/<int:inspection_id>')
 @login_required
 def edit_inspection(inspection_id):
@@ -3945,18 +4180,30 @@ def record_inspection_results(inspection_id):
     wo = None
     if results_form.generate_work_order.data:
         wo = inspections_module.generate_work_order_for_failures(inspection, current_user)
+
+    attachment_error = _save_attachment(request.files.get('photo'), 'inspection', inspection.id,
+                                         'UPLOAD_INSPECTION_ATTACHMENT', InspectionAttachment, 'inspection_id')
     db.session.commit()
 
     if inspection.failed_item_count:
         notifications_module.notify_inspection_failed(inspection)
         db.session.commit()
 
-    if wo:
+    if attachment_error:
+        flash(f'Inspection completed, but the photo could not be saved: {attachment_error}', 'warning')
+    elif wo:
         flash(f'Inspection completed. Work order {wo.wo_number} generated for the failed item(s).', 'success')
     elif inspection.failed_item_count:
         flash('Inspection completed with failed items (no work order generated, as requested).', 'warning')
     else:
         flash('Inspection completed — all items passed.', 'success')
+
+    if request.form.get('walkthrough') == '1':
+        next_insp = inspections_module.next_incomplete_room_inspection(inspection)
+        if next_insp:
+            return redirect(url_for('routes.walkthrough_room', inspection_id=next_insp.id))
+        flash('Facilities audit complete for this building — every room has been inspected.', 'success')
+        return redirect(url_for('routes.edit_facility', facility_id=inspection.room.facility_id))
     return redirect(url_for('routes.edit_inspection', inspection_id=inspection.id))
 
 
@@ -3972,6 +4219,37 @@ def delete_inspection(inspection_id):
     db.session.commit()
     flash('Scheduled inspection removed.', 'warning')
     return redirect(url_for('routes.inspections'))
+
+
+# ****************** Inspection Attachments (photos) ***********************
+@routes_blueprint.route('/download_inspection_attachment/<int:attachment_id>')
+@login_required
+def download_inspection_attachment(attachment_id):
+    attachment = InspectionAttachment.query.get_or_404(attachment_id)
+    inspection = Inspection.query.get_or_404(attachment.inspection_id)
+    if not can_access_inspection(inspection):
+        abort(403)
+    upload_folder = current_app.config['UPLOAD_INSPECTION_ATTACHMENT']
+    file_path = os.path.join(upload_folder, attachment.attach_file)
+    if not os.path.exists(file_path):
+        flash('File not found.', 'error')
+        return redirect(url_for('routes.edit_inspection', inspection_id=inspection.id))
+    return send_from_directory(upload_folder, attachment.attach_file, as_attachment=True)
+
+
+@routes_blueprint.route('/delete_inspection_attachment/<int:attachment_id>', methods=['POST'])
+@login_required
+def delete_inspection_attachment(attachment_id):
+    is_admin()
+    attachment = InspectionAttachment.query.get_or_404(attachment_id)
+    inspection_id = attachment.inspection_id
+    file_path = os.path.join(current_app.config['UPLOAD_INSPECTION_ATTACHMENT'], attachment.attach_file)
+    if os.path.exists(file_path):
+        os.remove(file_path)
+    db.session.delete(attachment)
+    db.session.commit()
+    flash('Attachment deleted successfully.', 'success')
+    return redirect(url_for('routes.edit_inspection', inspection_id=inspection_id))
 
 
 # ****************** Inspection Dashboard *******************************

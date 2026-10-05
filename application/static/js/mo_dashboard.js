@@ -5,7 +5,7 @@
 (function () {
   var data = window.MO_DASHBOARD || {};
   var charts = data.charts || {};
-  var primary = getComputedStyle(document.documentElement).getPropertyValue('--bs-main-color-primary').trim() || '#12707F';
+  var primary = getComputedStyle(document.documentElement).getPropertyValue('--bs-main-color-primary').trim() || '#7a0c0c';
   var palette = [primary, '#f5a623', '#d0021b', '#7ed321', '#4a90e2', '#9013fe', '#50e3c2', '#b8e986', '#8b572a', '#417505', '#9b9b9b'];
 
   var axisOpts = {
@@ -13,11 +13,49 @@
     x: { grid: { display: false }, ticks: { color: '#737373', padding: 8, font: { size: 11 }, autoSkip: true, maxRotation: 45 } }
   };
 
+  // Gauge color thresholds match the facility progress bars in
+  // mo_dashboard.html (pct_tone macro) and the spec's suggested palette:
+  // 90-100 success, 75-89 info, 50-74 warning, 25-49 accent, 0-24 danger.
+  function gaugeColor(val) {
+    if (val >= 90) { return '#15803D'; }
+    if (val >= 75) { return '#1D4ED8'; }
+    if (val >= 50) { return '#92400E'; }
+    if (val >= 25) { return '#d46205'; }
+    return '#B91C1C';
+  }
+
+  function buildGauge(canvas, spec) {
+    var val = (spec.datasets[0] && spec.datasets[0].data[0]) || 0;
+    new Chart(canvas.getContext('2d'), {
+      type: 'doughnut',
+      data: { datasets: [{ data: [val, 100 - val], backgroundColor: [gaugeColor(val), '#E5E7EB'], borderWidth: 0 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        circumference: 270, rotation: 225, cutout: '78%',
+        plugins: { legend: { display: false }, tooltip: { enabled: false } }
+      },
+      plugins: [{
+        id: 'gaugeCenterText',
+        afterDraw: function (chart) {
+          var ctx = chart.ctx, w = chart.width, h = chart.height;
+          ctx.save();
+          ctx.font = '700 ' + Math.round(h * 0.17) + 'px Inter, sans-serif';
+          ctx.fillStyle = '#17212B';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(val + '%', w / 2, h / 2 + h * 0.06);
+          ctx.restore();
+        }
+      }]
+    });
+  }
+
   function build(canvas) {
     var key = canvas.getAttribute('data-chart');
     var spec = charts[key];
     if (!spec) { return; }
     var type = canvas.getAttribute('data-type') || 'bar';
+    if (type === 'gauge') { buildGauge(canvas, spec); return; }
     var multi = spec.datasets.length > 1;
     var datasets = spec.datasets.map(function (ds, i) {
       var color = palette[i % palette.length];

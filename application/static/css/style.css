@@ -1,30 +1,31 @@
 @charset "UTF-8";
 
 /* ==========================================================================
-   ASSISTITK12 — VISUAL SYSTEM
-   A flat, editorial, borders-over-shadows design language. Deep navy
-   (brand-required) + warm terracotta accent, generous whitespace, and a
-   single accent color used sparingly instead of the gradient-on-everything
-   "admin template" look this replaces.
+   MAINTAINK12 — VISUAL SYSTEM
+   A flat, editorial, borders-over-shadows design language. Deep brick-red
+   primary (#7a0c0c) + a vivid amber-orange accent (#d46205), warmed by a
+   cream tint (#fff0d5), generous whitespace, and a single accent color
+   used sparingly instead of the gradient-on-everything "admin template"
+   look this replaces.
    ========================================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-/* #12707F */
+/* #7a0c0c — updated 2026-10-04, was #04403d (user-supplied red/orange/cream palette) */
 :root,
 [data-bs-theme=light] {
-  /* ── Brand (primary is fixed — do not change) ── */
-  --bs-main-color-primary:  #12707F;
+  /* ── Brand ── */
+  --bs-main-color-primary:  #551A0D;
   --bs-main-color-secondary:#475569;
 
-  --color-primary:       #12707F;
-  --color-primary-dark:  #0e535d;
-  --color-primary-tint:  #EAEFF2;
+  --color-primary:       #341008;
+  --color-primary-dark:  #541a0d;
+  --color-primary-tint:  #FFF0D5;
   --color-secondary:     #475569;
   --color-secondary-dark:#334155;
-  --color-accent:        #9A3412;
-  --color-accent-dark:   #7C2D12;
-  --color-accent-tint:   #FBEDE7;
-  --color-accent-on-dark:#E2894C;
+  --color-accent:        #d46205;
+  --color-accent-dark:   #b03817;
+  --color-accent-tint:   #FFF0D5;
+  --color-accent-on-dark:#d46205;
 
   /* ── Semantic ── */
   --color-success:       #15803D;
@@ -60,11 +61,13 @@
   --color-sidebar-text-hi:  #ffffff;
   --color-sidebar-active-bg:rgba(255,255,255,0.08);
 
-  /* ── Shadows (used sparingly — overlays only) ── */
-  --shadow-xs: 0 1px 2px rgba(15,23,32,0.06);
-  --shadow-sm: 0 1px 3px rgba(15,23,32,0.09);
-  --shadow-md: 0 6px 16px rgba(15,23,32,0.10);
-  --shadow-lg: 0 16px 40px rgba(15,23,32,0.16);
+  /* ── Shadows (used sparingly — overlays only). Layered (a tight contact
+     shadow + a soft ambient one) rather than one hard-edged blur — reads
+     as a modern, physically-plausible elevation instead of a flat smudge. ── */
+  --shadow-xs: 0 1px 2px rgba(15,23,32,0.05);
+  --shadow-sm: 0 1px 2px rgba(15,23,32,0.06), 0 3px 8px rgba(15,23,32,0.07);
+  --shadow-md: 0 2px 4px rgba(15,23,32,0.05), 0 10px 24px rgba(15,23,32,0.10);
+  --shadow-lg: 0 4px 10px rgba(15,23,32,0.08), 0 24px 56px rgba(15,23,32,0.18);
 
   /* ── Radius (restrained — not a pill factory) ── */
   --radius-xs:  4px;
@@ -94,7 +97,7 @@
      whole Bootstrap layer matches the new palette without touching
      template markup. ── */
   --bs-primary:        var(--color-primary);
-  --bs-primary-rgb:     21,52,72;
+  --bs-primary-rgb:     122,12,12;
   --bs-secondary:      var(--color-secondary);
   --bs-secondary-rgb:   71,85,105;
   --bs-success:        var(--color-success);
@@ -160,6 +163,26 @@ body {
 spacer { height: 1rem; display: block; }
 
 ::selection { background: var(--color-accent-tint); color: var(--color-accent-dark); }
+
+/* ==========================================================================
+   SCROLLBAR — thin, theme-colored, no bare OS-default gray bars
+   ========================================================================== */
+
+html { scrollbar-width: thin; scrollbar-color: var(--color-border-strong) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--color-bg);
+}
+::-webkit-scrollbar-thumb:hover { background-color: var(--color-text-subtle); }
+
+.sidenav, .navbar-vertical.navbar-expand-xs { scrollbar-color: rgba(255,255,255,0.22) transparent; }
+.sidenav ::-webkit-scrollbar-thumb,
+.navbar-vertical.navbar-expand-xs ::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.22); border-color: transparent; }
+.sidenav ::-webkit-scrollbar-thumb:hover,
+.navbar-vertical.navbar-expand-xs ::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,0.38); }
 
 /* ==========================================================================
    ACCESSIBILITY — FOCUS STATES
@@ -532,8 +555,13 @@ a.user-welcome:hover { color: var(--color-primary); text-decoration: none; }
   border: 1px solid var(--color-border);
   border-radius: var(--bs-card-border-radius);
   box-shadow: var(--shadow-xs);
-  transition: border-color 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
+/* A gentle elevation increase on hover — not a literal lift (no transform),
+   just a deeper shadow — gives otherwise-static cards some life without
+   contradicting the "flat surfaces, border not shadow" resting state. */
+.card:hover { box-shadow: var(--shadow-sm); border-color: var(--color-border-strong); }
+.card.card-plain:hover { box-shadow: none; border-color: transparent; }
 
 .card .card-header { padding: 1rem 1.25rem; background: transparent; border-bottom: 1px solid var(--color-border); }
 .card .card-body { font-family: inherit; margin: 0 auto; width: 98%; }
@@ -747,7 +775,7 @@ a.user-welcome:hover { color: var(--color-primary); text-decoration: none; }
 }
 .form-control:focus {
   border-color: var(--color-primary) !important;
-  box-shadow: 0 0 0 3px rgba(21,52,72,0.14);
+  box-shadow: 0 0 0 3px rgba(122,12,12,0.14);
   outline: none;
 }
 .form-control::placeholder { color: var(--color-text-subtle); opacity: 1; }
@@ -895,7 +923,7 @@ label, .form-label {
   background-color: var(--color-surface);
   padding: 0.55rem 2rem 0.55rem 0.8rem;
 }
-.form-select:focus { border-color: var(--color-primary) !important; box-shadow: 0 0 0 3px rgba(21,52,72,0.14); }
+.form-select:focus { border-color: var(--color-primary) !important; box-shadow: 0 0 0 3px rgba(122,12,12,0.14); }
 
 input.read-only { background: var(--color-surface-sunken) !important; color: var(--color-text) !important; }
 
@@ -978,6 +1006,12 @@ input.read-only { background: var(--color-surface-sunken) !important; color: var
   padding: 0.32em 0.6em;
 }
 .badge-sm { font-size: 0.625rem; padding: 0.28em 0.5em; }
+
+/* Bootstrap ships success/info/warning/danger/secondary — the walkthrough
+   progress bars' "25-49%, Behind" tier needs a 5th bucket (spec's "Orange"). */
+.bg-accent { background-color: var(--color-accent) !important; color: #fff !important; }
+
+.district-gauge-wrap { width: 100%; max-width: 220px; height: 200px; margin: 0 auto; }
 
 /* ==========================================================================
    ICONS
@@ -1278,7 +1312,7 @@ hr.horizontal.dark { background-color: var(--color-border-strong); }
 .login-form-control:focus, .login-form-control:active {
   outline: none !important;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(21,52,72,0.14);
+  box-shadow: 0 0 0 3px rgba(122,12,12,0.14);
 }
 
 .login-btn {
@@ -1428,6 +1462,72 @@ h3.bg-gradient-main.custom-title-card .text-uppercase { color: var(--color-text-
 .add-table-button:hover { background-color: var(--color-primary-dark) !important; }
 
 /* ==========================================================================
+   APP COMPONENTS — SUMMER WALKTHROUGH (fast inspection mode)
+   Large touch-friendly Good/Issue/Critical buttons built from a hidden
+   radio group + styled sibling labels — no JS needed beyond the "mark
+   room complete" shortcut, keyboard/screen-reader accessible (label[for]
+   + native radio semantics), works with the existing InspectionResultsForm
+   unchanged.
+   ========================================================================== */
+
+.result-btn-group { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.5rem; }
+
+.result-radio {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.result-btn {
+  flex: 1 1 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.9rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--color-border-strong);
+  background-color: var(--color-surface);
+  color: var(--color-text-muted);
+  font-weight: 700;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  user-select: none;
+  transition: var(--transition-fast);
+}
+.result-radio:focus-visible + .result-btn { outline: 2.5px solid var(--color-accent); outline-offset: 2px; }
+
+.result-btn-good:hover     { border-color: var(--color-success); color: var(--color-success-dark); }
+.result-btn-issue:hover    { border-color: var(--color-warning); color: var(--color-warning-dark); }
+.result-btn-critical:hover { border-color: var(--color-danger);  color: var(--color-danger-dark); }
+
+.result-radio:checked + .result-btn-good     { background-color: var(--color-success-tint); border-color: var(--color-success); color: var(--color-success-dark); }
+.result-radio:checked + .result-btn-issue    { background-color: var(--color-warning-tint); border-color: var(--color-warning); color: var(--color-warning-dark); }
+.result-radio:checked + .result-btn-critical { background-color: var(--color-danger-tint);  border-color: var(--color-danger);  color: var(--color-danger-dark); }
+
+.walkthrough-item-row { padding: 1rem 0; border-bottom: 1px solid var(--color-border); }
+.walkthrough-item-row:last-child { border-bottom: none; }
+.walkthrough-item-question { font-weight: 700; font-size: 1rem; margin-bottom: 0; color: var(--color-text); }
+
+.walkthrough-sticky-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  margin: 0 -1rem -1rem;
+  background-color: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+}
+
+@media (max-width: 575.98px) {
+  .result-btn { flex-basis: 100%; }
+}
+
+/* ==========================================================================
    APP COMPONENTS — SEARCH & FILTERS
    ========================================================================== */
 
@@ -1444,7 +1544,7 @@ input.search-field-box.form-control {
   height: 42px;
   background-color: var(--color-surface);
 }
-input.search-field-box.form-control:focus { border-color: var(--color-primary) !important; box-shadow: 0 0 0 3px rgba(21,52,72,0.12); }
+input.search-field-box.form-control:focus { border-color: var(--color-primary) !important; box-shadow: 0 0 0 3px rgba(122,12,12,0.12); }
 
 select.form-select-box.form-select {
   border: 1.5px solid var(--input-color-border) !important;
@@ -1452,7 +1552,7 @@ select.form-select-box.form-select {
   font-size: 0.875rem;
   color: var(--color-text);
 }
-select.form-select-box.form-select:focus { border-color: var(--color-primary) !important; box-shadow: 0 0 0 3px rgba(21,52,72,0.12); }
+select.form-select-box.form-select:focus { border-color: var(--color-primary) !important; box-shadow: 0 0 0 3px rgba(122,12,12,0.12); }
 
 .search-content-box { margin-bottom: 2rem; }
 .search-button-box {
@@ -1491,4 +1591,11 @@ select.form-select-box.form-select:focus { border-color: var(--color-primary) !i
   .col-xl-3.col-sm-6.mb-4,
   .col-xl-3.col-sm-6.mb-xl-0 { margin-bottom: 1rem !important; }
   .add-table-button { width: 100%; min-width: 0; }
+}
+
+/* Page-specific card width override (new_work_order.html) — stays full-width
+   below lg like every other col-12 card, narrows to exactly 95% at lg+
+   instead of a Bootstrap twelfths value. */
+@media (min-width: 992px) {
+  .col-width-95 { flex: 0 0 95%; max-width: 95%; }
 }

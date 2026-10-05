@@ -132,6 +132,119 @@ class TestSites:
         r = user_client.get('/add_site')
         assert r.status_code == 403
 
+    def test_site_details_loads_for_admin(self, admin_client):
+        r = admin_client.get('/site_details/1')
+        assert r.status_code == 200
+        assert b'Facility Health Score' in r.data
+        assert b'Work Orders by Status' in r.data
+
+    def test_site_details_work_order_status_counts(self, app, admin_client):
+        with app.app_context():
+            from application.models import WorkOrder, Priority, Category
+            from application import workflow
+            from main import db
+            pri = Priority.query.filter_by(name='High').first().id
+            cat = Category.query.filter_by(name='HVAC').first().id
+
+            def make(title, status):
+                wo = WorkOrder(site_id=1, title=title, source=workflow.SOURCE_MANUAL,
+                               status=workflow.NEW, priority_id=pri, category_id=cat)
+                db.session.add(wo)
+                db.session.flush()
+                wo.assign_number()
+                workflow.record_initial_status(wo)
+                if status != workflow.NEW:
+                    workflow.apply_transition(wo, status)
+                db.session.commit()
+
+            make('Status Card Open WO', workflow.IN_PROGRESS)
+            make('Status Card Pending WO', workflow.WAITING_APPROVAL)
+            make('Status Card Closed WO', workflow.CANCELLED)
+
+        r = admin_client.get('/site_details/1')
+        with app.app_context():
+            from application.models import WorkOrder
+            from application import workflow
+            counts = {s: WorkOrder.query.filter_by(site_id=1, status=s).count() for s in workflow.ALL_STATUSES}
+        open_count = sum(counts[s] for s in workflow.OPEN_STATUSES if s not in workflow.WAITING_STATUSES)
+        pending_count = sum(counts[s] for s in workflow.WAITING_STATUSES)
+        closed_count = sum(counts[s] for s in workflow.TERMINAL_STATUSES)
+        assert open_count >= 1 and pending_count >= 1 and closed_count >= 1
+        body = r.get_data(as_text=True)
+        # Each count renders somewhere on the page (loosely — just confirm no crash and real numbers show up).
+        assert str(open_count) in body
+        assert str(pending_count) in body
+        assert str(closed_count) in body
+        assert '/work_orders?status_filter=open&amp;site_filter=1' in body
+        assert '/work_orders?status_filter=pending&amp;site_filter=1' in body
+        assert '/work_orders?status_filter=closed&amp;site_filter=1' in body
+
+    def test_work_orders_pending_and_closed_status_filters(self, app, admin_client):
+        with app.app_context():
+            from application.models import WorkOrder, Priority, Category
+            from application import workflow
+            from main import db
+            pri = Priority.query.filter_by(name='High').first().id
+            cat = Category.query.filter_by(name='HVAC').first().id
+
+            def make(title, status):
+                wo = WorkOrder(site_id=1, title=title, source=workflow.SOURCE_MANUAL,
+                               status=workflow.NEW, priority_id=pri, category_id=cat)
+                db.session.add(wo)
+                db.session.flush()
+                wo.assign_number()
+                workflow.record_initial_status(wo)
+                if status != workflow.NEW:
+                    workflow.apply_transition(wo, status)
+                db.session.commit()
+
+            make('Filter Test Pending WO', workflow.ON_HOLD)
+            make('Filter Test Closed WO', workflow.CANCELLED)
+
+        r_pending = admin_client.get('/work_orders?status_filter=pending')
+        assert b'Filter Test Pending WO' in r_pending.data
+        assert b'Filter Test Closed WO' not in r_pending.data
+
+        r_closed = admin_client.get('/work_orders?status_filter=closed')
+        assert b'Filter Test Closed WO' in r_closed.data
+        assert b'Filter Test Pending WO' not in r_closed.data
+
+    def test_site_details_loads_for_own_site_user(self, user_client):
+        r = user_client.get('/site_details/1')
+        assert r.status_code == 200
+
+    def test_site_details_forbidden_for_other_site_user(self, app):
+        with app.app_context():
+            from application.models import Site, User
+            from application.utils import hash_email
+            from werkzeug.security import generate_password_hash
+            from main import db
+
+            other_site = Site.query.filter_by(site_name='Other Details School').first()
+            if other_site is None:
+                other_site = Site(site_name='Other Details School', site_acronyms='ODS', site_code='097',
+                                  site_cds='00-000-0000097', site_address='7 Other St', site_type='Elementary')
+                db.session.add(other_site)
+                db.session.commit()
+            tech = User.query.filter_by(email_hash=hash_email('details-tech@test.com', app.config['SECRET_KEY'])).first()
+            if tech is None:
+                tech = User(first_name='Details', last_name='Tech', status='Active',
+                           password=generate_password_hash('Some@Password1'), must_change_password=False,
+                           failed_login_attempts=0, role_id=3, site_id=other_site.id)
+                tech.email = 'details-tech@test.com'
+                db.session.add(tech)
+                db.session.commit()
+            tech_id = tech.id
+
+        with app.test_client() as c:
+            with c.session_transaction() as sess:
+                sess['_user_id'] = str(tech_id)
+                sess['_fresh'] = True
+            assert c.get('/site_details/1').status_code == 403
+
+    def test_site_details_nonexistent_site_404s(self, admin_client):
+        assert admin_client.get('/site_details/999999').status_code == 404
+
 
 # ---------------------------------------------------------------------------
 # Titles

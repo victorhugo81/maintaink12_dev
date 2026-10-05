@@ -4,7 +4,7 @@
 <div class="row">
     <div class="col-12">
         <div class="main-card-box card my-4">
-            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+            <div class="card-header p-0 position-relative mt-n4 z-index-2">
                 <div class="bg-gradient-main custom-title-card">
                     <h2 class="text-white ps-3"><i class="material-symbols-rounded opacity-5">checklist</i> {{ inspection.template.name }}
                         <span class="badge {% if inspection.status == 'Completed' %}bg-success{% else %}bg-warning{% endif %} ms-2">{{ inspection.status }}</span>
@@ -61,6 +61,18 @@
                     </div>
                     {% if inspection.generated_work_order %}
                     <p class="text-sm">Work order generated: <a href="{{ url_for('routes.edit_work_order', work_order_id=inspection.generated_work_order.id) }}">{{ inspection.generated_work_order.wo_number }}</a></p>
+                    {% endif %}
+
+                    {% if inspection.attachments %}
+                    <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-4">Photos</p>
+                    <hr class="mt-0 mb-3">
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for att in inspection.attachments %}
+                        <a href="{{ url_for('routes.download_inspection_attachment', attachment_id=att.id) }}" class="d-block">
+                            <img src="{{ url_for('static', filename='uploads/inspection_attachments/' + att.attach_file) }}" alt="Inspection photo" style="width:90px;height:90px;object-fit:cover;border-radius:var(--radius-md);border:1px solid var(--color-border);">
+                        </a>
+                        {% endfor %}
+                    </div>
                     {% endif %}
 
                     {% else %}

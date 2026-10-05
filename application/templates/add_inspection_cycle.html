@@ -6,7 +6,7 @@
         <div class="main-card-box card my-4">
             <div class="card-header p-0 position-relative mt-n4 z-index-2">
                 <div class="bg-gradient-main shadow-dark border-radius-lg pt-4 pb-3">
-                    <h2 class="text-white text-capitalize ps-3">Add New Category</h2>
+                    <h2 class="text-white text-capitalize ps-3">New Inspection Cycle</h2>
                 </div>
             </div>
             <div class="card-body px-4 pb-4">
@@ -15,21 +15,28 @@
                     <div class="col-12 d-flex justify-content-end align-items-center sticky-top bg-white py-2 mb-4 border-bottom">
                         <div class="d-flex gap-2 mt-3">
                             {{ form.submit(class="btn bg-gradient-main") }}
-                            <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.categories') }}">Back</a>
+                            <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.inspection_cycles') }}">Back</a>
                         </div>
                     </div>
                     <div class="row g-3">
-                        <div class="col-12 col-sm-8">
+                        <div class="col-12 col-sm-6">
                             <span aria-hidden="true" class="text-danger ms-1">*</span>
                             {{ form.name.label(class="form-label") }}
                             {{ form.name(class="form-control") }}
                         </div>
-                        <div class="col-12 col-sm-4">
-                            {{ form.sort_order.label(class="form-label") }}
-                            {{ form.sort_order(class="form-control") }}
+                        <div class="col-12 col-sm-3">
+                            {{ form.start_date.label(class="form-label") }}
+                            {{ form.start_date(class="form-control") }}
+                        </div>
+                        <div class="col-12 col-sm-3">
+                            {{ form.end_date.label(class="form-label") }}
+                            {{ form.end_date(class="form-control") }}
+                        </div>
+                        <div class="col-12 form-check mt-2">
+                            {{ form.is_active(class="form-check-input") }}
+                            {{ form.is_active.label(class="form-check-label") }}
                         </div>
                     </div>
-                    <p class="text-secondary text-xs mt-3">Subcategories can be added after saving.</p>
                 </form>
             </div>
         </div>

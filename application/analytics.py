@@ -125,6 +125,7 @@ def parse_filters(args, visible_site_ids, today=None):
         'priority_id': _int('priority_id'),
         'status': status,
         'requester_id': None,
+        'cycle_id': _int('cycle_id'),
     }
 
 
@@ -1121,8 +1122,17 @@ def build_dashboard(view, f, user, today=None):
             'wo': wo, 'top_category': top_category, 'total_in_period': wo['created_in_period'],
             'maintenance': maintenance, 'facility': facility, 'recurring': groups, 'cost': cost, 'sla': sla, **extra,
         }, f['period_label'])
+        from main import db
+        from application import inspections as inspections_module
+        from application.models import InspectionCycle
+        cycle = db.session.get(InspectionCycle, f['cycle_id']) if f.get('cycle_id') else None
+        if cycle is None:
+            cycle = InspectionCycle.query.filter_by(is_active=True).order_by(InspectionCycle.id.desc()).first()
+        progress = inspections_module.inspection_progress(cycle.id if cycle else None, f)
+        charts['district_gauge'] = {'labels': [], 'datasets': [{'label': 'Completion', 'data': [progress['district']['pct'] or 0]}]}
         data.update({'facility': facility, 'maintenance': maintenance, 'cost': cost, 'charts': charts,
-                     'recurring': groups, 'health': health, 'sla': sla, 'insights': insights})
+                     'recurring': groups, 'health': health, 'sla': sla, 'insights': insights,
+                     'progress': progress, 'cycle': cycle})
     elif view == 'technician':
         maintenance = maintenance_kpis({'site_ids': f['site_ids'], 'facility_id': f.get('facility_id'),
                                         'start': f['start'], 'end': f['end']}, today)

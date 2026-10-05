@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+        <div class="card-header p-0 position-relative mt-n4 z-index-2">
+        <div class="bg-gradient-main custom-title-card">
+          <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">event_repeat</i> {{ current_page_name }}</h2>
+          </div>
+          <div class="card-body px-0 pb-2">
+            <br>
+            <div class="table-per-page-section">
+            <div class="row justify-content-end">
+              <div class="col-2 text-end">
+              <a href="{{ url_for('routes.add_inspection_cycle') }}" type="button" class="btn bg-gradient-main add-table-button shadow-dark">Add Cycle</a>
+            </div>
+          </div>
+        </div>
+          <div class="table-responsive p-0">
+            <table class="table align-items-left mb-0 table-striped">
+              <thead>
+                <tr>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Cycle</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Start</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">End</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Status</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for c in cycles %}
+                <tr class="table-highlight-row">
+                  <td><span class="text-dark text-sm font-weight-bold ps-3">{{ c.name }}</span></td>
+                  <td><span class="text-secondary text-xs">{{ c.start_date.strftime('%m-%d-%Y') if c.start_date else '—' }}</span></td>
+                  <td><span class="text-secondary text-xs">{{ c.end_date.strftime('%m-%d-%Y') if c.end_date else '—' }}</span></td>
+                  <td><span class="badge {% if c.is_active %}bg-success{% else %}bg-secondary{% endif %}">{{ 'Active' if c.is_active else 'Inactive' }}</span></td>
+                  <td class="align-middle">
+                    <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ url_for('routes.edit_inspection_cycle', cycle_id=c.id) }}" class="btn table-button-edit font-weight-bold" aria-label="Edit cycle: {{ c.name }}">
+                      <i class="material-symbols-rounded position-relative text-lg">edit</i>
+                    </a>
+                    </div>
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-center text-secondary text-sm py-4">No inspection cycles yet — add one before starting a summer walkthrough.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+  </div>
+</div>
+</div>
+</div>
+
+{% endblock %}

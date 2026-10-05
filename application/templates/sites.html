@@ -7,7 +7,7 @@
 <div class="row">
     <div class="col-12">
         <div class="main-card-box card my-4">
-        <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+        <div class="card-header p-0 position-relative mt-n4 z-index-2">
         <div class="bg-gradient-main custom-title-card">
           <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">house</i> {{ current_page_name }}</h2>
           </div>
@@ -25,9 +25,6 @@
                   </select>
                 </form>
               </div>
-              <div class="col-2 text-end">
-              <a href="{{ url_for('routes.add_site') }}" type="button" class="btn bg-gradient-main add-table-button shadow-dark">Add Site</a>
-            </div>
           </div>
         </div>
     <!-- pause main content card -->
@@ -43,9 +40,7 @@
                 <tr>
                   <th class="text-uppercase text-xxs font-weight-bolder">School Name</th>
                   <th class="text-uppercase text-xxs font-weight-bolder">CDS Code</th>
-                  <th class="text-uppercase text-xxs font-weight-bolder">Site Code</th>
                   <th class="text-uppercase text-xxs font-weight-bolder">Site Address</th>
-                  <th class="text-uppercase text-xxs font-weight-bolder">City/State</th>
                   <th class="text-uppercase text-xxs font-weight-bolder">Site Type</th>
                   <th class="text-uppercase text-xxs font-weight-bolder">Principal</th>
                   <th class="text-uppercase text-xxs font-weight-bolder text-end">Actions</th>
@@ -60,7 +55,7 @@
                         
                       </div>
                       <div class="d-flex flex-column justify-content-center">
-                        <h6 class="mb-0 text-sm">{{ site.site_name }}</h6>
+                        <a href="{{ url_for('routes.site_details', site_id=site.id) }}"><h6 class="mb-0 text-sm">{{ site.site_name }}</h6></a>
                       </div>
                     </div>
                   </td>
@@ -68,13 +63,7 @@
                     <p class="text-xs font-weight-bold mb-0 text-uppercase justify-content-center">{{ site.site_cds }}</p>
                   </td>
                   <td>
-                    <p class="text-xs font-weight-bold mb-0 text-uppercase justify-content-center">{{ site.site_code }}</p>
-                  </td>
-                  <td>
                     <span class="text-secondary text-xs font-weight-bold justify-content-center">{{ site.site_address }}</span>
-                  </td>
-                  <td>
-                    <span class="text-secondary text-xs font-weight-bold justify-content-center">{{ [site.site_city, site.site_state]|select|join(', ') }}</span>
                   </td>
                   <td>
                     <span class="text-secondary text-xs font-weight-bold justify-content-center">{{ site.site_type }}</span>
@@ -86,6 +75,9 @@
                   </td>
                   <td class="align-middle">
                     <div class="d-flex justify-content-end gap-2">
+                    <a href="{{ url_for('routes.site_details', site_id=site.id) }}" type="button" class="btn table-button-edit font-weight-bold" aria-label="View details: {{ site.site_name }}">
+                      <i class="material-symbols-rounded position-relative text-lg">visibility</i>
+                    </a>
                     <a href="{{ url_for('routes.edit_site', site_id=site.id) }}" type="button" class="btn table-button-edit font-weight-bold" aria-label="Edit site: {{ site.site_name }}">
                       <i class="material-symbols-rounded position-relative text-lg">edit</i>
                     </a>

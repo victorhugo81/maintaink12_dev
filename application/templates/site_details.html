@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 z-index-2">
+                <div class="bg-gradient-main custom-title-card">
+                    <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">house</i> {{ site.site_name }}</h2>
+                    <p class="text-white ps-3 mb-0 opacity-8">{{ site.site_type }}{% if site.site_acronyms %} &middot; {{ site.site_acronyms }}{% endif %}</p>
+                </div>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <br>
+
+                <div class="row g-4 mb-4">
+                    <!-- Site info -->
+                    <div class="col-12 col-lg-5">
+                        <div class="card h-100">
+                            <div class="card-body px-4 py-3">
+                                <h6 class="mb-3">Site Information</h6>
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <p class="text-xs text-uppercase text-muted mb-1">Address</p>
+                                        <p class="text-sm mb-0">
+                                            {{ site.site_address }}{% if site.site_city or site.site_state or site.site_zip %}<br>
+                                            {{ [site.site_city, site.site_state]|select|join(', ') }} {{ site.site_zip or '' }}{% endif %}
+                                        </p>
+                                    </div>
+                                    <div class="col-6">
+                                        <p class="text-xs text-uppercase text-muted mb-1">CDS Code</p>
+                                        <p class="text-sm mb-0">{{ site.site_cds }}</p>
+                                    </div>
+                                    <div class="col-6">
+                                        <p class="text-xs text-uppercase text-muted mb-1">Site Code</p>
+                                        <p class="text-sm mb-0">{{ site.site_code }}</p>
+                                    </div>
+                                    <div class="col-12">
+                                        <p class="text-xs text-uppercase text-muted mb-1">Principal</p>
+                                        {% set principal_name = [site.principal_first_name, site.principal_last_name]|select|join(' ') %}
+                                        <p class="text-sm mb-0">{{ principal_name or '—' }}</p>
+                                        {% if site.principal_email %}<p class="text-xs text-secondary mb-0">{{ site.principal_email }}</p>{% endif %}
+                                        {% if site.principal_phone %}<p class="text-xs text-secondary mb-0">{{ site.principal_phone }}</p>{% endif %}
+                                    </div>
+                                </div>
+                                <hr class="my-3">
+                                <div class="row g-3 text-center">
+                                    <div class="col-4">
+                                        <h5 class="mb-0">{{ site.facilities|selectattr('is_active')|list|length }}</h5>
+                                        <p class="text-xxs text-uppercase text-muted mb-0">Buildings</p>
+                                    </div>
+                                    <div class="col-4">
+                                        <h5 class="mb-0 {{ 'text-danger' if wo.overdue else '' }}">{{ wo.overdue }}</h5>
+                                        <p class="text-xxs text-uppercase text-muted mb-0">Overdue WOs</p>
+                                    </div>
+                                    <div class="col-4">
+                                        <h5 class="mb-0 {{ 'text-danger' if (wo.critical or wo.emergency) else '' }}">{{ wo.total_open }}</h5>
+                                        <p class="text-xxs text-uppercase text-muted mb-0">Open WOs</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Facilities audit completion gauge -->
+                    <div class="col-12 col-lg-7">
+                        <div class="card h-100">
+                            <div class="card-body px-4 py-3 d-flex flex-column align-items-center justify-content-center text-center">
+                                <h6 class="mb-3 align-self-start">Facilities Audit{% if cycle %} &mdash; {{ cycle.name }}{% endif %}</h6>
+                                <div class="district-gauge-wrap">
+                                    <canvas data-chart="site_gauge" data-type="gauge" height="200"></canvas>
+                                </div>
+                                <p class="text-sm text-secondary mt-2 mb-0">{{ progress.district.rooms_inspected }} / {{ progress.district.rooms_total }} rooms inspected</p>
+                                {% if not cycle %}
+                                <p class="text-xs text-danger mt-1 mb-0">No active inspection cycle &mdash; <a href="{{ url_for('routes.add_inspection_cycle') }}">create one</a> to start tracking.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Work Order status -->
+                <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">Work Orders by Status</h6>
+                <div class="row mb-2">
+                    <div class="col-xl-4 col-sm-6 mb-4">
+                        <a href="{{ url_for('routes.work_orders', status_filter='open', site_filter=site.id) }}">
+                        <div class="small-cards-dashboard card">
+                            <div class="card-header p-2 ps-3">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <p class="text-sm mb-0 text-capitalize">Open</p>
+                                        <h4 class="mb-0">{{ wo_status.open }}</h4>
+                                    </div>
+                                    <div class="icon icon-md icon-shape text-center"><i class="material-symbols-rounded opacity-10">build</i></div>
+                                </div>
+                            </div>
+                        </div>
+                        </a>
+                    </div>
+                    <div class="col-xl-4 col-sm-6 mb-4">
+                        <a href="{{ url_for('routes.work_orders', status_filter='pending', site_filter=site.id) }}">
+                        <div class="small-cards-dashboard card">
+                            <div class="card-header p-2 ps-3">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <p class="text-sm mb-0 text-capitalize">Pending</p>
+                                        <h4 class="mb-0 {{ 'text-warning' if wo_status.pending else '' }}">{{ wo_status.pending }}</h4>
+                                    </div>
+                                    <div class="icon icon-md icon-shape text-center"><i class="material-symbols-rounded opacity-10">hourglass_top</i></div>
+                                </div>
+                            </div>
+                        </div>
+                        </a>
+                    </div>
+                    <div class="col-xl-4 col-sm-6 mb-4">
+                        <a href="{{ url_for('routes.work_orders', status_filter='closed', site_filter=site.id) }}">
+                        <div class="small-cards-dashboard card">
+                            <div class="card-header p-2 ps-3">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <p class="text-sm mb-0 text-capitalize">Closed</p>
+                                        <h4 class="mb-0">{{ wo_status.closed }}</h4>
+                                    </div>
+                                    <div class="icon icon-md icon-shape text-center"><i class="material-symbols-rounded opacity-10">task_alt</i></div>
+                                </div>
+                            </div>
+                        </div>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Facility Health Score (same table as the main dashboard, scoped to this site) -->
+                <div class="ticket-content-box mb-4" id="health">
+                    <h3>Facility Health Score</h3>
+                    <p class="text-xs text-secondary">0&ndash;100, higher is healthier. Every contributing factor is shown &mdash; a factor with no data is excluded from that facility's score, never counted as zero.</p>
+                    <div class="table-responsive p-0">
+                        <table class="table align-items-left mb-0 table-striped">
+                            <thead><tr>
+                                <th class="text-uppercase text-xxs font-weight-bolder">Facility</th>
+                                <th class="text-uppercase text-xxs font-weight-bolder">Score</th>
+                                {% for name in health_factors %}<th class="text-uppercase text-xxs font-weight-bolder">{{ name }}</th>{% endfor %}
+                            </tr></thead>
+                            <tbody>
+                            {% for row in health %}
+                            <tr class="table-highlight-row">
+                                <td><a href="{{ url_for('routes.edit_facility', facility_id=row.facility.id) }}"><span class="text-sm font-weight-bold">{{ row.facility.name }}</span></a></td>
+                                <td>{% if row.health.score is not none %}<span class="badge {% if row.health.score >= 75 %}bg-success{% elif row.health.score >= 50 %}bg-warning{% else %}bg-danger{% endif %}">{{ row.health.score }}</span> <span class="text-xs text-secondary">({{ row.health.factor_count }}/7)</span>{% else %}<span class="badge bg-secondary">No data</span>{% endif %}</td>
+                                {% for name in health_factors %}{% set fct = row.health.factors[name] %}
+                                <td class="text-xs">{% if fct.available %}<strong>{{ fct.value }}</strong>{% else %}<span class="text-secondary">&mdash;</span>{% endif %}<br><span class="text-secondary">{{ fct.detail }}</span></td>
+                                {% endfor %}
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="9" class="text-center text-secondary text-sm py-4">No active facilities at this site.</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end">
+                    <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.sites') }}">Back</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ g.csp_nonce }}">window.MO_DASHBOARD = {{ {'charts': {'site_gauge': {'labels': [], 'datasets': [{'label': 'Completion', 'data': [progress.district.pct or 0]}]}}}|tojson }};</script>
+<script src="{{ url_for('static', filename='js/plugins/chartjs.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/mo_dashboard.js') }}"></script>
+
+{% endblock %}

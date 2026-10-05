@@ -53,6 +53,8 @@ def create_app(config_name=None):
     os.makedirs(app.config['UPLOAD_WORK_ORDER_ATTACHMENT'], exist_ok=True)
     app.config['UPLOAD_PROJECT_DOCUMENT'] = os.path.join(app.root_path, 'application/static/uploads/project_documents')
     os.makedirs(app.config['UPLOAD_PROJECT_DOCUMENT'], exist_ok=True)
+    app.config['UPLOAD_INSPECTION_ATTACHMENT'] = os.path.join(app.root_path, 'application/static/uploads/inspection_attachments')
+    os.makedirs(app.config['UPLOAD_INSPECTION_ATTACHMENT'], exist_ok=True)
 
     # Use environment-specific configuration
     app.config.from_object(config[config_name])
