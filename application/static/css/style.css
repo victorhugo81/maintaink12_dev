@@ -2,30 +2,30 @@
 
 /* ==========================================================================
    MAINTAINK12 — VISUAL SYSTEM
-   A flat, editorial, borders-over-shadows design language. Deep brick-red
-   primary (#7a0c0c) + a vivid amber-orange accent (#d46205), warmed by a
-   cream tint (#fff0d5), generous whitespace, and a single accent color
+   A flat, editorial, borders-over-shadows design language. Warm coral-orange
+   primary (#F3794C) + a dusty-salmon accent (#E8967A), on a soft cream
+   background (#FCF1E8), generous whitespace, and a single accent color
    used sparingly instead of the gradient-on-everything "admin template"
    look this replaces.
    ========================================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-/* #7a0c0c — updated 2026-10-04, was #04403d (user-supplied red/orange/cream palette) */
+/* #F3794C — updated 2026-10-05, was #7a0c0c (user-supplied warm coral/cream dashboard reference image) */
 :root,
 [data-bs-theme=light] {
   /* ── Brand ── */
-  --bs-main-color-primary:  #551A0D;
-  --bs-main-color-secondary:#475569;
+  --bs-main-color-primary:  #F3794C;
+  --bs-main-color-secondary:#083D5D;
 
-  --color-primary:       #341008;
-  --color-primary-dark:  #541a0d;
-  --color-primary-tint:  #FFF0D5;
+  --color-primary:       #083D5D;
+  --color-primary-dark:  #B65B39;
+  --color-primary-tint:  #FDF2ED;
   --color-secondary:     #475569;
   --color-secondary-dark:#334155;
-  --color-accent:        #d46205;
-  --color-accent-dark:   #b03817;
-  --color-accent-tint:   #FFF0D5;
-  --color-accent-on-dark:#d46205;
+  --color-accent:        #E8967A;
+  --color-accent-dark:   #AE705B;
+  --color-accent-tint:   #FCF4F1;
+  --color-accent-on-dark:#FFA56B;
 
   /* ── Semantic ── */
   --color-success:       #15803D;
@@ -43,14 +43,14 @@
   --bs-warning: var(--color-warning);
 
   /* ── Neutrals ── */
-  --color-bg:            #F4F5F7;
+  --color-bg:            #FCF1E8;
   --color-surface:       #FFFFFF;
-  --color-surface-sunken:#EEF1F4;
-  --color-border:        #DBE1E7;
-  --color-border-strong: #98A7B3;
-  --color-text:          #17212B;
-  --color-text-muted:    #4C5C68;
-  --color-text-subtle:   #71828D;
+  --color-surface-sunken:#F7E8DC;
+  --color-border:        #EDD9C8;
+  --color-border-strong: #D9BBA3;
+  --color-text:          #2B211D;
+  --color-text-muted:    #6B5A4E;
+  --color-text-subtle:   #9C8878;
   --color-text-on-dark:  #ffffff;
   --input-color-border:  var(--color-border-strong);
 
@@ -97,7 +97,7 @@
      whole Bootstrap layer matches the new palette without touching
      template markup. ── */
   --bs-primary:        var(--color-primary);
-  --bs-primary-rgb:     122,12,12;
+  --bs-primary-rgb:     243,121,76;
   --bs-secondary:      var(--color-secondary);
   --bs-secondary-rgb:   71,85,105;
   --bs-success:        var(--color-success);
@@ -775,7 +775,7 @@ a.user-welcome:hover { color: var(--color-primary); text-decoration: none; }
 }
 .form-control:focus {
   border-color: var(--color-primary) !important;
-  box-shadow: 0 0 0 3px rgba(122,12,12,0.14);
+  box-shadow: 0 0 0 3px rgba(243,121,76,0.14);
   outline: none;
 }
 .form-control::placeholder { color: var(--color-text-subtle); opacity: 1; }
@@ -862,14 +862,19 @@ label, .form-label {
 .form-check:not(.form-switch) .form-check-input[type=checkbox]:checked,
 .form-check:not(.form-switch) .form-check-input[type=radio]:checked { border-color: var(--color-primary); }
 .form-check:not(.form-switch) .form-check-input[type=checkbox] { background-image: none; }
+/* A plain CSS-drawn checkmark (rotated border corner) rather than an icon
+   font glyph — this app never actually loads FontAwesome (only Material
+   Symbols Rounded, via Google Fonts), so the old `content: "\f00c"` glyph
+   silently failed to render, leaving a blank filled square with no visible
+   checkmark whenever a checkbox was checked. */
 .form-check:not(.form-switch) .form-check-input[type=checkbox]:after {
   transition: opacity 0.15s ease;
-  font-family: "FontAwesome";
-  content: "\f00c";
-  width: 100%; height: 100%;
-  color: #fff;
-  position: absolute; display: flex; align-items: center; justify-content: center;
-  font-size: 0.67rem;
+  content: "";
+  width: 0.3rem; height: 0.55rem;
+  border: solid #fff;
+  border-width: 0 0.135rem 0.135rem 0;
+  position: absolute; left: 0; right: 0; top: -0.08rem; bottom: 0; margin: auto;
+  transform: rotate(45deg);
   opacity: 0;
 }
 .form-check:not(.form-switch) .form-check-input[type=checkbox]:checked       { background: var(--color-primary); }
@@ -923,7 +928,7 @@ label, .form-label {
   background-color: var(--color-surface);
   padding: 0.55rem 2rem 0.55rem 0.8rem;
 }
-.form-select:focus { border-color: var(--color-primary) !important; box-shadow: 0 0 0 3px rgba(122,12,12,0.14); }
+.form-select:focus { border-color: var(--color-primary) !important; box-shadow: 0 0 0 3px rgba(243,121,76,0.14); }
 
 input.read-only { background: var(--color-surface-sunken) !important; color: var(--color-text) !important; }
 
@@ -1312,7 +1317,7 @@ hr.horizontal.dark { background-color: var(--color-border-strong); }
 .login-form-control:focus, .login-form-control:active {
   outline: none !important;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(122,12,12,0.14);
+  box-shadow: 0 0 0 3px rgba(243,121,76,0.14);
 }
 
 .login-btn {
@@ -1342,7 +1347,7 @@ hr.horizontal.dark { background-color: var(--color-border-strong); }
 
 .bg-gradient-main.custom-title-card,
 .bg-gradient-main.shadow-dark.border-radius-lg {
-  background-color: var(--bs-main-color-primary) !important;
+  background-color: var(--bs-main-color-secondary) !important;
   border-bottom: 1px solid var(--color-border);
   border-radius: 10px 10px 0px 0px !important;
   padding: 1.1rem 0.25rem 1.1rem !important;
@@ -1546,7 +1551,7 @@ input.search-field-box.form-control {
   height: 42px;
   background-color: var(--color-surface);
 }
-input.search-field-box.form-control:focus { border-color: var(--color-primary) !important; box-shadow: 0 0 0 3px rgba(122,12,12,0.12); }
+input.search-field-box.form-control:focus { border-color: var(--color-primary) !important; box-shadow: 0 0 0 3px rgba(243,121,76,0.12); }
 
 select.form-select-box.form-select {
   border: 1.5px solid var(--input-color-border) !important;
@@ -1554,7 +1559,7 @@ select.form-select-box.form-select {
   font-size: 0.875rem;
   color: var(--color-text);
 }
-select.form-select-box.form-select:focus { border-color: var(--color-primary) !important; box-shadow: 0 0 0 3px rgba(122,12,12,0.12); }
+select.form-select-box.form-select:focus { border-color: var(--color-primary) !important; box-shadow: 0 0 0 3px rgba(243,121,76,0.12); }
 
 .search-content-box { margin-bottom: 2rem; }
 .search-button-box {

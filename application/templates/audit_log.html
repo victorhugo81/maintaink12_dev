@@ -15,7 +15,7 @@
                     <div class="row g-2">
                         <div class="col-md-3 col-6">
                             <label class="filter-labels text-sm mb-0">Entity</label>
-                            <select class="form-select-box form-select" name="entity_type" onchange="this.form.submit()">
+                            <select class="form-select-box form-select" name="entity_type" data-autosubmit>
                                 <option value="">All</option>
                                 {% for t in entity_types %}<option value="{{ t }}" {% if entity_type == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
                             </select>
@@ -26,7 +26,7 @@
                         </div>
                         <div class="col-md-3 col-6">
                             <label class="filter-labels text-sm mb-0">User</label>
-                            <select class="form-select-box form-select" name="user_id" onchange="this.form.submit()">
+                            <select class="form-select-box form-select" name="user_id" data-autosubmit>
                                 <option value="">All</option>
                                 <option value="0" {% if user_id == 0 %}selected{% endif %}>System</option>
                                 {% for u in users %}<option value="{{ u.id }}" {% if user_id == u.id %}selected{% endif %}>{{ u.get_full_name() }}</option>{% endfor %}

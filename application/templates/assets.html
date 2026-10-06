@@ -34,7 +34,7 @@
               <input type="hidden" name="type_filter" value="{{ request.args.get('type_filter', '') }}">
               <input type="hidden" name="condition_filter" value="{{ request.args.get('condition_filter', '') }}">
               <input type="hidden" name="status_filter" value="{{ request.args.get('status_filter', '') }}">
-              <select name="site_filter" class="form-select-box form-select" onchange="this.form.submit()">
+              <select name="site_filter" class="form-select-box form-select" data-autosubmit>
                   <option value="">All Sites</option>
                   {% for site in sites %}
                   <option value="{{ site.id }}" {% if request.args.get('site_filter', '')|int == site.id %}selected{% endif %}>{{ site.site_name }}</option>
@@ -53,7 +53,7 @@
               <input type="hidden" name="type_filter" value="{{ request.args.get('type_filter', '') }}">
               <input type="hidden" name="condition_filter" value="{{ request.args.get('condition_filter', '') }}">
               <input type="hidden" name="status_filter" value="{{ request.args.get('status_filter', '') }}">
-              <select name="facility_filter" class="form-select-box form-select" onchange="this.form.submit()">
+              <select name="facility_filter" class="form-select-box form-select" data-autosubmit>
                   <option value="">All Facilities</option>
                   {% for facility in facilities %}
                   <option value="{{ facility.id }}" {% if request.args.get('facility_filter', '')|int == facility.id %}selected{% endif %}>{{ facility.name }}</option>
@@ -69,7 +69,7 @@
               <input type="hidden" name="facility_filter" value="{{ request.args.get('facility_filter', '') }}">
               <input type="hidden" name="condition_filter" value="{{ request.args.get('condition_filter', '') }}">
               <input type="hidden" name="status_filter" value="{{ request.args.get('status_filter', '') }}">
-              <select name="type_filter" class="form-select-box form-select" onchange="this.form.submit()">
+              <select name="type_filter" class="form-select-box form-select" data-autosubmit>
                   <option value="">All Types</option>
                   {% for asset_type in asset_types %}
                   <option value="{{ asset_type.id }}" {% if request.args.get('type_filter', '')|int == asset_type.id %}selected{% endif %}>{{ asset_type.name }}</option>
@@ -85,7 +85,7 @@
               <input type="hidden" name="facility_filter" value="{{ request.args.get('facility_filter', '') }}">
               <input type="hidden" name="type_filter" value="{{ request.args.get('type_filter', '') }}">
               <input type="hidden" name="status_filter" value="{{ request.args.get('status_filter', '') }}">
-              <select name="condition_filter" class="form-select-box form-select" onchange="this.form.submit()">
+              <select name="condition_filter" class="form-select-box form-select" data-autosubmit>
                   <option value="">All Conditions</option>
                   {% for label in condition_labels %}
                   <option value="{{ label }}" {% if request.args.get('condition_filter', '') == label %}selected{% endif %}>{{ label }}</option>
@@ -101,7 +101,7 @@
               <input type="hidden" name="facility_filter" value="{{ request.args.get('facility_filter', '') }}">
               <input type="hidden" name="type_filter" value="{{ request.args.get('type_filter', '') }}">
               <input type="hidden" name="condition_filter" value="{{ request.args.get('condition_filter', '') }}">
-              <select name="status_filter" class="form-select-box form-select" onchange="this.form.submit()">
+              <select name="status_filter" class="form-select-box form-select" data-autosubmit>
                 <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
                 <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
                 <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
@@ -116,7 +116,7 @@
               <div class="col-4">
                 <form method="get" class="d-flex">
                   <label for="per_page">Items per page: </label>
-                  <select name="per_page" id="per_page" class="per-page-drop"  onchange="this.form.submit()">
+                  <select name="per_page" id="per_page" class="per-page-drop"  data-autosubmit>
                     <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
                     <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
                     <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>

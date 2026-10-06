@@ -83,7 +83,10 @@
 <script nonce="{{ g.csp_nonce }}">
 document.getElementById('mark-room-complete')?.addEventListener('click', function () {
     document.querySelectorAll('.result-radio[value="Pass"]').forEach(function (r) { r.checked = true; });
-    document.getElementById('walkthrough-form').submit();
+    // Not .submit() — the form's own SubmitField is named "submit", which shadows
+    // HTMLFormElement.submit as a named-element property and makes it throw
+    // "submit is not a function". requestSubmit() isn't shadowed.
+    document.getElementById('walkthrough-form').requestSubmit();
 });
 </script>
 

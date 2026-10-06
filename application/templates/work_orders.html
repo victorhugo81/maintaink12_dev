@@ -31,7 +31,7 @@
             <label for="status_filter" class="filter-labels text-sm mb-0 text-capitalize">Status</label>
             <form method="get" class="d-flex">
               {{ hidden_except('status_filter') }}
-              <select name="status_filter" class="form-select-box form-select" onchange="this.form.submit()">
+              <select name="status_filter" class="form-select-box form-select" data-autosubmit>
                 <option value="open" {% if status_filter == 'open' %}selected{% endif %}>All Open</option>
                 <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Everything</option>
                 {% for s in statuses %}
@@ -44,7 +44,7 @@
             <label for="priority_filter" class="filter-labels text-sm mb-0 text-capitalize">Priority</label>
             <form method="get" class="d-flex">
               {{ hidden_except('priority_filter') }}
-              <select name="priority_filter" class="form-select-box form-select" onchange="this.form.submit()">
+              <select name="priority_filter" class="form-select-box form-select" data-autosubmit>
                 <option value="">All Priorities</option>
                 {% for p in priorities %}
                 <option value="{{ p.id }}" {% if request.args.get('priority_filter', '')|int == p.id %}selected{% endif %}>{{ p.name }}</option>
@@ -58,7 +58,7 @@
             <label for="category_filter" class="filter-labels text-sm mb-0 text-capitalize">Category</label>
             <form method="get" class="d-flex">
               {{ hidden_except('category_filter') }}
-              <select name="category_filter" class="form-select-box form-select" onchange="this.form.submit()">
+              <select name="category_filter" class="form-select-box form-select" data-autosubmit>
                 <option value="">All Categories</option>
                 {% for c in categories %}
                 <option value="{{ c.id }}" {% if request.args.get('category_filter', '')|int == c.id %}selected{% endif %}>{{ c.name }}</option>
@@ -71,7 +71,7 @@
             <label for="site_filter" class="filter-labels text-sm mb-0 text-capitalize">Site</label>
             <form method="get" class="d-flex">
               {{ hidden_except('site_filter') }}
-              <select name="site_filter" class="form-select-box form-select" onchange="this.form.submit()">
+              <select name="site_filter" class="form-select-box form-select" data-autosubmit>
                 <option value="">All Sites</option>
                 {% for site in sites %}
                 <option value="{{ site.id }}" {% if request.args.get('site_filter', '')|int == site.id %}selected{% endif %}>{{ site.site_name }}</option>
@@ -85,7 +85,7 @@
             <label for="assigned_filter" class="filter-labels text-sm mb-0 text-capitalize">Assigned To</label>
             <form method="get" class="d-flex">
               {{ hidden_except('assigned_filter') }}
-              <select name="assigned_filter" class="form-select-box form-select" onchange="this.form.submit()">
+              <select name="assigned_filter" class="form-select-box form-select" data-autosubmit>
                 <option value="">Anyone</option>
                 <option value="me" {% if request.args.get('assigned_filter') == 'me' %}selected{% endif %}>Me</option>
                 <option value="unassigned" {% if request.args.get('assigned_filter') == 'unassigned' %}selected{% endif %}>Unassigned</option>
@@ -99,7 +99,7 @@
             <label for="source_filter" class="filter-labels text-sm mb-0 text-capitalize">Source</label>
             <form method="get" class="d-flex">
               {{ hidden_except('source_filter') }}
-              <select name="source_filter" class="form-select-box form-select" onchange="this.form.submit()">
+              <select name="source_filter" class="form-select-box form-select" data-autosubmit>
                 <option value="">All Sources</option>
                 {% for s in sources %}
                 <option value="{{ s }}" {% if request.args.get('source_filter') == s %}selected{% endif %}>{{ s }}</option>
@@ -116,7 +116,7 @@
               <div class="col-4">
                 <form method="get" class="d-flex">
                   <label for="per_page">Items per page: </label>
-                  <select name="per_page" id="per_page" class="per-page-drop" onchange="this.form.submit()">
+                  <select name="per_page" id="per_page" class="per-page-drop" data-autosubmit>
                     <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
                     <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
                     <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>

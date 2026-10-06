@@ -230,6 +230,32 @@ class TestRooms:
         r = admin_client.get('/rooms')
         assert r.status_code == 200
 
+    def test_facility_filter_options_scoped_to_selected_site(self, app, admin_client):
+        with app.app_context():
+            from application.models import Site, Facility
+            from main import db
+            other_site = Site.query.filter_by(site_name='Rooms Filter Other School').first()
+            if other_site is None:
+                other_site = Site(site_name='Rooms Filter Other School', site_acronyms='RFO', site_code='096',
+                                  site_cds='00-000-0000096', site_address='6 Other St', site_type='Elementary')
+                db.session.add(other_site)
+                db.session.commit()
+            other_facility = Facility.query.filter_by(name='Rooms Filter Other Building').first()
+            if other_facility is None:
+                other_facility = Facility(site_id=other_site.id, name='Rooms Filter Other Building')
+                db.session.add(other_facility)
+                db.session.commit()
+            site1_id = 1
+
+        # Filtering by site 1 must not offer the other site's facility as an option.
+        r = admin_client.get(f'/rooms?site_filter={site1_id}')
+        assert r.status_code == 200
+        assert b'Rooms Filter Other Building' not in r.data
+
+        # With no site filter, every facility (including the other site's) is listed.
+        r = admin_client.get('/rooms')
+        assert b'Rooms Filter Other Building' in r.data
+
     def test_room_site_scoping_for_other_site_user(self, app):
         """A user at a different site cannot open a room belonging to Main School."""
         with app.app_context():

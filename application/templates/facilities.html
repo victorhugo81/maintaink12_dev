@@ -25,7 +25,7 @@
             <label for="site_filter" class="filter-labels text-sm mb-0 text-capitalize">Filter By Site</label>
             <form method="get" class="d-flex">
               <input type="hidden" name="status_filter" value="{{ request.args.get('status_filter', '') }}">
-              <select name="site_filter" class="form-select-box form-select" onchange="this.form.submit()">
+              <select name="site_filter" class="form-select-box form-select" data-autosubmit>
                   <option value="">All Sites</option>
                   {% for site in sites %}
                   <option value="{{ site.id }}" {% if request.args.get('site_filter', '')|int == site.id %}selected{% endif %}>
@@ -40,7 +40,7 @@
             <label for="status_filter" class="filter-labels text-sm mb-0 text-capitalize">Filter By Status</label>
             <form method="get" class="d-flex">
               <input type="hidden" name="site_filter" value="{{ request.args.get('site_filter', '') }}">
-              <select name="status_filter" class="form-select-box form-select" onchange="this.form.submit()">
+              <select name="status_filter" class="form-select-box form-select" data-autosubmit>
                 <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
                 <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
                 <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
@@ -56,7 +56,7 @@
               <div class="col-4">
                 <form method="get" class="d-flex">
                   <label for="per_page">Items per page: </label>
-                  <select name="per_page" id="per_page" class="per-page-drop"  onchange="this.form.submit()">
+                  <select name="per_page" id="per_page" class="per-page-drop"  data-autosubmit>
                     <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
                     <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
                     <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>

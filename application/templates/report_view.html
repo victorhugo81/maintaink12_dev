@@ -17,7 +17,7 @@
           <div class="row g-2">
             <div class="col-md-2 col-6">
               <label class="filter-labels text-sm mb-0">Date Range</label>
-              <select class="form-select-box form-select" name="preset" onchange="this.form.submit()">
+              <select class="form-select-box form-select" name="preset" data-autosubmit>
                 {% for p in presets %}<option value="{{ p }}" {% if filters.preset == p %}selected{% endif %}>{{ preset_labels[p] }}</option>{% endfor %}
               </select>
             </div>
@@ -33,7 +33,7 @@
             {% if options.sites %}
             <div class="col-md-2 col-6">
               <label class="filter-labels text-sm mb-0">Site</label>
-              <select class="form-select-box form-select" name="site_id" onchange="this.form.submit()">
+              <select class="form-select-box form-select" name="site_id" data-autosubmit>
                 <option value="">All Sites</option>
                 {% for s in options.sites %}<option value="{{ s.id }}" {% if filters.site_id == s.id %}selected{% endif %}>{{ s.site_name }}</option>{% endfor %}
               </select>
@@ -42,7 +42,7 @@
             {% if options.facilities %}
             <div class="col-md-2 col-6">
               <label class="filter-labels text-sm mb-0">Facility</label>
-              <select class="form-select-box form-select" name="facility_id" onchange="this.form.submit()">
+              <select class="form-select-box form-select" name="facility_id" data-autosubmit>
                 <option value="">All Facilities</option>
                 {% for fac in options.facilities %}<option value="{{ fac.id }}" {% if filters.facility_id == fac.id %}selected{% endif %}>{{ fac.name }}</option>{% endfor %}
               </select>
@@ -51,7 +51,7 @@
             {% if options.assets %}
             <div class="col-md-2 col-6">
               <label class="filter-labels text-sm mb-0">Asset</label>
-              <select class="form-select-box form-select" name="asset_id" onchange="this.form.submit()">
+              <select class="form-select-box form-select" name="asset_id" data-autosubmit>
                 <option value="">All Assets</option>
                 {% for a in options.assets %}<option value="{{ a.id }}" {% if filters.asset_id == a.id %}selected{% endif %}>{{ a.asset_tag }} &mdash; {{ a.name }}</option>{% endfor %}
               </select>
@@ -60,7 +60,7 @@
             {% if options.technicians %}
             <div class="col-md-2 col-6">
               <label class="filter-labels text-sm mb-0">Technician</label>
-              <select class="form-select-box form-select" name="technician_id" onchange="this.form.submit()">
+              <select class="form-select-box form-select" name="technician_id" data-autosubmit>
                 <option value="">All Technicians</option>
                 {% for t in options.technicians %}<option value="{{ t.id }}" {% if filters.technician_id == t.id %}selected{% endif %}>{{ t.get_full_name() }}</option>{% endfor %}
               </select>
@@ -69,7 +69,7 @@
             {% if options.vendors %}
             <div class="col-md-2 col-6">
               <label class="filter-labels text-sm mb-0">Vendor</label>
-              <select class="form-select-box form-select" name="vendor_id" onchange="this.form.submit()">
+              <select class="form-select-box form-select" name="vendor_id" data-autosubmit>
                 <option value="">All Vendors</option>
                 {% for v in options.vendors %}<option value="{{ v.id }}" {% if filters.vendor_id == v.id %}selected{% endif %}>{{ v.name }}</option>{% endfor %}
               </select>
@@ -78,7 +78,7 @@
             {% if 'category' in entry.filters %}
             <div class="col-md-2 col-6">
               <label class="filter-labels text-sm mb-0">Category</label>
-              <select class="form-select-box form-select" name="category_id" onchange="this.form.submit()">
+              <select class="form-select-box form-select" name="category_id" data-autosubmit>
                 <option value="">All Categories</option>
                 {% for c in options.categories %}<option value="{{ c.id }}" {% if filters.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
               </select>
@@ -87,7 +87,7 @@
             {% if 'priority' in entry.filters %}
             <div class="col-md-2 col-6">
               <label class="filter-labels text-sm mb-0">Priority</label>
-              <select class="form-select-box form-select" name="priority_id" onchange="this.form.submit()">
+              <select class="form-select-box form-select" name="priority_id" data-autosubmit>
                 <option value="">All Priorities</option>
                 {% for p in options.priorities %}<option value="{{ p.id }}" {% if filters.priority_id == p.id %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
               </select>
@@ -96,7 +96,7 @@
             {% if 'dimension' in entry.filters %}
             <div class="col-md-2 col-6">
               <label class="filter-labels text-sm mb-0">Group By</label>
-              <select class="form-select-box form-select" name="dimension" onchange="this.form.submit()">
+              <select class="form-select-box form-select" name="dimension" data-autosubmit>
                 {% for d in options.dimensions %}<option value="{{ d }}" {% if filters.dimension == d %}selected{% endif %}>{{ options.dimension_labels[d] }}</option>{% endfor %}
               </select>
             </div>

@@ -5,7 +5,7 @@
 (function () {
   var data = window.MO_DASHBOARD || {};
   var charts = data.charts || {};
-  var primary = getComputedStyle(document.documentElement).getPropertyValue('--bs-main-color-primary').trim() || '#7a0c0c';
+  var primary = getComputedStyle(document.documentElement).getPropertyValue('--bs-main-color-primary').trim() || '#F3794C';
   var palette = [primary, '#f5a623', '#d0021b', '#7ed321', '#4a90e2', '#9013fe', '#50e3c2', '#b8e986', '#8b572a', '#417505', '#9b9b9b'];
 
   var axisOpts = {
@@ -20,7 +20,7 @@
     if (val >= 90) { return '#15803D'; }
     if (val >= 75) { return '#1D4ED8'; }
     if (val >= 50) { return '#92400E'; }
-    if (val >= 25) { return '#d46205'; }
+    if (val >= 25) { return '#E8967A'; }
     return '#B91C1C';
   }
 

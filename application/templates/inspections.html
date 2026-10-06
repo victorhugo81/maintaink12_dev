@@ -12,7 +12,7 @@
             <br>
             <div class="d-flex justify-content-between mb-4">
               <form method="get" class="d-flex">
-                <select name="status_filter" class="form-select-box form-select" onchange="this.form.submit()">
+                <select name="status_filter" class="form-select-box form-select" data-autosubmit>
                   <option value="Scheduled" {% if status_filter == 'Scheduled' %}selected{% endif %}>Scheduled</option>
                   <option value="Completed" {% if status_filter == 'Completed' %}selected{% endif %}>Completed</option>
                   <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>

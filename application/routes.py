@@ -2121,13 +2121,16 @@ def rooms():
 
     query = Room.query
     if current_user.role_id in (1, 2):
+        fac_query = Facility.query
         if site_filter:
             try:
-                query = query.filter(Room.site_id == int(site_filter))
+                site_filter_id = int(site_filter)
+                query = query.filter(Room.site_id == site_filter_id)
+                fac_query = fac_query.filter(Facility.site_id == site_filter_id)
             except ValueError:
                 pass
         sites = Site.query.order_by(Site.site_name).all()
-        facilities_qs = Facility.query.order_by(Facility.name).all()
+        facilities_qs = fac_query.order_by(Facility.name).all()
     else:
         query = query.filter(Room.site_id == current_user.site_id)
         sites = Site.query.filter_by(id=current_user.site_id).all()

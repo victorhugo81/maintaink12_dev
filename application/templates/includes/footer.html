@@ -163,15 +163,30 @@ Scrollbar.init(document.querySelector('#sidenav-scrollbar'), options);
 }());
 </script>
 
+
+<!-- Auto-submitting filter/per-page selects. These used to be plain
+     onchange="this.form.submit()" attributes, but this app's CSP
+     (script-src 'self' 'nonce-x', deliberately no 'unsafe-inline') blocks
+     EVERY inline event-handler attribute in a CSP-enforcing browser —
+     nonces only authorize <script> elements, not onX= attributes. Mark the
+     element with data-autosubmit instead and wire it up here, where the
+     nonce actually applies. -->
+<script nonce="{{ g.csp_nonce }}">
+document.querySelectorAll('[data-autosubmit]').forEach(function (el) {
+  el.addEventListener('change', function () { el.form.submit(); });
+});
+</script>
+
 <!-- Unsaved changes warning -->
 <script nonce="{{ g.csp_nonce }}">
 (function () {
   var _dirty = false;
 
   // A form is trackable if it has at least one visible field AND no
-  // auto-submitting onchange fields (filter dropdowns, per-page selects).
+  // auto-submitting fields (filter dropdowns, per-page selects — see the
+  // [data-autosubmit] wiring above).
   function isTrackable(form) {
-    if (form.querySelector('[onchange]')) return false;
+    if (form.querySelector('[onchange], [data-autosubmit]')) return false;
     return form.querySelector('input:not([type="hidden"]), textarea, select') !== null;
   }
 

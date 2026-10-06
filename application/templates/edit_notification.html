@@ -45,8 +45,7 @@
                         type="checkbox" 
                         id="msg_status" 
                         name="msg_status"
-                        {% if notification.msg_status == 'Active' %}checked{% endif %}
-                        onchange="updateStatusLabel()">
+                        {% if notification.msg_status == 'Active' %}checked{% endif %}>
                     <label class="form-check-label" id="statusLabel" for="msg_status">
                         {{ 'Active' if notification.msg_status == 'Active' else 'Inactive' }}
                     </label>
@@ -82,6 +81,7 @@
         const label = document.getElementById('statusLabel');
         label.textContent = checkbox.checked ? 'Active' : 'Inactive';
     }
+    document.getElementById('msg_status').addEventListener('change', updateStatusLabel);
     </script>
 
 {% endblock %}

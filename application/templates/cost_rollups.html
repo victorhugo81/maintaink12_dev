@@ -13,7 +13,7 @@
             <div class="mb-4">
               <label for="dimension" class="filter-labels text-sm mb-0 text-capitalize">Group By</label>
               <form method="get" class="d-flex">
-                <select name="dimension" id="dimension" class="form-select-box form-select" onchange="this.form.submit()">
+                <select name="dimension" id="dimension" class="form-select-box form-select" data-autosubmit>
                   {% for d in dimensions %}
                   <option value="{{ d }}" {% if dimension == d %}selected{% endif %}>{{ dimension_labels[d] }}</option>
                   {% endfor %}

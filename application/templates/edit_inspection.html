@@ -79,35 +79,59 @@
                     <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-4">Record Results</p>
                     <hr class="mt-0 mb-3">
                     {% if active_items %}
-                    <form method="POST" action="{{ url_for('routes.record_inspection_results', inspection_id=inspection.id) }}">
+                    <form method="POST" action="{{ url_for('routes.record_inspection_results', inspection_id=inspection.id) }}" enctype="multipart/form-data" id="inspection-results-form">
                         {{ results_form.hidden_tag() }}
+
+                        <button type="button" id="mark-inspection-complete" class="btn btn-lg btn-success w-100 mb-4">
+                            <i class="material-symbols-rounded">check_circle</i> Mark Complete (all good)
+                        </button>
+
                         {% for entry in results_form.items.entries %}
                         {% set item = active_items[loop.index0] %}
-                        <div class="row g-3 align-items-center mb-3 pb-3 border-bottom">
-                            <div class="col-12 col-lg-4">
-                                <strong>{{ item.question }}</strong>
-                            </div>
-                            <div class="col-12 col-lg-4">
-                                {% for subfield in entry.form.result %}
-                                <div class="form-check form-check-inline">
-                                    {{ subfield(class="form-check-input") }}
-                                    {{ subfield.label(class="form-check-label") }}
-                                </div>
+                        <div class="walkthrough-item-row">
+                            <p class="walkthrough-item-question">{{ item.question }}</p>
+                            <div class="result-btn-group">
+                                {% set radios = {} %}
+                                {% for subfield in entry.form.result %}{% if radios.update({subfield.label.text: subfield}) %}{% endif %}{% endfor %}
+                                {% for key, label, cls, icon in [('Pass', 'Good', 'good', 'check_circle'), ('Needs Attention', 'Issue', 'issue', 'warning'), ('Fail', 'Critical', 'critical', 'error'), ('N/A', 'N/A', 'na', 'block')] %}
+                                {% set subfield = radios[key] %}
+                                {{ subfield(class="result-radio") }}
+                                <label class="result-btn result-btn-{{ cls }}" for="{{ subfield.id }}">
+                                    <i class="material-symbols-rounded">{{ icon }}</i> {{ label }}
+                                </label>
                                 {% endfor %}
                             </div>
-                            <div class="col-12 col-lg-4">
-                                {{ entry.form.notes(class="form-control", placeholder="Notes (optional)") }}
-                            </div>
+                            {{ entry.form.notes(class="form-control form-control-sm mt-2", placeholder="Add a note (optional)") }}
                         </div>
                         {% endfor %}
-                        <div class="form-check mb-3">
-                            {{ results_form.generate_work_order(class="form-check-input") }}
-                            {{ results_form.generate_work_order.label(class="form-check-label") }}
+
+                        <div class="row g-3 mt-3">
+                            <div class="col-12 col-sm-6">
+                                {{ results_form.generate_work_order.label(class="form-label") }}
+                                <div class="form-check">
+                                    {{ results_form.generate_work_order(class="form-check-input") }}
+                                    <label class="form-check-label" for="{{ results_form.generate_work_order.id }}">Generate a work order for any Critical item</label>
+                                </div>
+                            </div>
+                            <div class="col-12 col-sm-6">
+                                <label class="form-label" for="inspection-photo">Photo (optional)</label>
+                                <input type="file" class="form-control" id="inspection-photo" name="photo" accept="image/jpeg,image/png" capture="environment">
+                            </div>
                         </div>
-                        <div class="d-flex justify-content-end gap-2">
+
+                        <div class="d-flex justify-content-end gap-2 mt-4">
                             {{ results_form.submit(class="btn bg-gradient-main") }}
                         </div>
                     </form>
+                    <script nonce="{{ g.csp_nonce }}">
+                    document.getElementById('mark-inspection-complete')?.addEventListener('click', function () {
+                        document.querySelectorAll('.result-radio[value="Pass"]').forEach(function (r) { r.checked = true; });
+                        // Not .submit() — the form's own SubmitField is named "submit", which
+                        // shadows HTMLFormElement.submit as a named-element property and makes
+                        // it throw "submit is not a function". requestSubmit() isn't shadowed.
+                        document.getElementById('inspection-results-form').requestSubmit();
+                    });
+                    </script>
                     {% else %}
                     <p class="text-secondary text-sm">This template has no active checklist items.</p>
                     {% endif %}
