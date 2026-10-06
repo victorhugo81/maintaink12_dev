@@ -87,6 +87,7 @@ def create_app(config_name=None):
     limiter.init_app(app)
     scheduler.init_app(app)
     login_manager.login_view = "routes.login"
+    login_manager.login_message = ''  # suppress "Please log in to access this page." on redirect
 
     # Static assets (CSS/JS/images) shouldn't count against the default
     # per-IP rate limit — a single page view can request a dozen of them.
