@@ -35,11 +35,6 @@
 {% macro days(value) %}{% if value is none %}&mdash;{% else %}{{ value }} d{% endif %}{% endmacro %}
 {% macro money(value) %}${{ '{:,.2f}'.format(value|float) }}{% endmacro %}
 
-{# Spec's suggested completion-color buckets, shared by the district gauge
-   (mo_dashboard.js) and every per-school progress bar below. #}
-{% macro pct_tone(value) %}{% if value is none %}secondary{% elif value >= 90 %}success{% elif value >= 75 %}info{% elif value >= 50 %}warning{% elif value >= 25 %}accent{% else %}danger{% endif %}{% endmacro %}
-{% macro pct_status_label(value) %}{% if value is none %}No Data{% elif value >= 90 %}On Track{% elif value >= 75 %}Nearly There{% elif value >= 50 %}At Risk{% elif value >= 25 %}Behind{% else %}Critical{% endif %}{% endmacro %}
-
 {% set wo = data.wo %}
 {% set f = filters %}
 
@@ -179,27 +174,6 @@
           </div>
         </div>
 
-        {% if prog.facilities %}
-        <div class="card mb-4">
-          <div class="card-body px-4 py-3">
-            <h6 class="mb-3">School Progress</h6>
-            {% for row in prog.facilities %}
-            <div class="d-flex align-items-center justify-content-between mb-1">
-              <a href="{{ url_for('routes.edit_facility', facility_id=row.facility.id) }}" class="text-sm fw-bold text-dark">{{ row.facility.name }}</a>
-              <span class="text-xs text-secondary">
-                {{ row.rooms_inspected }} / {{ row.rooms_total }} rooms &middot;
-                {% if row.pct is none %}&mdash;{% else %}{{ row.pct }}%{% endif %} &middot;
-                <span class="badge bg-{{ pct_tone(row.pct) }}">{{ pct_status_label(row.pct) }}</span>
-              </span>
-            </div>
-            <div class="progress mb-3" style="height:8px;" role="progressbar" aria-valuenow="{{ row.pct or 0 }}" aria-valuemin="0" aria-valuemax="100" aria-label="{{ row.facility.name }} inspection progress">
-              <div class="progress-bar bg-{{ pct_tone(row.pct) }}" style="width: {{ row.pct or 0 }}%;"></div>
-            </div>
-            {% endfor %}
-          </div>
-        </div>
-        {% endif %}
-
         <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">Work Orders &mdash; current</h6>
         <div class="row">
           {{ kpi_card('Total Open', wo.total_open, 'build', url_for('routes.work_orders')) }}
@@ -282,34 +256,6 @@
           {{ chart_box('pm_vs_corrective', 'Preventive vs Corrective', 'By work order source', 'doughnut') }}
           {{ chart_box('condition_distribution', 'Asset Condition', 'Current condition of active assets', 'doughnut') }}
           {% endif %}
-        </div>
-
-        <!-- Facility Health -->
-        <div class="ticket-content-box mb-4" id="health">
-          <h3>Facility Health Score</h3>
-          <p class="text-xs text-secondary">0&ndash;100, higher is healthier. Every contributing factor is shown &mdash; a factor with no data is excluded from that facility's score, never counted as zero. Period-based factors (inspection failures, maintenance cost, recurring problems) follow the date filter above.</p>
-          <div class="table-responsive p-0">
-            <table class="table align-items-left mb-0 table-striped">
-              <thead><tr>
-                <th class="text-uppercase text-xxs font-weight-bolder">Facility</th>
-                <th class="text-uppercase text-xxs font-weight-bolder">Score</th>
-                {% for name in health_factors %}<th class="text-uppercase text-xxs font-weight-bolder">{{ name }}</th>{% endfor %}
-              </tr></thead>
-              <tbody>
-              {% for row in data.health %}
-              <tr class="table-highlight-row">
-                <td><a href="{{ url_for('routes.edit_facility', facility_id=row.facility.id) }}"><span class="text-sm font-weight-bold">{{ row.facility.name }}</span></a><br><span class="text-xs text-secondary">{{ row.facility.site.site_name }}</span></td>
-                <td>{% if row.health.score is not none %}<span class="badge {% if row.health.score >= 75 %}bg-success{% elif row.health.score >= 50 %}bg-warning{% else %}bg-danger{% endif %}">{{ row.health.score }}</span> <span class="text-xs text-secondary">({{ row.health.factor_count }}/7)</span>{% else %}<span class="badge bg-secondary">No data</span>{% endif %}</td>
-                {% for name in health_factors %}{% set fct = row.health.factors[name] %}
-                <td class="text-xs">{% if fct.available %}<strong>{{ fct.value }}</strong>{% else %}<span class="text-secondary">&mdash;</span>{% endif %}<br><span class="text-secondary">{{ fct.detail }}</span></td>
-                {% endfor %}
-              </tr>
-              {% else %}
-              <tr><td colspan="9" class="text-center text-secondary text-sm py-4">No active facilities in this scope.</td></tr>
-              {% endfor %}
-              </tbody>
-            </table>
-          </div>
         </div>
 
         <!-- SLA Breaches / Warnings -->

@@ -34,7 +34,6 @@
                   <th class="text-uppercase text-xxs font-weight-bolder">Total Work Orders</th>
                   <th class="text-uppercase text-xxs font-weight-bolder">Open Work</th>
                   <th class="text-uppercase text-xxs font-weight-bolder">Total Cost</th>
-                  <th class="text-uppercase text-xxs font-weight-bolder">Avg Completion (days)</th>
                   <th class="text-uppercase text-xxs font-weight-bolder">Contract End</th>
                   <th class="text-uppercase text-xxs font-weight-bolder">Insurance</th>
                   <th class="text-uppercase text-xxs font-weight-bolder">License</th>
@@ -51,13 +50,12 @@
                   <td><span class="text-secondary text-xs font-weight-bold">{{ row.stats.total_count }}</span></td>
                   <td><span class="text-secondary text-xs font-weight-bold">{{ row.stats.open_count }}</span></td>
                   <td><span class="text-secondary text-xs font-weight-bold">${{ '%.2f'|format(row.stats.total_cost) }}</span></td>
-                  <td><span class="text-secondary text-xs font-weight-bold">{{ row.stats.avg_completion_days if row.stats.avg_completion_days is not none else 'N/A' }}</span></td>
                   <td>{{ exp_badge(row.contract_status, row.vendor.contract_end_date) }}</td>
                   <td>{{ exp_badge(row.insurance_status, row.vendor.insurance_expiration) }}</td>
                   <td>{{ exp_badge(row.license_status, row.vendor.license_expiration) }}</td>
                 </tr>
                 {% else %}
-                <tr><td colspan="8" class="text-center text-secondary text-sm py-4">No active vendors.</td></tr>
+                <tr><td colspan="7" class="text-center text-secondary text-sm py-4">No active vendors.</td></tr>
                 {% endfor %}
               </tbody>
             </table>

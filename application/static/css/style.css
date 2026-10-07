@@ -17,8 +17,9 @@
   --bs-main-color-primary:  #F3794C;
   --bs-main-color-secondary:#083D5D;
 
-  --color-primary:       #083D5D;
-  --color-primary-dark:  #B65B39;
+  --color-primary:  #B65B39;
+  --color-primary-dark: #083D5D;
+
   --color-primary-tint:  #FDF2ED;
   --color-secondary:     #475569;
   --color-secondary-dark:#334155;
@@ -576,8 +577,7 @@ a.user-welcome:hover { color: var(--color-primary); text-decoration: none; }
 .small-cards-dashboard { padding: 0 !important; margin-top: 0; margin-bottom: 0; }
 .small-cards-dashboard.card {
   transition: var(--transition-base);
-  background-color: var(--color-primary);
-  border-color: var(--color-primary-dark);
+  background-color: var(--bs-main-color-primary);
 }
 /* These cards are wrapped in a bare <a> — override its color/underline
    behavior (and the count/label text inside) so the resting state reads
@@ -1016,7 +1016,11 @@ input.read-only { background: var(--color-surface-sunken) !important; color: var
    progress bars' "25-49%, Behind" tier needs a 5th bucket (spec's "Orange"). */
 .bg-accent { background-color: var(--color-accent) !important; color: #fff !important; }
 
-.district-gauge-wrap { width: 100%; max-width: 220px; height: 200px; margin: 0 auto; }
+.district-gauge-wrap { width: 100%; 
+  max-width: 220px; 
+  height: 200px; 
+  margin: 0 auto; 
+}
 
 /* ==========================================================================
    ICONS

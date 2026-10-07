@@ -452,7 +452,7 @@ class TestDashboardRoutes:
 
     def test_admin_default_is_executive_and_can_switch(self, admin_client):
         r = admin_client.get('/')
-        assert r.status_code == 200 and b'Executive' in r.data and b'Facility Health Score' in r.data
+        assert r.status_code == 200 and b'Executive' in r.data
         r = admin_client.get('/?view=manager&preset=year')
         assert r.status_code == 200 and b'M&amp;O Manager' in r.data and b'Response &amp; Completion' in r.data
         r = admin_client.get('/?view=technician')
