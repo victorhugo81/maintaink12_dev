@@ -575,35 +575,36 @@ a.user-welcome:hover { color: var(--color-primary); text-decoration: none; }
 
 .card-dashboard-box { padding: 1.5rem 1.25rem; min-height: 280px !important; }
 .small-cards-dashboard { padding: 0 !important; margin-top: 0; margin-bottom: 0; }
+
+/* KPI tiles — a neutral card with a colored left accent bar and a tinted
+   icon badge, not a solid-filled block. The bar/badge color follows the
+   number's own tone class (text-danger/text-warning), so a row of tiles
+   reads as "mostly neutral, a couple of these need attention" instead of
+   every stat shouting in the same brand color regardless of severity. */
 .small-cards-dashboard.card {
   transition: var(--transition-base);
-  background-color: var(--bs-main-color-primary);
+  background-color: var(--color-surface);
+  border-left: 4px solid var(--color-primary);
 }
-/* These cards are wrapped in a bare <a> — override its color/underline
-   behavior (and the count/label text inside) so the resting state reads
-   as white text on the primary-navy fill, flipping to dark text on white
-   on hover. */
 .small-cards-dashboard.card,
 .small-cards-dashboard.card p,
 .small-cards-dashboard.card h4 {
-  color: #fff;
-  text-decoration: none;
-}
-.small-cards-dashboard.card .icon-shape { background-color: rgba(255,255,255,0.18); }
-.small-cards-dashboard.card .icon-shape .material-symbols-rounded { color: #fff; }
-
-.small-cards-dashboard.card:hover {
-  background-color: #fff;
-  border-color: var(--color-border-strong);
-}
-.small-cards-dashboard.card:hover,
-.small-cards-dashboard.card:hover p,
-.small-cards-dashboard.card:hover h4 {
   color: var(--color-text);
   text-decoration: none;
 }
-.small-cards-dashboard.card:hover .icon-shape { background-color: var(--color-primary-tint); }
-.small-cards-dashboard.card:hover .icon-shape .material-symbols-rounded { color: var(--color-primary); }
+.small-cards-dashboard.card h4 { font-size: 1.5rem; }
+.small-cards-dashboard.card p { color: var(--color-text-muted); }
+.small-cards-dashboard.card .icon-shape { background-color: var(--color-primary-tint); }
+.small-cards-dashboard.card .icon-shape .material-symbols-rounded { color: var(--color-primary); }
+
+.small-cards-dashboard.card:has(h4.text-danger)  { border-left-color: var(--color-danger); }
+.small-cards-dashboard.card:has(h4.text-danger)  .icon-shape { background-color: var(--color-danger-tint); }
+.small-cards-dashboard.card:has(h4.text-danger)  .icon-shape .material-symbols-rounded { color: var(--color-danger); }
+.small-cards-dashboard.card:has(h4.text-warning) { border-left-color: var(--color-warning); }
+.small-cards-dashboard.card:has(h4.text-warning) .icon-shape { background-color: var(--color-warning-tint); }
+.small-cards-dashboard.card:has(h4.text-warning) .icon-shape .material-symbols-rounded { color: var(--color-warning); }
+
+.small-cards-dashboard.card:hover { box-shadow: var(--shadow-sm); }
 .small-cards-dashboard .card-header { border-bottom: none; }
 
 .custom-title-card { border-radius: var(--radius-lg); padding-top: 0.7rem; padding-bottom: 0.5rem; }
@@ -1016,10 +1017,55 @@ input.read-only { background: var(--color-surface-sunken) !important; color: var
    progress bars' "25-49%, Behind" tier needs a 5th bucket (spec's "Orange"). */
 .bg-accent { background-color: var(--color-accent) !important; color: #fff !important; }
 
-.district-gauge-wrap { width: 100%; 
-  max-width: 220px; 
-  height: 200px; 
-  margin: 0 auto; 
+.district-gauge-wrap { width: 100%;
+  max-width: 220px;
+  height: 200px;
+  margin: 0 auto;
+}
+
+/* ==========================================================================
+   DASHBOARD HERO — a full-bleed, solid-fill band (no gradient — the
+   "admin template" look this app deliberately moved away from) for the
+   district completion gauge + headline work-order counts. Everything
+   below it reverts to the normal flat/bordered card language; this is the
+   one place on the page meant to read as a single, dominant focal point
+   rather than another tile in the grid.
+   ========================================================================== */
+.dashboard-hero {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2rem;
+  background-color: var(--color-primary);
+  border-radius: var(--radius-xl);
+  padding: 1.75rem 2rem;
+}
+
+.dashboard-hero-gauge-card {
+  flex: 0 0 auto;
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: 0.75rem 1.5rem 1rem;
+  text-align: center;
+  box-shadow: var(--shadow-md);
+}
+.dashboard-hero-gauge-card .district-gauge-wrap { max-width: 170px; height: 150px; }
+.dashboard-hero-gauge-caption { font-size: 0.75rem; color: var(--color-text-muted); margin: 0.25rem 0 0; font-weight: 600; }
+
+.dashboard-hero-stats {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 1rem 2.5rem;
+}
+.hero-stat { min-width: 110px; }
+.hero-stat-value { font-size: 2.5rem; font-weight: 800; line-height: 1; color: #fff; letter-spacing: -0.02em; }
+.hero-stat-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.75); margin-top: 0.35rem; }
+.hero-stat-alert .hero-stat-value { color: var(--color-primary-tint); }
+
+@media (max-width: 767.98px) {
+  .dashboard-hero { padding: 1.5rem; justify-content: center; text-align: center; }
+  .dashboard-hero-stats { justify-content: center; }
 }
 
 /* ==========================================================================

@@ -147,95 +147,129 @@
         {% set fac = data.facility %}{% set m = data.maintenance %}{% set cost = data.cost %}
         {% set prog = data.progress %}{% set cyc = data.cycle %}
 
-        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">
-          Facilities Audit{% if cyc %} &mdash; {{ cyc.name }}{% endif %}
-        </h6>
-        <div class="row align-items-stretch mb-2">
-          <div class="col-12 col-lg-4 mb-4">
-            <div class="card h-100 d-flex flex-column align-items-center justify-content-center py-4">
-              <div class="district-gauge-wrap">
-                <canvas data-chart="district_gauge" data-type="gauge" height="200"></canvas>
-              </div>
-              <p class="text-sm text-secondary mt-2 mb-0">{{ prog.district.rooms_inspected }} / {{ prog.district.rooms_total }} rooms inspected</p>
-              {% if not cyc %}
-              <p class="text-xs text-danger mt-1 mb-0 px-3 text-center">No inspection cycle yet &mdash; <a href="{{ url_for('routes.add_inspection_cycle') }}">create one</a> to start tracking the summer walkthrough.</p>
+        <div class="dashboard-hero mb-3">
+          <div class="dashboard-hero-gauge-card">
+            <div class="district-gauge-wrap">
+              <canvas data-chart="district_gauge" data-type="gauge" height="150"></canvas>
+            </div>
+            <p class="dashboard-hero-gauge-caption">{{ prog.district.rooms_inspected }} / {{ prog.district.rooms_total }} rooms</p>
+          </div>
+          <div class="dashboard-hero-stats">
+            <div class="hero-stat">
+              <div class="hero-stat-value">{{ wo.total_open }}</div>
+              <div class="hero-stat-label">Open Work Orders</div>
+            </div>
+            <div class="hero-stat hero-stat-alert">
+              <div class="hero-stat-value">{{ wo.critical }}</div>
+              <div class="hero-stat-label">Critical</div>
+            </div>
+            <div class="hero-stat hero-stat-alert">
+              <div class="hero-stat-value">{{ wo.overdue }}</div>
+              <div class="hero-stat-label">Overdue</div>
+            </div>
+            <div class="hero-stat">
+              <div class="hero-stat-value">{% if prog.district.pct is none %}&mdash;{% else %}{{ prog.district.pct }}%{% endif %}</div>
+              <div class="hero-stat-label">Facilities Audit{% if cyc %} &mdash; {{ cyc.name }}{% endif %}</div>
+            </div>
+          </div>
+        </div>
+        {% if not cyc %}
+        <p class="text-xs text-danger mb-3">No inspection cycle yet &mdash; <a href="{{ url_for('routes.add_inspection_cycle') }}">create one</a> to start tracking the summer walkthrough.</p>
+        {% endif %}
+
+        <div class="row mb-2">
+          {{ kpi_card('Schools Completed', prog.completed_count, 'verified', url_for('routes.facilities')) }}
+          {{ kpi_card('Schools In Progress', prog.in_progress_count, 'autorenew') }}
+          {{ kpi_card('Schools Not Started', prog.not_started_count, 'radio_button_unchecked') }}
+          {{ kpi_card('Open Audit Issues', prog.district.issues_open, 'report', None, 'text-warning' if prog.district.issues_open else '') }}
+          {{ kpi_card('Critical Audit Issues', prog.district.critical_count, 'emergency', None, 'text-danger' if prog.district.critical_count else '') }}
+        </div>
+
+        <!-- Operational Insights — the plain-English "what's going on" summary comes
+             right after the headline gauge, ahead of the KPI grids, per the spec's
+             visual hierarchy (read this first, drill into numbers after). -->
+        <div class="card mb-4" id="insights">
+          <div class="card-body px-4 py-3">
+            <h6 class="mb-1"><i class="material-symbols-rounded text-lg align-middle me-1">auto_awesome</i> Operational Insights</h6>
+            <p class="text-xs text-secondary">Rule-based statements generated from the figures below for the current filters &mdash; nothing here is estimated or inferred beyond the query results.</p>
+            {% for i in data.insights %}
+            <div class="alert alert-{{ i.level }} text-sm py-2 mb-2" role="alert">{{ i.text }}</div>
+            {% else %}
+            <p class="text-sm text-secondary mb-0">Not enough data in this period to state anything with confidence.</p>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Work Orders panel — "current" (point-in-time, ignores the date filter) and
+             "this period" (date-filtered) grouped under one roof instead of two bare,
+             unbounded KPI rows. -->
+        <div class="card mb-4">
+          <div class="card-header d-flex align-items-center gap-2">
+            <i class="material-symbols-rounded text-lg">build</i>
+            <h6 class="mb-0">Work Orders</h6>
+          </div>
+          <div class="card-body px-4 py-3">
+            <p class="text-xxs mb-2">Current</p>
+            <div class="row">
+              {{ kpi_card('Total Open', wo.total_open, 'build', url_for('routes.work_orders')) }}
+              {{ kpi_card('Overdue', wo.overdue, 'alarm', None, 'text-danger' if wo.overdue else '') }}
+              {{ kpi_card('Unassigned', wo.unassigned, 'person_off', url_for('routes.work_orders', assigned_filter='unassigned')) }}
+              {{ kpi_card('Emergency / Critical', wo.emergency ~ ' / ' ~ wo.critical, 'emergency', None, 'text-danger' if (wo.emergency or wo.critical) else '') }}
+              {% if view == 'manager' %}
+              {{ kpi_card('New Requests', wo.new_requests, 'inbox', url_for('routes.work_orders', status_filter='New')) }}
+              {{ kpi_card('In Progress', wo.in_progress, 'progress_activity', url_for('routes.work_orders', status_filter='In Progress')) }}
+              {{ kpi_card('Waiting', wo.waiting, 'hourglass_top') }}
+              {{ kpi_card('Backlog (open > 30 days)', wo.backlog, 'inventory') }}
+              {% endif %}
+            </div>
+            <p class="text-xxs mb-2 mt-2">{{ f.period_label }}</p>
+            <div class="row mb-0">
+              {{ kpi_card('Opened', wo.created_in_period, 'add_circle') }}
+              {{ kpi_card('Completed', wo.completed, 'task_alt') }}
+              {{ kpi_card('Completion Rate', pct(wo.completion_rate), 'percent') }}
+              {{ kpi_card('SLA Compliance (due date)', pct(wo.sla_compliance), 'verified') }}
+              {% if view == 'manager' %}
+              {{ kpi_card('Avg Response', days(wo.avg_response_days), 'timer') }}
+              {{ kpi_card('Avg Resolution', days(wo.avg_resolution_days), 'schedule') }}
+              {{ kpi_card('Repeat Work', pct(wo.repeat_work_pct), 'repeat') }}
+              {{ kpi_card('Labor Hours', m.labor_hours, 'engineering') }}
               {% endif %}
             </div>
           </div>
-          <div class="col-12 col-lg-8">
-            <div class="row">
-              {{ kpi_card('Schools Completed', prog.completed_count, 'verified', url_for('routes.facilities')) }}
-              {{ kpi_card('Schools In Progress', prog.in_progress_count, 'autorenew') }}
-              {{ kpi_card('Schools Not Started', prog.not_started_count, 'radio_button_unchecked') }}
-              {{ kpi_card('Rooms Inspected / Total', prog.district.rooms_inspected ~ ' / ' ~ prog.district.rooms_total, 'meeting_room') }}
-              {{ kpi_card('Open Audit Issues', prog.district.issues_open, 'report', None, 'text-warning' if prog.district.issues_open else '') }}
-              {{ kpi_card('Critical Audit Issues', prog.district.critical_count, 'emergency', None, 'text-danger' if prog.district.critical_count else '') }}
+        </div>
+
+        <!-- Facilities, Maintenance & Cost panel -->
+        <div class="card mb-4">
+          <div class="card-header d-flex align-items-center gap-2">
+            <i class="material-symbols-rounded text-lg">domain</i>
+            <h6 class="mb-0">Facilities, Maintenance &amp; Cost</h6>
+          </div>
+          <div class="card-body px-4 py-3">
+            <div class="row mb-0">
+              {{ kpi_card('Facilities / Rooms / Assets', fac.total_facilities ~ ' / ' ~ fac.total_rooms ~ ' / ' ~ fac.total_assets, 'domain', url_for('routes.facilities')) }}
+              {{ kpi_card('Assets Poor / Critical', fac.assets_poor_critical, 'warning', url_for('routes.capital_replacement'), 'text-danger' if fac.assets_poor_critical else '') }}
+              {{ kpi_card('Assets Past Expected Life', fac.assets_past_expected_life, 'history') }}
+              {{ kpi_card('PM Due / Overdue', m.pm_due ~ ' / ' ~ m.pm_overdue, 'event_repeat', url_for('routes.pm_dashboard'), 'text-danger' if m.pm_overdue else '') }}
+              {{ kpi_card('Inspections Due / Overdue', m.inspections_due ~ ' / ' ~ m.inspections_overdue, 'checklist', url_for('routes.inspection_dashboard'), 'text-danger' if m.inspections_overdue else '') }}
+              {{ kpi_card('Maintenance Cost (' ~ f.period_label ~ ')', money(cost.actual_total), 'payments', url_for('routes.cost_rollups')) }}
+              {{ kpi_card('Estimated vs Actual', money(cost.estimated_total) ~ ' / ' ~ money(cost.actual_total), 'balance') }}
+              {{ kpi_card('Preventive vs Corrective', pct(m.preventive_pct) ~ ' PM', 'autorenew') }}
+              {% if view == 'manager' %}
+              {{ kpi_card('Assets Requiring Attention', fac.assets_requiring_attention, 'priority_high') }}
+              {{ kpi_card('Cost per Work Order', money(cost.cost_per_work_order), 'receipt_long') }}
+              {{ kpi_card('Labor / Material / Vendor', money(cost.labor_cost) ~ ' / ' ~ money(cost.material_cost) ~ ' / ' ~ money(cost.vendor_cost), 'stacked_bar_chart') }}
+              {{ kpi_card('Recurring Issues', data.recurring|length, 'repeat', None, 'text-warning' if data.recurring else '') }}
+              {% if data.sla.available %}
+              {{ kpi_card('SLA Breaches', data.sla.breach_count, 'gpp_bad', None, 'text-danger' if data.sla.breach_count else '') }}
+              {{ kpi_card('SLA Warnings', data.sla.warning_count, 'warning', None, 'text-warning' if data.sla.warning_count else '') }}
+              {% endif %}
+              {% endif %}
             </div>
           </div>
         </div>
 
-        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">Work Orders &mdash; current</h6>
-        <div class="row">
-          {{ kpi_card('Total Open', wo.total_open, 'build', url_for('routes.work_orders')) }}
-          {{ kpi_card('Overdue', wo.overdue, 'alarm', None, 'text-danger' if wo.overdue else '') }}
-          {{ kpi_card('Unassigned', wo.unassigned, 'person_off', url_for('routes.work_orders', assigned_filter='unassigned')) }}
-          {{ kpi_card('Emergency / Critical', wo.emergency ~ ' / ' ~ wo.critical, 'emergency', None, 'text-danger' if (wo.emergency or wo.critical) else '') }}
-          {% if view == 'manager' %}
-          {{ kpi_card('New Requests', wo.new_requests, 'inbox', url_for('routes.work_orders', status_filter='New')) }}
-          {{ kpi_card('In Progress', wo.in_progress, 'progress_activity', url_for('routes.work_orders', status_filter='In Progress')) }}
-          {{ kpi_card('Waiting', wo.waiting, 'hourglass_top') }}
-          {{ kpi_card('Backlog (open > 30 days)', wo.backlog, 'inventory') }}
-          {% endif %}
-        </div>
-
-        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">Work Orders &mdash; {{ f.period_label }}</h6>
-        <div class="row">
-          {{ kpi_card('Opened', wo.created_in_period, 'add_circle') }}
-          {{ kpi_card('Completed', wo.completed, 'task_alt') }}
-          {{ kpi_card('Completion Rate', pct(wo.completion_rate), 'percent') }}
-          {{ kpi_card('SLA Compliance (due date)', pct(wo.sla_compliance), 'verified') }}
-          {% if view == 'manager' %}
-          {{ kpi_card('Avg Response', days(wo.avg_response_days), 'timer') }}
-          {{ kpi_card('Avg Resolution', days(wo.avg_resolution_days), 'schedule') }}
-          {{ kpi_card('Repeat Work', pct(wo.repeat_work_pct), 'repeat') }}
-          {{ kpi_card('Labor Hours', m.labor_hours, 'engineering') }}
-          {% endif %}
-        </div>
-
-        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">Facilities, Maintenance &amp; Cost</h6>
-        <div class="row">
-          {{ kpi_card('Facilities / Rooms / Assets', fac.total_facilities ~ ' / ' ~ fac.total_rooms ~ ' / ' ~ fac.total_assets, 'domain', url_for('routes.facilities')) }}
-          {{ kpi_card('Assets Poor / Critical', fac.assets_poor_critical, 'warning', url_for('routes.capital_replacement'), 'text-danger' if fac.assets_poor_critical else '') }}
-          {{ kpi_card('Assets Past Expected Life', fac.assets_past_expected_life, 'history') }}
-          {{ kpi_card('PM Due / Overdue', m.pm_due ~ ' / ' ~ m.pm_overdue, 'event_repeat', url_for('routes.pm_dashboard'), 'text-danger' if m.pm_overdue else '') }}
-          {{ kpi_card('Inspections Due / Overdue', m.inspections_due ~ ' / ' ~ m.inspections_overdue, 'checklist', url_for('routes.inspection_dashboard'), 'text-danger' if m.inspections_overdue else '') }}
-          {{ kpi_card('Maintenance Cost (' ~ f.period_label ~ ')', money(cost.actual_total), 'payments', url_for('routes.cost_rollups')) }}
-          {{ kpi_card('Estimated vs Actual', money(cost.estimated_total) ~ ' / ' ~ money(cost.actual_total), 'balance') }}
-          {{ kpi_card('Preventive vs Corrective', pct(m.preventive_pct) ~ ' PM', 'autorenew') }}
-          {% if view == 'manager' %}
-          {{ kpi_card('Assets Requiring Attention', fac.assets_requiring_attention, 'priority_high') }}
-          {{ kpi_card('Cost per Work Order', money(cost.cost_per_work_order), 'receipt_long') }}
-          {{ kpi_card('Labor / Material / Vendor', money(cost.labor_cost) ~ ' / ' ~ money(cost.material_cost) ~ ' / ' ~ money(cost.vendor_cost), 'stacked_bar_chart') }}
-          {{ kpi_card('Recurring Issues', data.recurring|length, 'repeat', None, 'text-warning' if data.recurring else '') }}
-          {% if data.sla.available %}
-          {{ kpi_card('SLA Breaches', data.sla.breach_count, 'gpp_bad', None, 'text-danger' if data.sla.breach_count else '') }}
-          {{ kpi_card('SLA Warnings', data.sla.warning_count, 'warning', None, 'text-warning' if data.sla.warning_count else '') }}
-          {% endif %}
-          {% endif %}
-        </div>
-
-        <!-- Operational Insights -->
-        <div class="ticket-content-box mb-4" id="insights">
-          <h3>Operational Insights</h3>
-          <p class="text-xs text-secondary">Rule-based statements generated from the figures above for the current filters &mdash; nothing here is estimated or inferred beyond the query results.</p>
-          {% for i in data.insights %}
-          <div class="alert alert-{{ i.level }} text-white text-sm py-2 mb-2" role="alert">{{ i.text }}</div>
-          {% else %}
-          <p class="text-sm text-secondary mb-0">Not enough data in this period to state anything with confidence.</p>
-          {% endfor %}
-        </div>
-
         <!-- Charts -->
+        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">Trends &amp; Breakdown</h6>
         <div class="row">
           {% if view == 'executive' %}
           {{ chart_box('by_facility', 'Work Orders by Facility', 'Opened ' ~ f.period_label ~ ' (top 10)') }}
@@ -257,6 +291,8 @@
           {{ chart_box('condition_distribution', 'Asset Condition', 'Current condition of active assets', 'doughnut') }}
           {% endif %}
         </div>
+
+        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2 mt-2">Details</h6>
 
         <!-- SLA Breaches / Warnings -->
         <div class="ticket-content-box mb-4" id="sla">
@@ -340,24 +376,33 @@
         {# ============================ TECHNICIAN ============================ #}
         {% elif view == 'technician' %}
         {% set m = data.maintenance %}
-        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">My Work &mdash; current</h6>
-        <div class="row">
-          {{ kpi_card('My Open', wo.total_open, 'build', url_for('routes.work_orders', assigned_filter='me')) }}
-          {{ kpi_card('In Progress', wo.in_progress, 'progress_activity') }}
-          {{ kpi_card('Overdue', wo.overdue, 'alarm', None, 'text-danger' if wo.overdue else '') }}
-          {{ kpi_card('Due Today', wo.due_today, 'today', None, 'text-warning' if wo.due_today else '') }}
-          {{ kpi_card('Due This Week', wo.due_this_week, 'date_range') }}
-          {{ kpi_card('Waiting', wo.waiting, 'hourglass_top') }}
-          {{ kpi_card('PM Due / Overdue (my site)', m.pm_due ~ ' / ' ~ m.pm_overdue, 'event_repeat', url_for('routes.pm_dashboard')) }}
-          {{ kpi_card('Inspections Due / Overdue (my site)', m.inspections_due ~ ' / ' ~ m.inspections_overdue, 'checklist', url_for('routes.inspection_dashboard')) }}
+        <div class="card mb-4">
+          <div class="card-header d-flex align-items-center gap-2">
+            <i class="material-symbols-rounded text-lg">build</i>
+            <h6 class="mb-0">My Work</h6>
+          </div>
+          <div class="card-body px-4 py-3">
+            <p class="text-xxs mb-2">Current</p>
+            <div class="row">
+              {{ kpi_card('My Open', wo.total_open, 'build', url_for('routes.work_orders', assigned_filter='me')) }}
+              {{ kpi_card('In Progress', wo.in_progress, 'progress_activity') }}
+              {{ kpi_card('Overdue', wo.overdue, 'alarm', None, 'text-danger' if wo.overdue else '') }}
+              {{ kpi_card('Due Today', wo.due_today, 'today', None, 'text-warning' if wo.due_today else '') }}
+              {{ kpi_card('Due This Week', wo.due_this_week, 'date_range') }}
+              {{ kpi_card('Waiting', wo.waiting, 'hourglass_top') }}
+              {{ kpi_card('PM Due / Overdue (my site)', m.pm_due ~ ' / ' ~ m.pm_overdue, 'event_repeat', url_for('routes.pm_dashboard')) }}
+              {{ kpi_card('Inspections Due / Overdue (my site)', m.inspections_due ~ ' / ' ~ m.inspections_overdue, 'checklist', url_for('routes.inspection_dashboard')) }}
+            </div>
+            <p class="text-xxs mb-2 mt-2">{{ f.period_label }}</p>
+            <div class="row mb-0">
+              {{ kpi_card('Assigned to Me (opened)', wo.created_in_period, 'assignment_ind') }}
+              {{ kpi_card('Completed', wo.completed, 'task_alt') }}
+              {{ kpi_card('Avg Resolution', days(wo.avg_resolution_days), 'schedule') }}
+              {{ kpi_card('SLA Compliance (due date)', pct(wo.sla_compliance), 'verified') }}
+            </div>
+          </div>
         </div>
-        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">My Work &mdash; {{ f.period_label }}</h6>
-        <div class="row">
-          {{ kpi_card('Assigned to Me (opened)', wo.created_in_period, 'assignment_ind') }}
-          {{ kpi_card('Completed', wo.completed, 'task_alt') }}
-          {{ kpi_card('Avg Resolution', days(wo.avg_resolution_days), 'schedule') }}
-          {{ kpi_card('SLA Compliance (due date)', pct(wo.sla_compliance), 'verified') }}
-        </div>
+        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">Trends &amp; Breakdown</h6>
         <div class="row">
           {{ chart_box('by_status', 'My Work Orders by Status', 'Opened ' ~ f.period_label) }}
           {{ chart_box('by_priority', 'My Work Orders by Priority', 'Opened ' ~ f.period_label) }}
@@ -396,19 +441,28 @@
 
         {# ============================ SCHOOL STAFF ============================ #}
         {% else %}
-        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">My Requests &mdash; current</h6>
-        <div class="row">
-          {{ kpi_card('Open', wo.total_open, 'build', url_for('routes.work_orders')) }}
-          {{ kpi_card('New (not yet assigned)', wo.new_requests, 'inbox') }}
-          {{ kpi_card('In Progress', wo.in_progress, 'progress_activity') }}
-          {{ kpi_card('Waiting', wo.waiting, 'hourglass_top') }}
+        <div class="card mb-4">
+          <div class="card-header d-flex align-items-center gap-2">
+            <i class="material-symbols-rounded text-lg">assignment</i>
+            <h6 class="mb-0">My Requests</h6>
+          </div>
+          <div class="card-body px-4 py-3">
+            <p class="text-xxs mb-2">Current</p>
+            <div class="row">
+              {{ kpi_card('Open', wo.total_open, 'build', url_for('routes.work_orders')) }}
+              {{ kpi_card('New (not yet assigned)', wo.new_requests, 'inbox') }}
+              {{ kpi_card('In Progress', wo.in_progress, 'progress_activity') }}
+              {{ kpi_card('Waiting', wo.waiting, 'hourglass_top') }}
+            </div>
+            <p class="text-xxs mb-2 mt-2">{{ f.period_label }}</p>
+            <div class="row mb-0">
+              {{ kpi_card('Submitted', wo.created_in_period, 'add_circle', url_for('routes.request_work_order')) }}
+              {{ kpi_card('Completed', wo.completed, 'task_alt') }}
+              {{ kpi_card('Avg Resolution', days(wo.avg_resolution_days), 'schedule') }}
+            </div>
+          </div>
         </div>
-        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">My Requests &mdash; {{ f.period_label }}</h6>
-        <div class="row">
-          {{ kpi_card('Submitted', wo.created_in_period, 'add_circle', url_for('routes.request_work_order')) }}
-          {{ kpi_card('Completed', wo.completed, 'task_alt') }}
-          {{ kpi_card('Avg Resolution', days(wo.avg_resolution_days), 'schedule') }}
-        </div>
+        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">Trends &amp; Breakdown</h6>
         <div class="row">
           {{ chart_box('by_status', 'My Requests by Status', 'Submitted ' ~ f.period_label) }}
           <div class="tall-card-box col-lg-4 col-md-6 mb-4">
