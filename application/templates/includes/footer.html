@@ -173,7 +173,12 @@ Scrollbar.init(document.querySelector('#sidenav-scrollbar'), options);
      nonce actually applies. -->
 <script nonce="{{ g.csp_nonce }}">
 document.querySelectorAll('[data-autosubmit]').forEach(function (el) {
-  el.addEventListener('change', function () { el.form.submit(); });
+  // requestSubmit(), not submit() — submit() skips the form's own "submit"
+  // event entirely, so nothing downstream (the unsaved-changes watcher
+  // below, any future submit listener) ever finds out this navigation
+  // happened, and it also means a plain click-away mid-navigation can't be
+  // told apart from a real unsaved edit.
+  el.addEventListener('change', function () { el.form.requestSubmit(); });
 });
 </script>
 

@@ -70,7 +70,7 @@
             {% if options.cycles is defined %}
             <div class="col-md-3 col-6">
               <label class="filter-labels text-sm mb-0">Inspection Cycle</label>
-              <select class="form-select-box form-select" name="cycle_id">
+              <select class="form-select-box form-select" name="cycle_id" data-autosubmit>
                 <option value="">Current / Active Cycle</option>
                 {% for c in options.cycles %}<option value="{{ c.id }}" {% if f.cycle_id == c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
               </select>
@@ -88,7 +88,7 @@
             {% if options.sites %}
             <div class="col-md-2 col-6">
               <label class="filter-labels text-sm mb-0">Site</label>
-              <select class="form-select-box form-select" name="site_id">
+              <select class="form-select-box form-select" name="site_id" data-autosubmit>
                 <option value="">All Sites</option>
                 {% for s in options.sites %}<option value="{{ s.id }}" {% if f.site_id == s.id %}selected{% endif %}>{{ s.site_name }}</option>{% endfor %}
               </select>
@@ -97,21 +97,21 @@
             {% if options.facilities is defined %}
             <div class="col-md-2 col-6">
               <label class="filter-labels text-sm mb-0">Facility</label>
-              <select class="form-select-box form-select" name="facility_id">
+              <select class="form-select-box form-select" name="facility_id" data-autosubmit>
                 <option value="">All Facilities</option>
                 {% for fac in options.facilities %}<option value="{{ fac.id }}" {% if f.facility_id == fac.id %}selected{% endif %}>{{ fac.name }}</option>{% endfor %}
               </select>
             </div>
             <div class="col-md-2 col-6">
               <label class="filter-labels text-sm mb-0">Department (Team)</label>
-              <select class="form-select-box form-select" name="team">
+              <select class="form-select-box form-select" name="team" data-autosubmit>
                 <option value="">All Teams</option>
                 {% for t in options.teams %}<option value="{{ t }}" {% if f.team == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
               </select>
             </div>
             <div class="col-md-2 col-6">
               <label class="filter-labels text-sm mb-0">Technician</label>
-              <select class="form-select-box form-select" name="technician_id">
+              <select class="form-select-box form-select" name="technician_id" data-autosubmit>
                 <option value="">All Technicians</option>
                 {% for t in options.technicians %}<option value="{{ t.id }}" {% if f.technician_id == t.id %}selected{% endif %}>{{ t.get_full_name() }}</option>{% endfor %}
               </select>
@@ -119,21 +119,21 @@
             {% endif %}
             <div class="col-md-2 col-6">
               <label class="filter-labels text-sm mb-0">Category</label>
-              <select class="form-select-box form-select" name="category_id">
+              <select class="form-select-box form-select" name="category_id" data-autosubmit>
                 <option value="">All Categories</option>
                 {% for c in options.categories %}<option value="{{ c.id }}" {% if f.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
               </select>
             </div>
             <div class="col-md-2 col-6">
               <label class="filter-labels text-sm mb-0">Priority</label>
-              <select class="form-select-box form-select" name="priority_id">
+              <select class="form-select-box form-select" name="priority_id" data-autosubmit>
                 <option value="">All Priorities</option>
                 {% for p in options.priorities %}<option value="{{ p.id }}" {% if f.priority_id == p.id %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
               </select>
             </div>
             <div class="col-md-2 col-6">
               <label class="filter-labels text-sm mb-0">Status</label>
-              <select class="form-select-box form-select" name="status">
+              <select class="form-select-box form-select" name="status" data-autosubmit>
                 <option value="">All Statuses</option>
                 {% for s in options.statuses %}<option value="{{ s }}" {% if f.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
               </select>

@@ -85,18 +85,36 @@
 
   document.querySelectorAll('canvas[data-chart]').forEach(build);
 
-  // Filter form: submit on any select change; show custom date inputs only for the custom preset.
+  // Filter form: every select except "preset" uses the generic
+  // [data-autosubmit] wiring in includes/footer.html. "preset" needs its
+  // own listener (toggle the custom-date inputs; skip auto-submit while
+  // "custom" is selected so the user can type dates first) and must NOT
+  // also carry data-autosubmit, or footer.html's delegated listener would
+  // submit the form on that same change too, defeating the skip.
+  //
+  // This split matters: a per-select listener calling form.requestSubmit()
+  // races with includes/footer.html's unsaved-changes watcher, which
+  // listens for "change" on the form itself. Because requestSubmit()
+  // synchronously fires a nested "submit" event (clearing the watcher's
+  // dirty flag) *before* the original "change" event finishes bubbling
+  // from the select up to the form (which sets the flag right back to
+  // true), the watcher's dirty flag can end up true again by the time the
+  // navigation actually happens — spuriously triggering the "Leave site?"
+  // beforeunload prompt. Routing non-preset selects through
+  // [data-autosubmit] avoids this: that attribute makes the whole form
+  // untrackable (see footer.html's isTrackable()), so the watcher never
+  // listens on it in the first place.
   var form = document.getElementById('dashboard-filters');
   if (form) {
     var preset = form.querySelector('[name="preset"]');
     var custom = form.querySelector('#custom-range');
     function toggleCustom() { if (custom) { custom.hidden = preset.value !== 'custom'; } }
     toggleCustom();
-    form.querySelectorAll('select').forEach(function (sel) {
-      sel.addEventListener('change', function () {
-        if (sel === preset) { toggleCustom(); if (preset.value === 'custom') { return; } }
-        form.submit();
+    if (preset) {
+      preset.addEventListener('change', function () {
+        toggleCustom();
+        if (preset.value !== 'custom') { form.requestSubmit(); }
       });
-    });
+    }
   }
 })();

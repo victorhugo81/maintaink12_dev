@@ -1,6 +1,7 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField, SelectField, TextAreaField, FieldList, FormField, BooleanField, RadioField, DateTimeField, IntegerField, DateField, DecimalField
+from wtforms import StringField, PasswordField, SubmitField, SelectField, SelectMultipleField, TextAreaField, FieldList, FormField, BooleanField, RadioField, DateTimeField, IntegerField, DateField, DecimalField
 from wtforms.validators import DataRequired, Email, Length, Optional, NumberRange
+from wtforms.widgets import ListWidget, CheckboxInput
 from flask_wtf.file import FileField, FileRequired, FileAllowed
 from datetime import datetime
 
@@ -245,8 +246,10 @@ class InspectionItemForm(FlaskForm):
 
 class InspectionForm(FlaskForm):
     template_id = SelectField('Template:', coerce=int, choices=[], validators=[DataRequired()])
+    site_id = SelectField('Site:', coerce=int, choices=[], validators=[Optional()])
     facility_id = SelectField('Facility:', coerce=int, choices=[], validators=[Optional()])
-    room_id = SelectField('Room:', coerce=int, choices=[], validators=[Optional()])
+    room_ids = SelectMultipleField('Rooms:', coerce=int, choices=[], validators=[Optional()],
+                                    option_widget=CheckboxInput(), widget=ListWidget(prefix_label=False))
     asset_id = SelectField('Asset:', coerce=int, choices=[], validators=[Optional()])
     due_date = DateField('Due Date:', validators=[DataRequired()])
     inspector_id = SelectField('Inspector:', coerce=int, choices=[], validators=[Optional()])

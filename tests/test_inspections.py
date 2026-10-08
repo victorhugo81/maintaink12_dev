@@ -130,9 +130,9 @@ class TestScheduling:
 
     def test_choosing_two_targets_rejected(self, app, admin_client):
         template_id = _make_template(app)
-        facility_id, room_id, _ = _facility_room_asset(app)
+        facility_id, _, asset_id = _facility_room_asset(app)
         r = admin_client.post('/add_inspection', data={
-            'template_id': str(template_id), 'facility_id': str(facility_id), 'room_id': str(room_id), 'asset_id': '0',
+            'template_id': str(template_id), 'facility_id': str(facility_id), 'room_id': '0', 'asset_id': str(asset_id),
             'due_date': '2026-10-15',
         }, follow_redirects=True)
         assert b'exactly one' in r.data
@@ -144,6 +144,47 @@ class TestScheduling:
             'due_date': '2026-10-15',
         }, follow_redirects=True)
         assert b'exactly one' in r.data
+
+    def test_room_ids_creates_one_inspection_per_room(self, app, admin_client):
+        template_id = _make_template(app)
+        facility_id, room_id, _ = _facility_room_asset(app)
+        with app.app_context():
+            from application.models import Room
+            from main import db
+            room2 = Room(site_id=1, facility_id=facility_id, room_number='102', is_active=True)
+            db.session.add(room2)
+            db.session.commit()
+            room2_id = room2.id
+        r = admin_client.post('/add_inspection', data={
+            'template_id': str(template_id), 'facility_id': '0', 'asset_id': '0',
+            'room_ids': [str(room_id), str(room2_id)],
+            'due_date': '2026-10-15',
+        }, follow_redirects=True)
+        assert b'2 inspections scheduled' in r.data
+        with app.app_context():
+            from application.models import Inspection
+            created = Inspection.query.filter(Inspection.template_id == template_id,
+                                               Inspection.room_id.in_([room_id, room2_id])).all()
+            assert {i.room_id for i in created} == {room_id, room2_id}
+            assert all(i.facility_id is None for i in created)
+
+    def test_room_ids_takes_precedence_over_facility(self, app, admin_client):
+        # Facility is also usable as a plain filter for narrowing the room
+        # checklist in the UI — if any room is checked, that's the real
+        # intent, so it wins over a facility_id left selected alongside it.
+        template_id = _make_template(app)
+        facility_id, room_id, _ = _facility_room_asset(app)
+        r = admin_client.post('/add_inspection', data={
+            'template_id': str(template_id), 'facility_id': str(facility_id), 'asset_id': '0',
+            'room_ids': [str(room_id)],
+            'due_date': '2026-10-15',
+        }, follow_redirects=True)
+        assert b'1 inspections scheduled' in r.data
+        with app.app_context():
+            from application.models import Inspection
+            insp = Inspection.query.filter_by(template_id=template_id, room_id=room_id).first()
+            assert insp is not None
+            assert insp.facility_id is None
 
     def test_scheduled_inspection_deletable_completed_is_not(self, app, admin_client):
         template_id = _make_template(app, name='Deletable Template', questions=['Only Q?'])

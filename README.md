@@ -1,9 +1,19 @@
 # Maintaink12
 
-A lightweight CMMS / work-order management system for K-12 district Maintenance & Operations
-(M&O) departments — built on the [AssistItK12](https://github.com/victorhugo81/assistitk12)
-codebase (Flask + Bootstrap + MySQL). Maintaink12 is a separate project from AssistItK12
-(no shared git history); it started as a copy of that codebase and diverges from there.
+A CMMS for K-12 district Maintenance & Operations (M&O) departments — built on the
+[AssistItK12](https://github.com/victorhugo81/assistitk12) codebase (Flask + Bootstrap +
+MySQL). Maintaink12 is a separate project from AssistItK12 (no shared git history); it
+started as a copy of that codebase and diverges from there.
+
+Covers the full M&O workflow: Facilities/Rooms/Assets with condition tracking and QR
+codes; Work Orders with a status-transition workflow, labor/material cost tracking, and
+Vendor assignment; Preventive Maintenance plans that auto-generate work orders on a
+schedule; a Facilities Audit workflow (checklist-based room-by-room walkthroughs, grouped
+into yearly Inspection Cycles, with completion-% rollups); Capital Projects and
+Asset-Risk/Capital-Replacement scoring; SLA targets with breach/warning tracking and an
+automated notification sweep; a role-based M&O Dashboard and a CSV-exportable Reports
+section; global search and a generalized CSV import tool; and an automatic, field-level
+audit log.
 
 See [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) for the full vision, data model, and
 canonical KPI list, and [`docs/MAINTAINK12_PLAN_AND_PROMPTS.md`](docs/MAINTAINK12_PLAN_AND_PROMPTS.md)

@@ -3990,16 +3990,17 @@ def edit_inspection_cycle(cycle_id):
 
 # ****************** Scheduling & performing inspections ******************
 def _validate_inspection_target(form):
-    """Exactly one of facility_id/room_id/asset_id must be chosen. Returns (site_id, error)."""
-    chosen = [v for v in (form.facility_id.data or None, form.room_id.data or None, form.asset_id.data or None) if v]
+    """
+    Exactly one of facility_id/asset_id must be chosen. Returns (site_id, error).
+    Room targets go through form.room_ids instead (bulk, one Inspection per
+    room — see add_inspection()), not through this single-target helper.
+    """
+    chosen = [v for v in (form.facility_id.data or None, form.asset_id.data or None) if v]
     if len(chosen) != 1:
-        return None, 'Choose exactly one target: a facility, a room, or an asset.'
+        return None, 'Choose exactly one target: a facility, an asset, or one or more rooms.'
     if form.facility_id.data:
         facility = db.session.get(Facility, form.facility_id.data)
         return (facility.site_id if facility else None), (None if facility else 'Selected facility not found.')
-    if form.room_id.data:
-        room = db.session.get(Room, form.room_id.data)
-        return (room.site_id if room else None), (None if room else 'Selected room not found.')
     asset = db.session.get(Asset, form.asset_id.data)
     return (asset.site_id if asset else None), (None if asset else 'Selected asset not found.')
 
@@ -4028,23 +4029,76 @@ def add_inspection():
     form = InspectionForm()
     site_ids = _visible_site_ids()
     form.template_id.choices = [(t.id, t.name) for t in InspectionTemplate.query.filter_by(is_active=True).order_by(InspectionTemplate.name).all()]
-    form.facility_id.choices, form.room_id.choices, form.asset_id.choices = _location_choices(site_ids, with_none=True)
+    site_query = Site.query.order_by(Site.site_name)
+    if site_ids:
+        site_query = site_query.filter(Site.id.in_(site_ids))
+    form.site_id.choices = [(0, '-- All Sites --')] + [(s.id, s.site_name) for s in site_query.all()]
+    facility_choices, room_choices, asset_choices = _location_choices(site_ids, with_none=True)
+    form.facility_id.choices, form.asset_id.choices = facility_choices, asset_choices
+    form.room_ids.choices = room_choices[1:]  # drop the single-select "-- No room --" placeholder
     form.inspector_id.choices = _assignee_choices(site_ids)
 
+    # Site/Facility -> room is a client-side filter only (site_id isn't
+    # stored; _validate_inspection_target derives the real site from
+    # whichever target is chosen) — these maps just drive the JS in
+    # add_inspection.html so picking from "so many rooms" is easier.
+    fac_q = Facility.query.filter_by(is_active=True)
+    room_q = Room.query.filter_by(is_active=True)
+    asset_q = Asset.query.filter_by(is_active=True)
+    if site_ids:
+        fac_q = fac_q.filter(Facility.site_id.in_(site_ids))
+        room_q = room_q.filter(Room.site_id.in_(site_ids))
+        asset_q = asset_q.filter(Asset.site_id.in_(site_ids))
+    facility_site_map = {f.id: f.site_id for f in fac_q.all()}
+    rooms_in_scope = room_q.all()
+    room_site_map = {r.id: r.site_id for r in rooms_in_scope}
+    room_facility_map = {r.id: r.facility_id for r in rooms_in_scope}
+    asset_site_map = {a.id: a.site_id for a in asset_q.all()}
+
+    site_maps = dict(facility_site_map=facility_site_map, room_site_map=room_site_map,
+                      room_facility_map=room_facility_map, asset_site_map=asset_site_map)
+
     if form.validate_on_submit():
+        room_ids = [r for r in (form.room_ids.data or []) if r]
+
+        if room_ids:
+            rooms = Room.query.filter(Room.id.in_(room_ids)).all()
+            if len(rooms) != len(set(room_ids)):
+                flash('One or more selected rooms were not found.', 'danger')
+                return render_template('add_inspection.html', form=form, current_path=request.path, current_page_name=current_page_name, **site_maps)
+            if any(not can_access_site(room.site_id) for room in rooms):
+                flash('You cannot schedule inspections for one of the selected rooms.', 'danger')
+                return render_template('add_inspection.html', form=form, current_path=request.path, current_page_name=current_page_name, **site_maps)
+
+            for room in rooms:
+                db.session.add(Inspection(
+                    template_id=form.template_id.data,
+                    site_id=room.site_id,
+                    facility_id=None,
+                    room_id=room.id,
+                    asset_id=None,
+                    due_date=form.due_date.data,
+                    inspector_id=form.inspector_id.data or None,
+                    notes=form.notes.data,
+                    created_by_id=current_user.id,
+                ))
+            db.session.commit()
+            flash(f'{len(rooms)} inspections scheduled.', 'success')
+            return redirect(url_for('routes.inspections'))
+
         site_id, error = _validate_inspection_target(form)
         if error:
             flash(error, 'danger')
-            return render_template('add_inspection.html', form=form, current_path=request.path, current_page_name=current_page_name)
+            return render_template('add_inspection.html', form=form, current_path=request.path, current_page_name=current_page_name, **site_maps)
         if not can_access_site(site_id):
             flash('You cannot schedule inspections for that site.', 'danger')
-            return render_template('add_inspection.html', form=form, current_path=request.path, current_page_name=current_page_name)
+            return render_template('add_inspection.html', form=form, current_path=request.path, current_page_name=current_page_name, **site_maps)
 
         inspection = Inspection(
             template_id=form.template_id.data,
             site_id=site_id,
             facility_id=form.facility_id.data or None,
-            room_id=form.room_id.data or None,
+            room_id=None,
             asset_id=form.asset_id.data or None,
             due_date=form.due_date.data,
             inspector_id=form.inspector_id.data or None,
@@ -4057,7 +4111,7 @@ def add_inspection():
         return redirect(url_for('routes.edit_inspection', inspection_id=inspection.id))
 
     return render_template('add_inspection.html', form=form,
-        current_path=request.path, current_page_name=current_page_name)
+        current_path=request.path, current_page_name=current_page_name, **site_maps)
 
 
 # ****************** Summer Walkthrough (bulk, fast mode) *****************

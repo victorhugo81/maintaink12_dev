@@ -37,20 +37,44 @@
                         </div>
                     </div>
 
-                    <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Target &mdash; choose exactly one</p>
+                    <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Target &mdash; a facility, an asset, or one or more rooms</p>
                     <hr class="mt-0 mb-3">
                     <div class="row g-3">
-                        <div class="col-12 col-sm-4">
+                        <div class="col-12">
+                            {{ form.site_id.label(class="form-label") }}
+                            {{ form.site_id(class="form-select-box form-select", id="insp-site") }}
+                        </div>
+                        <div class="col-12 col-sm-6">
                             {{ form.facility_id.label(class="form-label") }}
-                            {{ form.facility_id(class="form-select-box form-select") }}
+                            {{ form.facility_id(class="form-select-box form-select", id="insp-facility") }}
                         </div>
-                        <div class="col-12 col-sm-4">
-                            {{ form.room_id.label(class="form-label") }}
-                            {{ form.room_id(class="form-select-box form-select") }}
-                        </div>
-                        <div class="col-12 col-sm-4">
+                        <div class="col-12 col-sm-6">
                             {{ form.asset_id.label(class="form-label") }}
-                            {{ form.asset_id(class="form-select-box form-select") }}
+                            {{ form.asset_id(class="form-select-box form-select", id="insp-asset") }}
+                        </div>
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
+                                {{ form.room_ids.label(class="form-label mb-0") }}
+                                <div class="d-flex gap-2">
+                                    <input type="search" id="room-search" class="form-control form-control-sm" placeholder="Search rooms&hellip;" style="max-width: 200px;">
+                                    <button type="button" id="rooms-select-all" class="btn btn-sm reset-button-box mb-0">Select all shown</button>
+                                    <button type="button" id="rooms-clear-all" class="btn btn-sm reset-button-box mb-0">Clear</button>
+                                </div>
+                            </div>
+                            <p class="text-xs text-secondary mb-2">Use Site/Facility above to narrow this list, then check as many rooms as you need &mdash; one inspection is scheduled per room checked. Checking any room ignores the Facility/Asset target above.</p>
+                            <div id="room-checklist" class="border rounded p-2" style="max-height: 280px; overflow-y: auto;">
+                                {% for subfield in form.room_ids %}
+                                <div class="form-check room-check-item"
+                                     data-site="{{ room_site_map.get(subfield.data, '') }}"
+                                     data-facility="{{ room_facility_map.get(subfield.data, '') }}"
+                                     data-label="{{ subfield.label.text|lower }}">
+                                    {{ subfield(class="form-check-input") }}
+                                    {{ subfield.label(class="form-check-label") }}
+                                </div>
+                                {% else %}
+                                <p class="text-secondary text-sm mb-0">No rooms found.</p>
+                                {% endfor %}
+                            </div>
                         </div>
                     </div>
 
@@ -71,5 +95,84 @@
         </div>
     </div>
 </div>
+
+<script nonce="{{ g.csp_nonce }}">
+(function () {
+  // Site/Facility are client-side filters only (site_id isn't stored on
+  // Inspection) — same technique as start_walkthrough.html's cascade, plus
+  // a checkbox list + search for rooms since a facility can have far too
+  // many rooms to pick from a single dropdown one at a time.
+  var siteSelect = document.getElementById('insp-site');
+  if (!siteSelect) { return; }
+  var facilitySelect = document.getElementById('insp-facility');
+  var singleTargets = [
+    { select: facilitySelect, map: {{ facility_site_map|tojson }} },
+    { select: document.getElementById('insp-asset'), map: {{ asset_site_map|tojson }} }
+  ];
+
+  function applySingleTargetFilter() {
+    var siteId = parseInt(siteSelect.value, 10);
+    singleTargets.forEach(function (t) {
+      if (!t.select) { return; }
+      Array.prototype.forEach.call(t.select.options, function (opt) {
+        if (opt.value === '0') { return; } // "-- None --" / "-- No asset --" always stays pickable
+        var match = !siteId || t.map[opt.value] === siteId;
+        opt.hidden = !match;
+        opt.disabled = !match;
+        if (!match && opt.selected) { t.select.value = '0'; }
+      });
+    });
+  }
+
+  var roomItems = Array.prototype.slice.call(document.querySelectorAll('.room-check-item'));
+  var searchInput = document.getElementById('room-search');
+
+  function applyRoomFilter() {
+    var siteId = parseInt(siteSelect.value, 10);
+    var facilityId = facilitySelect ? parseInt(facilitySelect.value, 10) : 0;
+    var term = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    roomItems.forEach(function (item) {
+      var itemSite = parseInt(item.getAttribute('data-site'), 10);
+      var itemFacility = parseInt(item.getAttribute('data-facility'), 10);
+      var inScope = (!siteId || itemSite === siteId) && (!facilityId || itemFacility === facilityId);
+      var matchTerm = !term || item.getAttribute('data-label').indexOf(term) !== -1;
+      item.hidden = !(inScope && matchTerm);
+      // Only force-uncheck on a real scope mismatch, not a transient search
+      // filter — clearing the search box shouldn't have thrown away a pick.
+      if (!inScope) {
+        var cb = item.querySelector('input[type="checkbox"]');
+        if (cb) { cb.checked = false; }
+      }
+    });
+  }
+
+  siteSelect.addEventListener('change', function () { applySingleTargetFilter(); applyRoomFilter(); });
+  if (facilitySelect) { facilitySelect.addEventListener('change', applyRoomFilter); }
+  if (searchInput) { searchInput.addEventListener('input', applyRoomFilter); }
+
+  var selectAllBtn = document.getElementById('rooms-select-all');
+  if (selectAllBtn) {
+    selectAllBtn.addEventListener('click', function () {
+      roomItems.forEach(function (item) {
+        if (item.hidden) { return; }
+        var cb = item.querySelector('input[type="checkbox"]');
+        if (cb) { cb.checked = true; }
+      });
+    });
+  }
+  var clearAllBtn = document.getElementById('rooms-clear-all');
+  if (clearAllBtn) {
+    clearAllBtn.addEventListener('click', function () {
+      roomItems.forEach(function (item) {
+        var cb = item.querySelector('input[type="checkbox"]');
+        if (cb) { cb.checked = false; }
+      });
+    });
+  }
+
+  applySingleTargetFilter();
+  applyRoomFilter();
+})();
+</script>
 
 {% endblock %}

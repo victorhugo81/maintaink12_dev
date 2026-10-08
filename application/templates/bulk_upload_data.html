@@ -578,8 +578,12 @@ document.getElementById('toggleFtpPwd').addEventListener('click', () => {
 // Save FTP settings to Organization
 const FTP_SAVE_URL = "{{ url_for('routes.ftp_save_settings') }}";
 function saveFtpSettings() {
+    // requestSubmit(), not submit() — submit() skips the form's own "submit"
+    // event, so the unsaved-changes watcher in includes/footer.html never
+    // clears its dirty flag and the browser shows a spurious "Leave site?"
+    // prompt right after this intentional navigation.
     document.getElementById('ftpForm').action = FTP_SAVE_URL;
-    document.getElementById('ftpForm').submit();
+    document.getElementById('ftpForm').requestSubmit();
 }
 
 // Activate the correct tab from ?tab=xxx query param
