@@ -101,6 +101,69 @@ def start_walkthrough(facility, cycle, template, user=None):
     return created
 
 
+def pending_facility_ids(cycle_id, template_id, facility_ids):
+    """
+    Facility ids (within facility_ids) that still have at least one active
+    room without a Completed Inspection for this exact (cycle, template)
+    pair — i.e. still worth starting/resuming a walkthrough for.
+
+    Deliberately template-scoped, unlike inspection_progress()'s cycle-only
+    rollup used by the dashboard/facilities page: start_walkthrough.html
+    lets the user change the Checklist Template before picking a School/
+    Building, and a facility fully audited under one template may still
+    have every room pending under another — so "pending" has to be
+    recomputed per (cycle, template) combo, not just per cycle.
+    """
+    from main import db
+    from sqlalchemy import func
+    from application.models import Room, Inspection
+
+    if not facility_ids:
+        return set()
+    room_totals = dict(
+        db.session.query(Room.facility_id, func.count(Room.id))
+        .filter(Room.facility_id.in_(facility_ids), Room.is_active.is_(True))
+        .group_by(Room.facility_id).all()
+    )
+    inspected = dict(
+        db.session.query(Room.facility_id, func.count(Inspection.id))
+        .select_from(Inspection).join(Room, Inspection.room_id == Room.id)
+        .filter(Room.facility_id.in_(facility_ids), Inspection.cycle_id == cycle_id,
+                Inspection.template_id == template_id, Inspection.status == 'Completed')
+        .group_by(Room.facility_id).all()
+    )
+    return {fid for fid in facility_ids if room_totals.get(fid, 0) > 0 and inspected.get(fid, 0) < room_totals[fid]}
+
+
+def facilities_ever_inspected_under_template(template_id, facility_ids):
+    """
+    Facility ids (within facility_ids) that have at least one Inspection
+    ever created under this exact template — any cycle, any status, room-
+    or facility-targeted. Not every template applies to every building
+    (e.g. a Playground Safety checklist only makes sense at schools that
+    actually have a playground), and there's no explicit template-to-
+    facility scoping in the data model, so this uses "has this template
+    been used here before" (via /add_inspection or a prior walkthrough) as
+    the signal for "this template is relevant here" — see its use in
+    start_walkthrough()'s pending_matrix.
+    """
+    from main import db
+    from application.models import Inspection, Room
+
+    if not facility_ids:
+        return set()
+    from_room = (
+        db.session.query(Room.facility_id)
+        .join(Inspection, Inspection.room_id == Room.id)
+        .filter(Room.facility_id.in_(facility_ids), Inspection.template_id == template_id)
+    )
+    from_facility = (
+        db.session.query(Inspection.facility_id)
+        .filter(Inspection.facility_id.in_(facility_ids), Inspection.template_id == template_id)
+    )
+    return {fid for (fid,) in from_room.union(from_facility).all()}
+
+
 def next_incomplete_room_inspection(inspection):
     """
     Given a room-targeted Inspection created by a bulk walkthrough, find the

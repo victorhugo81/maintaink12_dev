@@ -297,7 +297,7 @@ def organization():
         Response: Rendered organization template or redirect on successful update
     """
     # Map URL paths to readable page names for navigation
-    page_names = {'/organization': 'Data Integration'}
+    page_names = {'/organization': 'Settings'}
     # Get current path for navigation highlighting
     current_path = request.path
     # Get page name for display in UI
@@ -4136,38 +4136,51 @@ def start_walkthrough():
         fq = fq.filter(Facility.site_id.in_(site_ids))
     facilities = fq.order_by(Facility.name).all()
 
-    # Only list buildings with a pending audit for the active cycle — fully
-    # completed ones (every active room Completed) have nothing left to
-    # walk through. Before any cycle exists, nothing has been audited yet,
-    # so every building is still "pending" and none are filtered out.
-    active_cycle = InspectionCycle.query.filter_by(is_active=True).order_by(InspectionCycle.id.desc()).first()
-    if active_cycle and facilities:
-        progress = inspections_module.inspection_progress(active_cycle.id, facility_ids=[fac.id for fac in facilities])
-        pending_ids = {row['facility'].id for row in progress['facilities']
-                       if row['rooms_total'] > 0 and row['pct'] != 100.0}
-        facilities = [fac for fac in facilities if fac.id in pending_ids]
-
     form.facility_id.choices = [(fac.id, fac.name) for fac in facilities]
     facility_sites = {fac.id: fac.site_id for fac in facilities}
-    form.cycle_id.choices = [(c.id, c.name) for c in InspectionCycle.query.order_by(InspectionCycle.id.desc()).all()]
-    form.template_id.choices = [(t.id, t.name) for t in InspectionTemplate.query.filter_by(is_active=True).order_by(InspectionTemplate.name).all()]
+    cycles = InspectionCycle.query.order_by(InspectionCycle.id.desc()).all()
+    templates = InspectionTemplate.query.filter_by(is_active=True).order_by(InspectionTemplate.name).all()
+    form.cycle_id.choices = [(c.id, c.name) for c in cycles]
+    form.template_id.choices = [(t.id, t.name) for t in templates]
     if request.method == 'GET' and current_user.site_id in dict(form.site_id.choices):
         form.site_id.data = current_user.site_id
 
     if not form.cycle_id.choices or not form.template_id.choices:
         flash('You need at least one inspection cycle and checklist template before starting a facilities audit.', 'danger')
         return redirect(url_for('routes.inspections'))
-    if not form.facility_id.choices:
-        if active_cycle:
-            flash(f'Every building has a completed facilities audit for "{active_cycle.name}" already.', 'info')
-        else:
-            flash('You need at least one active facility before starting a facilities audit.', 'danger')
+    if not facilities:
+        flash('You need at least one active facility before starting a facilities audit.', 'danger')
+        return redirect(url_for('routes.facilities'))
+
+    # A building fully audited under one cycle+template may still have
+    # every room pending under another, so "pending" is recomputed per
+    # (cycle, template) combo — start_walkthrough.html filters the School/
+    # Building lists live as the user changes either dropdown, using this
+    # matrix (small: a handful of cycles x templates, a few queries each).
+    # Not every template applies to every building (e.g. Playground Safety
+    # doesn't apply at a site with no playground), and there's no explicit
+    # template-to-facility scoping, so a building only qualifies once this
+    # template has actually been used there before (via Schedule Inspection
+    # or a prior walkthrough) — see facilities_ever_inspected_under_template.
+    facility_ids = [fac.id for fac in facilities]
+    template_history = {
+        template.id: inspections_module.facilities_ever_inspected_under_template(template.id, facility_ids)
+        for template in templates
+    }
+    pending_matrix = {
+        f'{cycle.id}_{template.id}': list(
+            inspections_module.pending_facility_ids(cycle.id, template.id, facility_ids) & template_history[template.id]
+        )
+        for cycle in cycles for template in templates
+    }
+    if not any(pending_matrix.values()):
+        flash('Every building already has a completed facilities audit for every cycle and checklist template.', 'info')
         return redirect(url_for('routes.facilities'))
 
     if form.validate_on_submit():
         if facility_sites.get(form.facility_id.data) != form.site_id.data:
             flash('Selected building does not belong to the selected site.', 'danger')
-            return render_template('start_walkthrough.html', form=form,
+            return render_template('start_walkthrough.html', form=form, pending_matrix=pending_matrix,
                 current_path=request.path, current_page_name=current_page_name, facility_sites=facility_sites)
         facility = Facility.query.get_or_404(form.facility_id.data)
         if not can_access_site(facility.site_id):
@@ -4189,7 +4202,7 @@ def start_walkthrough():
               'success' if created else 'info')
         return redirect(url_for('routes.walkthrough_room', inspection_id=first.id))
 
-    return render_template('start_walkthrough.html', form=form, facility_sites=facility_sites,
+    return render_template('start_walkthrough.html', form=form, facility_sites=facility_sites, pending_matrix=pending_matrix,
         current_path=request.path, current_page_name=current_page_name)
 
 

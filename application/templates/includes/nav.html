@@ -183,7 +183,7 @@
         <li class="nav-item">
           <a class="nav-link{% if request.endpoint in ['routes.organization', 'routes.upload_users'] %} active{% endif %}" href="{{ url_for('routes.organization') }}">
             <i class="material-symbols-rounded">database</i>
-            <span class="nav-link-text ms-1">Data Integration</span>
+            <span class="nav-link-text ms-1">Settings</span>
           </a>
         </li>
         <li class="nav-item">
@@ -226,12 +226,6 @@
             <a class="nav-link{% if request.endpoint in ['routes.inspection_templates', 'routes.add_inspection_template', 'routes.edit_inspection_template'] %} active{% endif %}" href="{{ url_for('routes.inspection_templates') }}">
               <i class="material-symbols-rounded">checklist</i>
               <span class="nav-link-text ms-1">Inspection Templates</span>
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link{% if request.endpoint in ['routes.inspection_cycles', 'routes.add_inspection_cycle', 'routes.edit_inspection_cycle'] %} active{% endif %}" href="{{ url_for('routes.inspection_cycles') }}">
-              <i class="material-symbols-rounded">event_repeat</i>
-              <span class="nav-link-text ms-1">Inspection Cycles</span>
             </a>
           </li>
           <li class="nav-item">
@@ -384,7 +378,7 @@
                     <h6 class="ms-2 text-uppercase text-xxs text-dark font-weight-bolder opacity-5">Settings</h6>
                   </li>
                   <li class="list-group-item"> 
-                    <a class="{% if current_path == '/organization' %}active{% else %}text-dark{% endif %}" href="{{ url_for('routes.organization') }}">Data Integration</a>
+                    <a class="{% if current_path == '/organization' %}active{% else %}text-dark{% endif %}" href="{{ url_for('routes.organization') }}">Settings</a>
                   </li>
                   <li class="list-group-item"> 
                     <a class="{% if current_path == '/sites' %}active{% else %}text-dark{% endif %}" href="{{ url_for('routes.sites') }}">Sites
@@ -408,9 +402,6 @@
                     </li>
                     <li class="list-group-item">
                       <a class="{% if current_path == '/inspection_templates' %}active{% else %}text-dark{% endif %}" href="{{ url_for('routes.inspection_templates') }}">Inspection Templates</a>
-                    </li>
-                    <li class="list-group-item">
-                      <a class="{% if current_path == '/inspection_cycles' %}active{% else %}text-dark{% endif %}" href="{{ url_for('routes.inspection_cycles') }}">Inspection Cycles</a>
                     </li>
                     <li class="list-group-item">
                       <a class="{% if current_path == '/vendors' %}active{% else %}text-dark{% endif %}" href="{{ url_for('routes.vendors') }}">Vendors</a>

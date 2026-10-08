@@ -8,7 +8,7 @@
         <div class="main-card-box card my-4">
         <div class="card-header p-0 position-relative mt-n4 z-index-2">
         <div class="bg-gradient-main custom-title-card">
-          <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">database</i> Data Integration</h2>
+          <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">database</i> Settings</h2>
           </div>
         <div class="card-body px-0 pb-2">
             <br>
@@ -39,9 +39,9 @@
               </a>
             </li>
             <li class="nav-item secondary-nav pt-2">
-              <a class="nav-link text-dark d-flex" data-scroll="" href="#bulk-upload">
-                <i class="material-symbols-rounded text-lg me-2">upload_file</i>
-                <span class="text-sm">Bulk Upload</span>
+              <a class="nav-link text-dark d-flex" data-scroll="" href="#additional-settings">
+                <i class="material-symbols-rounded text-lg me-2">tune</i>
+                <span class="text-sm">Additional Settings</span>
               </a>
             </li>
           </ul>
@@ -166,19 +166,41 @@
 
     <hr class="mx-4">
 
-    <!-- Bulk Upload -->
+    <!-- Additional Settings -->
     <div class="card-body align-items-center">
-        <div class="container-md align-items-center"  id="bulk-upload">
+        <div class="container-md align-items-center" id="additional-settings">
             <h3 class="bg-gradient-main custom-title-card px-3">
-            <span class="text-white">Bulk Upload</h3>
-            <p class="text-sm text-muted mb-3 pt-4">Upload a CSV file to create or update multiple users at once.</p>
-            <a href="{{ url_for('routes.upload_users') }}" class="btn bg-gradient-main add-table-button shadow-dark mb-0">
-                <i class="material-symbols-rounded position-relative me-1" style="font-size:1rem; vertical-align:middle;">upload_file</i>
-                Bulk Upload
-            </a>
+            <span class="text-white">Additional Settings</span></h3>
+            <p class="text-sm text-muted mb-3 pt-4">Other admin tools that don't fit above.</p>
+            <div class="row">
+                <div class="col-xl-3 col-md-4 col-sm-6 mb-4">
+                    <a href="{{ url_for('routes.upload_users') }}">
+                        <div class="small-cards-dashboard card">
+                            <div class="card-header p-2 ps-3">
+                                <div class="d-flex justify-content-between">
+                                    <div><p class="text-sm mb-0">Bulk Upload Users</p></div>
+                                    <div class="icon icon-md icon-shape text-center"><i class="material-symbols-rounded opacity-10">upload_file</i></div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-xl-3 col-md-4 col-sm-6 mb-4">
+                    <a href="{{ url_for('routes.inspection_cycles') }}">
+                        <div class="small-cards-dashboard card">
+                            <div class="card-header p-2 ps-3">
+                                <div class="d-flex justify-content-between">
+                                    <div><p class="text-sm mb-0">Inspection Cycles</p></div>
+                                    <div class="icon icon-md icon-shape text-center"><i class="material-symbols-rounded opacity-10">event_repeat</i></div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
-    <!-- End Bulk Upload -->
+    <!-- End Additional Settings -->
 
 
 

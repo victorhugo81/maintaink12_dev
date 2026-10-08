@@ -16,6 +16,14 @@
                 <form method="POST">
                     {{ form.hidden_tag() }}
                     <div class="row g-3 mt-2">
+                        <div class="col-12 col-sm-6">
+                            {{ form.cycle_id.label(class="form-label") }}
+                            {{ form.cycle_id(class="form-select-box form-select form-select-lg", id="audit-cycle") }}
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            {{ form.template_id.label(class="form-label") }}
+                            {{ form.template_id(class="form-select-box form-select form-select-lg", id="audit-template") }}
+                        </div>
                         <div class="col-12">
                             {{ form.site_id.label(class="form-label") }}
                             {{ form.site_id(class="form-select-box form-select form-select-lg", id="audit-site") }}
@@ -24,14 +32,8 @@
                             {{ form.facility_id.label(class="form-label") }}
                             {{ form.facility_id(class="form-select-box form-select form-select-lg", id="audit-facility") }}
                         </div>
-                        <div class="col-12 col-sm-6">
-                            {{ form.cycle_id.label(class="form-label") }}
-                            {{ form.cycle_id(class="form-select-box form-select form-select-lg") }}
-                        </div>
-                        <div class="col-12 col-sm-6">
-                            {{ form.template_id.label(class="form-label") }}
-                            {{ form.template_id(class="form-select-box form-select form-select-lg") }}
-                        </div>
+                        <p class="text-xs text-secondary mb-0">Only schools/buildings that use the selected Checklist Template and still have a pending audit for the selected Inspection Cycle are listed.</p>
+                        <p class="text-xs text-warning mb-0" id="no-eligible-buildings" hidden>No school/building is set up for this Checklist Template yet &mdash; use <a href="{{ url_for('routes.add_inspection') }}">Schedule Inspection</a> to assign it somewhere first.</p>
                         <div class="col-12 d-grid gap-2 mt-4">
                             {{ form.submit(class="btn btn-lg bg-gradient-main") }}
                             <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.inspections') }}">Cancel</a>
@@ -46,27 +48,70 @@
 <script nonce="{{ g.csp_nonce }}">
 (function () {
   var facilitySites = {{ facility_sites|tojson }};
+  // "{cycleId}_{templateId}" -> facility ids still pending for that exact
+  // combo (see inspections.pending_facility_ids) — a building done under
+  // one template can still be pending under another, so this has to be
+  // recomputed whenever Cycle or Template changes, not just once.
+  var pendingMatrix = {{ pending_matrix|tojson }};
+  var cycleSelect = document.getElementById('audit-cycle');
+  var templateSelect = document.getElementById('audit-template');
   var siteSelect = document.getElementById('audit-site');
   var facilitySelect = document.getElementById('audit-facility');
-  if (!siteSelect || !facilitySelect) { return; }
+  var noEligibleMsg = document.getElementById('no-eligible-buildings');
+  var submitBtn = document.querySelector('form button[type="submit"], form input[type="submit"]');
+  if (!cycleSelect || !templateSelect || !siteSelect || !facilitySelect) { return; }
+
+  function pendingSet() {
+    var list = pendingMatrix[cycleSelect.value + '_' + templateSelect.value];
+    return new Set((list || []).map(String));
+  }
 
   function applyFilter() {
-    var siteId = parseInt(siteSelect.value, 10);
-    var sawSelected = false;
-    Array.prototype.forEach.call(facilitySelect.options, function (opt) {
-      var match = facilitySites[opt.value] === siteId;
+    var pending = pendingSet();
+    var hasEligible = pending.size > 0;
+    if (noEligibleMsg) { noEligibleMsg.hidden = hasEligible; }
+    if (submitBtn) { submitBtn.disabled = !hasEligible; }
+    // When pending is empty, every option below naturally fails its match
+    // check and gets hidden — no special-casing needed beyond the message/button above.
+
+    // Sites: show only ones with at least one pending facility for this cycle/template.
+    var sitesWithPending = {};
+    Object.keys(facilitySites).forEach(function (fid) {
+      if (pending.has(fid)) { sitesWithPending[facilitySites[fid]] = true; }
+    });
+    var sawSelectedSite = false;
+    Array.prototype.forEach.call(siteSelect.options, function (opt) {
+      var match = !!sitesWithPending[opt.value];
       opt.hidden = !match;
       opt.disabled = !match;
-      if (match && opt.selected) { sawSelected = true; }
+      if (match && opt.selected) { sawSelectedSite = true; }
     });
-    if (!sawSelected) {
-      var firstMatch = Array.prototype.find.call(facilitySelect.options, function (opt) {
-        return facilitySites[opt.value] === siteId;
+    if (!sawSelectedSite) {
+      var firstSite = Array.prototype.find.call(siteSelect.options, function (opt) {
+        return !!sitesWithPending[opt.value];
       });
-      if (firstMatch) { facilitySelect.value = firstMatch.value; }
+      if (firstSite) { siteSelect.value = firstSite.value; }
+    }
+
+    // Facilities: show only ones in the chosen (now possibly corrected) site AND pending.
+    var siteId = parseInt(siteSelect.value, 10);
+    var sawSelectedFacility = false;
+    Array.prototype.forEach.call(facilitySelect.options, function (opt) {
+      var match = facilitySites[opt.value] === siteId && pending.has(opt.value);
+      opt.hidden = !match;
+      opt.disabled = !match;
+      if (match && opt.selected) { sawSelectedFacility = true; }
+    });
+    if (!sawSelectedFacility) {
+      var firstFacility = Array.prototype.find.call(facilitySelect.options, function (opt) {
+        return facilitySites[opt.value] === siteId && pending.has(opt.value);
+      });
+      if (firstFacility) { facilitySelect.value = firstFacility.value; }
     }
   }
 
+  cycleSelect.addEventListener('change', applyFilter);
+  templateSelect.addEventListener('change', applyFilter);
   siteSelect.addEventListener('change', applyFilter);
   applyFilter();
 })();

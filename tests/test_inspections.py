@@ -3,6 +3,8 @@ Inspection tests: template/item CRUD, target validation, template-to-result
 mapping, failed-item work-order generation, and due/overdue bucketing.
 """
 from datetime import date
+import json
+import re
 import pytest
 
 
@@ -605,6 +607,12 @@ class TestStartWalkthrough:
             assert Inspection.query.filter_by(cycle_id=cycle_id, template_id=template_id).count() == 2
 
     def test_building_dropdown_excludes_fully_audited_facility(self, app, admin_client):
+        # The School/Building lists are now filtered client-side (JS reads
+        # pending_matrix and hides/hides options live as Cycle/Template
+        # change — see start_walkthrough.html), so both buildings are still
+        # in the server-rendered <option> markup; what must actually differ
+        # is which facility ids pending_matrix lists as pending for this
+        # (cycle, template) combo.
         done_id = _walkthrough_facility(app, name='Fully Audited Building', active_rooms=1)
         pending_id = _walkthrough_facility(app, name='Pending Audit Building', active_rooms=1)
         cycle_id = _make_cycle(app, name='Dropdown Filter Cycle')
@@ -631,7 +639,59 @@ class TestStartWalkthrough:
         r = admin_client.get('/start_walkthrough')
         body = r.get_data(as_text=True)
         assert 'Pending Audit Building' in body
-        assert 'Fully Audited Building' not in body
+        assert 'Fully Audited Building' in body  # present in markup, just JS-hidden once not pending
+        with app.app_context():
+            from application.inspections import pending_facility_ids
+            pending = pending_facility_ids(cycle_id, template_id, [done_id, pending_id])
+            assert pending == {pending_id}
+
+    def test_facilities_ever_inspected_under_template(self, app):
+        used_id = _walkthrough_facility(app, name='Template History Used Building', active_rooms=1)
+        untouched_id = _walkthrough_facility(app, name='Template History Untouched Building', active_rooms=1)
+        cycle_id = _make_cycle(app, name='Template History Cycle')
+        template_id = _make_template(app, name='Template History Template', questions=['Q?'])
+        other_template_id = _make_template(app, name='Other Template', questions=['Q?'])
+
+        with app.app_context():
+            from application.models import Room, Inspection
+            from application.inspections import facilities_ever_inspected_under_template
+            from main import db
+            room = Room.query.filter_by(facility_id=used_id).first()
+            db.session.add(Inspection(template_id=template_id, cycle_id=cycle_id, site_id=1,
+                                       room_id=room.id, due_date=date(2026, 10, 15), status='Scheduled'))
+            db.session.commit()
+
+            assert facilities_ever_inspected_under_template(template_id, [used_id, untouched_id]) == {used_id}
+            assert facilities_ever_inspected_under_template(other_template_id, [used_id, untouched_id]) == set()
+
+    def test_dropdown_excludes_buildings_never_used_with_this_template(self, app, admin_client):
+        # The literal bug report this guards against: with only one building
+        # ever set up for a given Checklist Template, every other (never
+        # touched) building used to still show up as "pending" simply
+        # because 0-of-N-rooms-done also counts as incomplete. A template
+        # should only suggest buildings it has actually been assigned to.
+        used_id = _walkthrough_facility(app, name='Only Playground Building', active_rooms=1)
+        untouched_id = _walkthrough_facility(app, name='No Playground Here Building', active_rooms=1)
+        cycle_id = _make_cycle(app, name='Scoped Template Cycle')
+        template_id = _make_template(app, name='Playground Safety & Equipment', questions=['Q?'])
+
+        with app.app_context():
+            from application.models import Room, Inspection
+            from main import db
+            room = Room.query.filter_by(facility_id=used_id).first()
+            db.session.add(Inspection(template_id=template_id, cycle_id=cycle_id, site_id=1,
+                                       room_id=room.id, due_date=date(2026, 10, 15), status='Scheduled'))
+            db.session.commit()
+
+        r = admin_client.get('/start_walkthrough')
+        assert r.status_code == 200
+        body = r.get_data(as_text=True)
+        match = re.search(r'var pendingMatrix = (\{.*?\});', body)
+        assert match, 'pendingMatrix not found in rendered page'
+        matrix = json.loads(match.group(1))
+        key = f'{cycle_id}_{template_id}'
+        assert used_id in matrix.get(key, [])
+        assert untouched_id not in matrix.get(key, [])
 
 
 class TestWalkthroughRoomFlow:
