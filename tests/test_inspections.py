@@ -110,6 +110,61 @@ class TestInspectionTemplateCRUD:
         assert b'Cannot delete' in r.data
 
 
+class TestInspectionQuestionPresets:
+    """
+    The global, reusable question library on edit_inspection_template.html's
+    Presets tab — not tied to any one template, so any template_id in the
+    URL/fixtures below is only "where to redirect back to" after a change.
+    """
+    def test_regular_user_cannot_manage_presets(self, app, user_client):
+        template_id = _make_template(app)
+        assert user_client.post(f'/edit_inspection_template/{template_id}/add_question_preset', data={
+            'category': 'Electrical', 'question': 'Hacked?',
+        }).status_code == 403
+
+    def test_add_preset_appears_on_edit_page(self, app, admin_client):
+        template_id = _make_template(app)
+        r = admin_client.post(f'/edit_inspection_template/{template_id}/add_question_preset', data={
+            'category': 'Custom', 'question': 'Is the widget calibrated?', 'sort_order': '5',
+        }, follow_redirects=True)
+        assert r.status_code == 200
+        assert b'Preset question added' in r.data
+        assert b'Is the widget calibrated?' in r.data
+        with app.app_context():
+            from application.models import InspectionQuestionPreset
+            preset = InspectionQuestionPreset.query.filter_by(question='Is the widget calibrated?').first()
+            assert preset is not None
+            assert preset.category == 'Custom' and preset.sort_order == 5
+
+    def test_delete_preset(self, app, admin_client):
+        template_id = _make_template(app)
+        admin_client.post(f'/edit_inspection_template/{template_id}/add_question_preset', data={
+            'category': 'Custom', 'question': 'Temporary preset?',
+        }, follow_redirects=True)
+        with app.app_context():
+            from application.models import InspectionQuestionPreset
+            from main import db
+            preset_id = InspectionQuestionPreset.query.filter_by(question='Temporary preset?').first().id
+        r = admin_client.post(f'/edit_inspection_template/{template_id}/delete_question_preset/{preset_id}', follow_redirects=True)
+        assert r.status_code == 200
+        assert b'Preset question removed' in r.data
+        with app.app_context():
+            from application.models import InspectionQuestionPreset
+            from main import db
+            assert db.session.get(InspectionQuestionPreset, preset_id) is None
+
+    def test_preset_shared_across_templates(self, app, admin_client):
+        # Added from one template's page, but it's a global library, so it
+        # must show up on a completely different template's page too.
+        template_a = _make_template(app, name='Preset Share Template A')
+        template_b = _make_template(app, name='Preset Share Template B')
+        admin_client.post(f'/edit_inspection_template/{template_a}/add_question_preset', data={
+            'category': 'Shared', 'question': 'Is this shared across templates?',
+        }, follow_redirects=True)
+        r = admin_client.get(f'/edit_inspection_template/{template_b}')
+        assert b'Is this shared across templates?' in r.data
+
+
 class TestScheduling:
     def test_regular_user_cannot_schedule(self, user_client):
         assert user_client.get('/add_inspection').status_code == 403

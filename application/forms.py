@@ -244,6 +244,15 @@ class InspectionItemForm(FlaskForm):
     submit = SubmitField('Add Item')
 
 
+class InspectionQuestionPresetForm(FlaskForm):
+    category = StringField('Category:', validators=[DataRequired(), Length(max=100)],
+                            render_kw={'placeholder': 'e.g. Electrical'})
+    question = StringField('Question:', validators=[DataRequired(), Length(max=255)],
+                            render_kw={'placeholder': 'e.g. Outlets and switches in good condition?'})
+    sort_order = IntegerField('Sort Order:', validators=[Optional(), NumberRange(min=0)], default=0)
+    submit = SubmitField('Add Preset Question')
+
+
 class InspectionForm(FlaskForm):
     template_id = SelectField('Template:', coerce=int, choices=[], validators=[DataRequired()])
     site_id = SelectField('Site:', coerce=int, choices=[], validators=[Optional()])

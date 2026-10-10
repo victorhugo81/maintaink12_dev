@@ -621,6 +621,21 @@ class InspectionItem(db.Model):
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
 
 
+class InspectionQuestionPreset(db.Model):
+    """
+    A reusable library of common checklist questions (grouped by a free-text
+    `category`, e.g. "Electrical"), offered as a quick-fill dropdown on the
+    "Add Item" form in edit_inspection_template.html — not referenced by any
+    FK, so there's no soft-delete concern like InspectionItem has against
+    InspectionResult; deleting one just removes it from the picklist.
+    """
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    category = db.Column(db.String(100), nullable=False)
+    question = db.Column(db.String(255), nullable=False)
+    sort_order = db.Column(db.Integer, default=0, nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+
 class Inspection(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     template_id = db.Column(db.Integer, db.ForeignKey('inspection_template.id'), nullable=False, index=True)

@@ -10,88 +10,184 @@
                 </div>
             </div>
             <div class="card-body px-4 pb-4">
-                <form method="POST" action="{{ url_for('routes.edit_inspection_template', template_id=template.id) }}">
-                    {{ form.hidden_tag() }}
-                    <div class="col-12 d-flex justify-content-end align-items-center sticky-top bg-white py-2 mb-4 border-bottom">
-                        <div class="d-flex gap-2 mt-3 align-items-center">
-                            <div class="form-check me-3">
-                                {{ form.is_active(class="form-check-input") }}
-                                {{ form.is_active.label(class="form-check-label") }}
-                            </div>
-                            {{ form.submit(class="btn bg-gradient-main") }}
-                            <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.inspection_templates') }}">Back</a>
-                        </div>
-                    </div>
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <span aria-hidden="true" class="text-danger ms-1">*</span>
-                            {{ form.name.label(class="form-label") }}
-                            {{ form.name(class="form-control") }}
-                        </div>
-                        <div class="col-12">
-                            {{ form.description.label(class="form-label") }}
-                            {{ form.description(class="form-control", rows=2) }}
-                        </div>
-                        <div class="col-12 col-sm-6">
-                            {{ form.category_id.label(class="form-label") }}
-                            {{ form.category_id(class="form-select-box form-select") }}
-                        </div>
-                        <div class="col-12 col-sm-6">
-                            {{ form.priority_id.label(class="form-label") }}
-                            {{ form.priority_id(class="form-select-box form-select") }}
-                        </div>
-                    </div>
-                </form>
 
-                <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Checklist Items</p>
-                <hr class="mt-0 mb-3">
-                {% if template.items %}
-                <table class="table table-sm align-items-left mb-3">
-                    <thead><tr>
-                        <th class="text-uppercase text-xxs font-weight-bolder">Question</th>
-                        <th class="text-uppercase text-xxs font-weight-bolder">Order</th>
-                        <th class="text-uppercase text-xxs font-weight-bolder">Status</th>
-                        <th></th>
-                    </tr></thead>
-                    <tbody>
-                    {% for item in template.items %}
-                    <tr>
-                        <td>{{ item.question }}</td>
-                        <td class="text-xs">{{ item.sort_order }}</td>
-                        <td><span class="badge {% if item.is_active %}bg-success{% else %}bg-secondary{% endif %}">{{ 'Active' if item.is_active else 'Inactive' }}</span></td>
-                        <td class="text-end">
-                            {% if item.is_active %}
-                            <form id="delete-item-{{ item.id }}" action="{{ url_for('routes.delete_inspection_item', item_id=item.id) }}" method="POST">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal"
-                                        data-confirm-message="Remove checklist item &quot;{{ item.question }}&quot;?"
-                                        data-form-id="delete-item-{{ item.id }}">
-                                    <i class="material-symbols-rounded position-relative text-lg">delete</i>
-                                </button>
-                            </form>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <p class="text-secondary text-sm">No checklist items yet.</p>
-                {% endif %}
-                <form method="POST" action="{{ url_for('routes.add_inspection_item', template_id=template.id) }}" class="row g-2 align-items-end">
-                    {{ item_form.hidden_tag() }}
-                    <div class="col-auto" style="min-width: 300px;">
-                        {{ item_form.question.label(class="form-label") }}
-                        {{ item_form.question(class="form-control", placeholder="e.g. Pressure gauge in operable range?") }}
+                <ul class="nav nav-tabs mb-4" id="templateTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link{% if active_tab == 'template' %} active{% endif %}" id="template-tab"
+                                data-bs-toggle="tab" data-bs-target="#template-pane" type="button" role="tab"
+                                aria-controls="template-pane" aria-selected="{{ 'true' if active_tab == 'template' else 'false' }}">
+                            <i class="material-symbols-rounded position-relative me-1" style="font-size:1rem; vertical-align:middle;">checklist</i>
+                            Template
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link{% if active_tab == 'presets' %} active{% endif %}" id="presets-tab"
+                                data-bs-toggle="tab" data-bs-target="#presets-pane" type="button" role="tab"
+                                aria-controls="presets-pane" aria-selected="{{ 'true' if active_tab == 'presets' else 'false' }}">
+                            <i class="material-symbols-rounded position-relative me-1" style="font-size:1rem; vertical-align:middle;">list_alt</i>
+                            Preset Questions
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="templateTabContent">
+
+                    <!-- Template tab: settings + this template's checklist items -->
+                    <div class="tab-pane fade{% if active_tab == 'template' %} show active{% endif %}" id="template-pane" role="tabpanel" aria-labelledby="template-tab">
+                        <form method="POST" action="{{ url_for('routes.edit_inspection_template', template_id=template.id) }}">
+                            {{ form.hidden_tag() }}
+                            <div class="col-12 d-flex justify-content-end align-items-center sticky-top bg-white py-2 mb-4 border-bottom">
+                                <div class="d-flex gap-2 mt-3 align-items-center">
+                                    <div class="form-check me-3">
+                                        {{ form.is_active(class="form-check-input") }}
+                                        {{ form.is_active.label(class="form-check-label") }}
+                                    </div>
+                                    {{ form.submit(class="btn bg-gradient-main") }}
+                                    <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.inspection_templates') }}">Back</a>
+                                </div>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <span aria-hidden="true" class="text-danger ms-1">*</span>
+                                    {{ form.name.label(class="form-label") }}
+                                    {{ form.name(class="form-control") }}
+                                </div>
+                                <div class="col-12">
+                                    {{ form.description.label(class="form-label") }}
+                                    {{ form.description(class="form-control", rows=2) }}
+                                </div>
+                                <div class="col-12 col-sm-6">
+                                    {{ form.category_id.label(class="form-label") }}
+                                    {{ form.category_id(class="form-select-box form-select") }}
+                                </div>
+                                <div class="col-12 col-sm-6">
+                                    {{ form.priority_id.label(class="form-label") }}
+                                    {{ form.priority_id(class="form-select-box form-select") }}
+                                </div>
+                            </div>
+                        </form>
+
+                        <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Checklist Items</p>
+                        <hr class="mt-0 mb-3">
+                        {% set active_items = template.items|selectattr('is_active')|list %}
+                        {% if active_items %}
+                        <table class="table table-sm align-items-left mb-3">
+                            <thead><tr>
+                                <th class="text-uppercase text-xxs font-weight-bolder">Question</th>
+                                <th class="text-uppercase text-xxs font-weight-bolder">Order</th>
+                                <th></th>
+                            </tr></thead>
+                            <tbody>
+                            {% for item in active_items %}
+                            <tr>
+                                <td>{{ item.question }}</td>
+                                <td class="text-xs">{{ item.sort_order }}</td>
+                                <td class="text-end">
+                                    <form id="delete-item-{{ item.id }}" action="{{ url_for('routes.delete_inspection_item', item_id=item.id) }}" method="POST">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal"
+                                                data-confirm-message="Remove checklist item &quot;{{ item.question }}&quot;?"
+                                                data-form-id="delete-item-{{ item.id }}">
+                                            <i class="material-symbols-rounded position-relative text-lg">delete</i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p class="text-secondary text-sm">No checklist items yet.</p>
+                        {% endif %}
+                        <form method="POST" action="{{ url_for('routes.add_inspection_item', template_id=template.id) }}" class="row g-2 align-items-end">
+                            {{ item_form.hidden_tag() }}
+                            <div class="col-auto" style="min-width: 320px;">
+                                {{ item_form.question.label(class="form-label") }}
+                                <span aria-hidden="true" class="text-danger ms-1">*</span>
+                                <select name="question" id="item-question-input" class="form-select-box form-select" required>
+                                    <option value="">-- Choose a preset question --</option>
+                                    {% for category, group in presets|groupby('category') %}
+                                    <optgroup label="{{ category }}">
+                                        {% for preset in group %}
+                                        <option value="{{ preset.question }}">{{ preset.question }}</option>
+                                        {% endfor %}
+                                    </optgroup>
+                                    {% endfor %}
+                                </select>
+                                {% if not presets %}
+                                <small class="text-secondary text-xs">No presets yet — add some on the <strong>Preset Questions</strong> tab first.</small>
+                                {% endif %}
+                            </div>
+                            <div class="col-auto">
+                                {{ item_form.sort_order.label(class="form-label") }}
+                                {{ item_form.sort_order(class="form-control") }}
+                            </div>
+                            <div class="col-auto">
+                                {{ item_form.submit(class="btn bg-gradient-main") }}
+                            </div>
+                        </form>
                     </div>
-                    <div class="col-auto">
-                        {{ item_form.sort_order.label(class="form-label") }}
-                        {{ item_form.sort_order(class="form-control") }}
+
+                    <!-- Preset Questions tab: the global, reusable question library -->
+                    <div class="tab-pane fade{% if active_tab == 'presets' %} show active{% endif %}" id="presets-pane" role="tabpanel" aria-labelledby="presets-tab">
+                        <p class="text-sm text-secondary">Shared across every checklist template — add common questions here once, then quick-fill them from the Preset Question dropdown on the Template tab.</p>
+                        {% if presets %}
+                        <table class="table table-sm align-items-left mb-3">
+                            <thead><tr>
+                                <th class="text-uppercase text-xxs font-weight-bolder">Category</th>
+                                <th class="text-uppercase text-xxs font-weight-bolder">Question</th>
+                                <th class="text-uppercase text-xxs font-weight-bolder">Order</th>
+                                <th></th>
+                            </tr></thead>
+                            <tbody>
+                            {% for preset in presets %}
+                            <tr>
+                                <td>{{ preset.category }}</td>
+                                <td>{{ preset.question }}</td>
+                                <td class="text-xs">{{ preset.sort_order }}</td>
+                                <td class="text-end">
+                                    <form id="delete-preset-{{ preset.id }}" action="{{ url_for('routes.delete_inspection_question_preset', template_id=template.id, preset_id=preset.id) }}" method="POST">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal"
+                                                data-confirm-message="Remove preset question &quot;{{ preset.question }}&quot;?"
+                                                data-form-id="delete-preset-{{ preset.id }}">
+                                            <i class="material-symbols-rounded position-relative text-lg">delete</i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p class="text-secondary text-sm">No preset questions yet.</p>
+                        {% endif %}
+                        <form method="POST" action="{{ url_for('routes.add_inspection_question_preset', template_id=template.id) }}" class="row g-2 align-items-end">
+                            {{ preset_form.hidden_tag() }}
+                            <div class="col-auto" style="min-width: 220px;">
+                                {{ preset_form.category.label(class="form-label") }}
+                                {{ preset_form.category(class="form-control", list="preset-category-list") }}
+                                <datalist id="preset-category-list">
+                                    {% for category, _ in presets|groupby('category') %}
+                                    <option value="{{ category }}">
+                                    {% endfor %}
+                                </datalist>
+                            </div>
+                            <div class="col-auto" style="min-width: 320px;">
+                                {{ preset_form.question.label(class="form-label") }}
+                                {{ preset_form.question(class="form-control") }}
+                            </div>
+                            <div class="col-auto">
+                                {{ preset_form.sort_order.label(class="form-label") }}
+                                {{ preset_form.sort_order(class="form-control") }}
+                            </div>
+                            <div class="col-auto">
+                                {{ preset_form.submit(class="btn bg-gradient-main") }}
+                            </div>
+                        </form>
                     </div>
-                    <div class="col-auto">
-                        {{ item_form.submit(class="btn bg-gradient-main") }}
-                    </div>
-                </form>
+
+                </div>
             </div>
         </div>
     </div>

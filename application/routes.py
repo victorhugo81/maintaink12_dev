@@ -4,8 +4,8 @@ from flask_login import login_user, login_required, logout_user, current_user
 from flask_paginate import Pagination, get_page_args
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from .models import User, Role, Site, Notification, Organization, BulkUploadLog, Facility, Floor, Room, FacilityAttachment, RoomAttachment, AssetType, Asset, AssetConditionHistory, AssetAttachment, condition_label_for_score, CONDITION_SCALE, Priority, Category, Subcategory, WorkOrder, WorkOrderComment, WorkOrderAttachment, WorkOrderStatusHistory, MaintenancePlan, MaintenanceSchedule, InspectionTemplate, InspectionItem, Inspection, InspectionResult, INSPECTION_RESULTS, InspectionCycle, InspectionAttachment, Vendor, WorkOrderMaterial, WorkOrderLabor, CostRecord, Project, ProjectTask, ProjectCost, ProjectDocument, PROJECT_STATUSES, SLARule, NotificationPreference, NotificationLog, NOTIFICATION_EVENTS, NOTIFICATION_EVENT_LABELS, CsvImportLog, AuditLog
-from .forms import LoginForm, UserForm, RoleForm, SiteForm, NotificationForm, OrganizationForm, EmailConfigForm, FacilityForm, FloorForm, RoomForm, AssetTypeForm, AssetForm, AssetConditionForm, PriorityForm, CategoryForm, SubcategoryForm, WorkOrderRequestForm, WorkOrderForm, WorkOrderStatusForm, WorkOrderCommentForm, MaintenancePlanForm, InspectionTemplateForm, InspectionItemForm, InspectionForm, InspectionResultsForm, InspectionResultItemForm, InspectionCycleForm, StartWalkthroughForm, VendorForm, WorkOrderLaborForm, WorkOrderMaterialForm, CostRecordForm, ProjectForm, ProjectTaskForm, ProjectCostForm, ProjectVendorForm, AssetRiskFieldsForm, SLARuleForm, NotificationPreferenceForm, CsvImportUploadForm
+from .models import User, Role, Site, Notification, Organization, BulkUploadLog, Facility, Floor, Room, FacilityAttachment, RoomAttachment, AssetType, Asset, AssetConditionHistory, AssetAttachment, condition_label_for_score, CONDITION_SCALE, Priority, Category, Subcategory, WorkOrder, WorkOrderComment, WorkOrderAttachment, WorkOrderStatusHistory, MaintenancePlan, MaintenanceSchedule, InspectionTemplate, InspectionItem, InspectionQuestionPreset, Inspection, InspectionResult, INSPECTION_RESULTS, InspectionCycle, InspectionAttachment, Vendor, WorkOrderMaterial, WorkOrderLabor, CostRecord, Project, ProjectTask, ProjectCost, ProjectDocument, PROJECT_STATUSES, SLARule, NotificationPreference, NotificationLog, NOTIFICATION_EVENTS, NOTIFICATION_EVENT_LABELS, CsvImportLog, AuditLog
+from .forms import LoginForm, UserForm, RoleForm, SiteForm, NotificationForm, OrganizationForm, EmailConfigForm, FacilityForm, FloorForm, RoomForm, AssetTypeForm, AssetForm, AssetConditionForm, PriorityForm, CategoryForm, SubcategoryForm, WorkOrderRequestForm, WorkOrderForm, WorkOrderStatusForm, WorkOrderCommentForm, MaintenancePlanForm, InspectionTemplateForm, InspectionItemForm, InspectionQuestionPresetForm, InspectionForm, InspectionResultsForm, InspectionResultItemForm, InspectionCycleForm, StartWalkthroughForm, VendorForm, WorkOrderLaborForm, WorkOrderMaterialForm, CostRecordForm, ProjectForm, ProjectTaskForm, ProjectCostForm, ProjectVendorForm, AssetRiskFieldsForm, SLARuleForm, NotificationPreferenceForm, CsvImportUploadForm
 from .utils import validate_password, validate_file_upload, encrypt_mail_password, decrypt_mail_password, hash_email, get_app_version
 from .email_utils import send_temp_password_email, send_password_updated_email, send_work_order_notification
 from . import workflow
@@ -3892,11 +3892,15 @@ def edit_inspection_template(template_id):
     form.category_id.choices = [(c.id, c.name) for c in Category.query.filter_by(is_active=True).order_by(Category.sort_order, Category.name).all()]
     form.priority_id.choices = [(p.id, p.name) for p in Priority.query.filter_by(is_active=True).order_by(Priority.sort_order).all()]
     item_form = InspectionItemForm()
+    preset_form = InspectionQuestionPresetForm()
+    presets = InspectionQuestionPreset.query.order_by(InspectionQuestionPreset.category, InspectionQuestionPreset.sort_order).all()
+    active_tab = request.args.get('tab', 'template')
 
     if form.validate_on_submit():
         if InspectionTemplate.query.filter(InspectionTemplate.name == form.name.data, InspectionTemplate.id != template.id).first():
             flash('A template with this name already exists.', 'danger')
-            return render_template('edit_inspection_template.html', form=form, item_form=item_form, template=template)
+            return render_template('edit_inspection_template.html', form=form, item_form=item_form, template=template,
+                preset_form=preset_form, presets=presets, active_tab=active_tab)
         template.name = form.name.data
         template.description = form.description.data
         template.category_id = form.category_id.data
@@ -3906,7 +3910,8 @@ def edit_inspection_template(template_id):
         flash('Template updated successfully!', 'success')
         return redirect(url_for('routes.inspection_templates'))
 
-    return render_template('edit_inspection_template.html', form=form, item_form=item_form, template=template)
+    return render_template('edit_inspection_template.html', form=form, item_form=item_form, template=template,
+        preset_form=preset_form, presets=presets, active_tab=active_tab)
 
 
 @routes_blueprint.route('/delete_inspection_template/<int:template_id>', methods=['POST'])
@@ -3954,6 +3959,39 @@ def delete_inspection_item(item_id):
         db.session.commit()
         flash('Checklist item removed.', 'warning')
     return redirect(url_for('routes.edit_inspection_template', template_id=template_id))
+
+
+# ****************** Preset checklist questions (global, reusable) ********
+# Not tied to any one InspectionTemplate — just a quick-fill library offered
+# on the "Add Item" form (edit_inspection_template.html's Presets tab).
+# template_id in these URLs is only "where to redirect back to", matching
+# the tab the admin was working from; it isn't stored on the preset itself.
+@routes_blueprint.route('/edit_inspection_template/<int:template_id>/add_question_preset', methods=['POST'])
+@login_required
+def add_inspection_question_preset(template_id):
+    is_admin()
+    InspectionTemplate.query.get_or_404(template_id)  # just to 404 on a bad id before redirecting back to it
+    form = InspectionQuestionPresetForm()
+    if form.validate_on_submit():
+        db.session.add(InspectionQuestionPreset(category=form.category.data, question=form.question.data,
+                                                 sort_order=form.sort_order.data or 0))
+        db.session.commit()
+        flash('Preset question added.', 'success')
+    else:
+        flash('A category and question are required.', 'danger')
+    return redirect(url_for('routes.edit_inspection_template', template_id=template_id, tab='presets'))
+
+
+@routes_blueprint.route('/edit_inspection_template/<int:template_id>/delete_question_preset/<int:preset_id>', methods=['POST'])
+@login_required
+def delete_inspection_question_preset(template_id, preset_id):
+    is_admin()
+    InspectionTemplate.query.get_or_404(template_id)
+    preset = InspectionQuestionPreset.query.get_or_404(preset_id)
+    db.session.delete(preset)
+    db.session.commit()
+    flash('Preset question removed.', 'warning')
+    return redirect(url_for('routes.edit_inspection_template', template_id=template_id, tab='presets'))
 
 
 # ****************** Inspection Cycles (admin reference data) *************
