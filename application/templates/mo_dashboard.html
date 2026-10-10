@@ -42,12 +42,12 @@
   <div class="col-12">
     <div class="main-card-box card my-4">
       <div class="card-header p-0 position-relative mt-n4 z-index-2">
-        <div class="bg-gradient-main custom-title-card d-flex justify-content-between align-items-center pe-3">
+        <div class="bg-gradient-main custom-title-card d-flex flex-wrap justify-content-between align-items-center gap-2 pe-3">
           <h2 class="text-white text-capitalize ps-3 mb-0"><i class="material-symbols-rounded opacity-5">insights</i> {{ current_page_name }} &mdash; {{ view_labels[view] }}</h2>
           {% if allowed_views|length > 1 %}
           <div class="btn-group btn-group-sm">
             {% for v in allowed_views %}
-            <a class="btn btn-sm {% if v == view %}btn-light{% else %}btn-outline-light{% endif %} mb-0"
+            <a class="btn btn-sm {% if v == view %}btn-light{% else %}btn-outline-light{% endif %} mb-0 text-nowrap"
                href="{{ url_for('routes.mo_dashboard', view=v, preset=f.preset, start=f.start if f.preset == 'custom' else None, end=f.end if f.preset == 'custom' else None) }}">{{ view_labels[v] }}</a>
             {% endfor %}
           </div>

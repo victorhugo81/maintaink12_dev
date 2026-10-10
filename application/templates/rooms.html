@@ -79,7 +79,7 @@
                 </form>
               </div>
               {% if current_user.is_admin %}
-              <div class="col-2 text-end">
+              <div class="col-auto text-end">
               <a href="{{ url_for('routes.add_room') }}" type="button" class="btn bg-gradient-main add-table-button shadow-dark">Add Room</a>
             </div>
             {% endif %}
