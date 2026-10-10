@@ -54,12 +54,12 @@ def _seed_base_data(db, app):
 
     key = app.config['SECRET_KEY']
 
-    # Roles — id 1 = Admin, 2 = Specialist, 3 = Technician, 4 = Teacher
+    # Roles — id 1 = Admin, 2 = Specialist, 3 = Technician, 4 = Staff
     roles = [
         Role(id=1, role_name='Admin'),
         Role(id=2, role_name='Specialist'),
         Role(id=3, role_name='Technician'),
-        Role(id=4, role_name='Teacher'),
+        Role(id=4, role_name='Staff'),
     ]
     db.session.bulk_save_objects(roles)
 

@@ -56,7 +56,7 @@ Models (application/models.py)
 Key models and their notable fields:
 
 Model	Notes
-User	Email stored encrypted (cryptography.fernet); password hashed with scrypt; role_id 1=Admin, 2=Specialist, 3=Technician (site-scoped for work orders/facilities/rooms), 4+=other roles (Teacher/Staff) scoped to their own records/site
+User	Email stored encrypted (cryptography.fernet); password hashed with scrypt; role_id 1=Admin, 2=Specialist, 3=Technician (site-scoped for work orders/facilities/rooms), 4=Staff (any other site user — teacher, office staff, custodian, etc. — scoped to their own records/site). Only 3 permission tiers actually exist in code (`User.is_admin`/`is_tech_role` in models.py do case-insensitive `role_name` string matching against "admin" and "specialist"/"technician" — role_id is otherwise just an int, not itself checked for 2 vs 3 except where site-scoping differs), so a since-removed, separately-seeded 5th role (also once labeled "Staff", pre-Phase-14) was collapsed into this one role_id 4 since nothing ever told the two apart — don't reintroduce a 5th seeded role without also giving it a real permission distinction in those two properties, or it'll just be dead weight again.
 Organization	Stores SMTP and FTP config with encrypted passwords; config overrides app.config at startup
 Site	Has both site_name and site_acronyms; every Facility/Room/WorkOrder carries a site_id. Also carries the optional site_city/site_state/site_zip/principal_* fields (Phase 13) populated by the legacy sites.csv bulk importer
 Facility	M&O addition (Phase 1). Belongs to a Site; has Floors and Rooms; "delete" is soft (is_active=False) since later phases (assets, work orders, inspections) will reference it and must keep history

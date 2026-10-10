@@ -1450,8 +1450,8 @@ def add_role():
 def edit_role(role_id):
     is_admin()  # Ensure only admins can access this route
     
-    # Restrict editing roles with IDs 1, 2, 3, 4, 5
-    if role_id in {1, 2, 3, 4, 5}:
+    # Restrict editing roles with IDs 1, 2, 3, 4 (the core seeded roles)
+    if role_id in {1, 2, 3, 4}:
         flash('You are not allowed to edit this role.', 'danger')
         return redirect(url_for('routes.roles'))
 
@@ -1482,8 +1482,8 @@ def edit_role(role_id):
 def delete_role(role_id):
     is_admin()  # Ensure only admins can access this route
 
-    # Restrict deleting roles with IDs 1, 2, 3, 4, 5
-    if role_id in {1, 2, 3, 4, 5}:
+    # Restrict deleting roles with IDs 1, 2, 3, 4 (the core seeded roles)
+    if role_id in {1, 2, 3, 4}:
         flash('You are not allowed to delete this role.', 'danger')
         return redirect(url_for('routes.roles'))
     

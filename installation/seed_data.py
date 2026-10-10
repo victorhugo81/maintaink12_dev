@@ -45,12 +45,16 @@ with app.app_context():
             print("Organization created.")
 
         # --- Roles ---
+        # Only 3 permission tiers actually exist in code (User.is_admin /
+        # is_tech_role in application/models.py): Admin, Specialist+Technician
+        # ("M&O staff"), and everyone else. Staff covers any site user who
+        # submits/views their own requests — teacher, office staff,
+        # custodian, etc. — since nothing distinguishes them further.
         roles = [
             ('1', 'Admin'),
             ('2', 'Specialist'),
             ('3', 'Technician'),
-            ('4', 'Teacher'),
-            ('5', 'Staff')
+            ('4', 'Staff'),
         ]
         for role_id, role_name in roles:
             if not Role.query.filter_by(role_name=role_name).first():
