@@ -34,22 +34,80 @@
     <div class="col-12 col-sm-6 col-lg-3">
         <span aria-hidden="true" class="text-danger ms-1">*</span>
         {{ form.site_id.label(class="form-label") }}
-        {{ form.site_id(class="form-select-box form-select", disabled=ro) }}
+        {{ form.site_id(class="form-select-box form-select", disabled=ro, id="wo-site") }}
         <small class="text-secondary text-xs">Overridden by the facility's site when a facility is chosen.</small>
     </div>
     <div class="col-12 col-sm-6 col-lg-3">
         {{ form.facility_id.label(class="form-label") }}
-        {{ form.facility_id(class="form-select-box form-select", disabled=ro) }}
+        {{ form.facility_id(class="form-select-box form-select", disabled=ro, id="wo-facility") }}
     </div>
     <div class="col-12 col-sm-6 col-lg-3">
         {{ form.room_id.label(class="form-label") }}
-        {{ form.room_id(class="form-select-box form-select", disabled=ro) }}
+        {{ form.room_id(class="form-select-box form-select", disabled=ro, id="wo-room") }}
     </div>
     <div class="col-12 col-sm-6 col-lg-3">
         {{ form.asset_id.label(class="form-label") }}
-        {{ form.asset_id(class="form-select-box form-select", disabled=ro) }}
+        {{ form.asset_id(class="form-select-box form-select", disabled=ro, id="wo-asset") }}
     </div>
 </div>
+
+{% if not ro %}
+<script nonce="{{ g.csp_nonce }}">
+(function () {
+  // Site -> Facility -> Room/Asset cascading, same technique as
+  // new_work_order.html's Site -> Building -> Room. Facility/Room/Asset are
+  // all optional here (unlike new_work_order.html's required Building), so
+  // a non-matching selection resets to its "0" sentinel ("-- None --" /
+  // "-- No room --" / "-- No asset --") rather than jumping to a pick.
+  var facilitySites = {{ facility_sites|tojson }};
+  var roomFacilities = {{ room_facilities|tojson }};
+  var assetFacilities = {{ asset_facilities|tojson }};
+  var siteSelect = document.getElementById('wo-site');
+  var facilitySelect = document.getElementById('wo-facility');
+  var roomSelect = document.getElementById('wo-room');
+  var assetSelect = document.getElementById('wo-asset');
+  if (!siteSelect || !facilitySelect || !roomSelect || !assetSelect) { return; }
+
+  function applyFacilityFilter() {
+    var siteId = parseInt(siteSelect.value, 10);
+    var sawSelected = false;
+    Array.prototype.forEach.call(facilitySelect.options, function (opt) {
+      var isSentinel = opt.value === '0';
+      var match = isSentinel || facilitySites[opt.value] === siteId;
+      opt.hidden = !match;
+      opt.disabled = !match;
+      if (match && opt.selected) { sawSelected = true; }
+    });
+    if (!sawSelected) { facilitySelect.value = '0'; }
+  }
+
+  function applyRoomAndAssetFilter() {
+    var facilityId = parseInt(facilitySelect.value, 10);
+    [[roomSelect, roomFacilities], [assetSelect, assetFacilities]].forEach(function (pair) {
+      var select = pair[0], facilityMap = pair[1];
+      var sawSelected = false;
+      Array.prototype.forEach.call(select.options, function (opt) {
+        var isSentinel = opt.value === '0';
+        var match = isSentinel || facilityMap[opt.value] === facilityId;
+        opt.hidden = !match;
+        opt.disabled = !match;
+        if (match && opt.selected) { sawSelected = true; }
+      });
+      if (!sawSelected) { select.value = '0'; }
+    });
+  }
+
+  siteSelect.addEventListener('change', function () {
+    applyFacilityFilter();
+    applyRoomAndAssetFilter();
+  });
+  facilitySelect.addEventListener('change', applyRoomAndAssetFilter);
+
+  applyFacilityFilter();
+  applyRoomAndAssetFilter();
+})();
+</script>
+{% endif %}
 
 <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Who &amp; When</p>
 <hr class="mt-0 mb-3">

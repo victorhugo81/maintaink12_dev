@@ -3146,7 +3146,7 @@ def work_orders():
         'work_orders.html',
         work_orders=items, pagination=pagination, per_page=per_page, total=total,
         current_path=current_path, current_page_name=current_page_name,
-        sites=sites,
+        sites=sites, staff=current_user.role_id in (1, 2, 3),
         priorities=Priority.query.order_by(Priority.sort_order).all(),
         categories=Category.query.order_by(Category.sort_order, Category.name).all(),
         assignees=_assignee_choices(_visible_site_ids())[1:] if current_user.role_id in (1, 2, 3) else [],
@@ -3156,25 +3156,31 @@ def work_orders():
 
 
 # ****************** Requester submission (the simple mobile flow) ********
-@routes_blueprint.route('/request_work_order', methods=['GET', 'POST'])
-@login_required
-def request_work_order():
-    current_page_name = 'New Request'
-    form = WorkOrderRequestForm()
+def _work_order_create_context(current_page_name):
+    """
+    Shared context for new_work_order.html — one page with two tabs instead
+    of two separate pages: "Request Maintenance" (WorkOrderRequestForm, open
+    to every logged-in user) and, only for M&O staff (role_id 1-3), "Full
+    Work Order" (WorkOrderForm, same fields as edit_work_order.html). Both
+    /request_work_order and /add_work_order render this same template with
+    a different `active_tab`, so both routes build their context here to
+    stay consistent (including on a validation-failure re-render).
+    """
+    request_form = WorkOrderRequestForm()
     site_ids = _visible_site_ids()
     site_query = Site.query.order_by(Site.site_name)
     if site_ids:
         site_query = site_query.filter(Site.id.in_(site_ids))
-    form.site_id.choices = [(s.id, s.site_name) for s in site_query.all()]
+    request_form.site_id.choices = [(s.id, s.site_name) for s in site_query.all()]
     facility_choices, room_choices, _ = _location_choices(site_ids, with_none=False)
-    form.facility_id.choices = facility_choices
-    form.room_id.choices = room_choices
-    form.category_id.choices, _, form.priority_id.choices = _classification_choices()
-    if request.method == 'GET' and current_user.site_id in dict(form.site_id.choices):
-        form.site_id.data = current_user.site_id
+    request_form.facility_id.choices = facility_choices
+    request_form.room_id.choices = room_choices
+    request_form.category_id.choices, _, request_form.priority_id.choices = _classification_choices()
+    if request.method == 'GET' and current_user.site_id in dict(request_form.site_id.choices):
+        request_form.site_id.data = current_user.site_id
 
-    # Site is a pure UI narrowing aid (the JS below filters the Building list
-    # by it) — the WorkOrder's real site_id still comes from the chosen
+    # Site is a pure UI narrowing aid (the JS filters the Building list by
+    # it) — the WorkOrder's real site_id still comes from the chosen
     # facility via _validate_work_order_links, same as before this field
     # existed. Just catch an inconsistent pairing (stale JS, tampered POST).
     fac_query = Facility.query.filter_by(is_active=True)
@@ -3184,18 +3190,35 @@ def request_work_order():
     room_facilities = {r.id: r.facility_id for r in
                         Room.query.filter(Room.facility_id.in_(facility_sites.keys()),
                                           Room.is_active.is_(True)).all()}
+    asset_facilities = {}
+
+    full_form = None
+    if current_user.role_id in (1, 2, 3):
+        full_form = WorkOrderForm()
+        location_maps = _fill_staff_form_choices(full_form)
+        if request.method == 'GET':
+            full_form.site_id.data = current_user.site_id
+        asset_facilities = location_maps['asset_facilities']
+
+    return dict(request_form=request_form, full_form=full_form, current_page_name=current_page_name,
+                facility_sites=facility_sites, room_facilities=room_facilities, asset_facilities=asset_facilities)
+
+
+@routes_blueprint.route('/request_work_order', methods=['GET', 'POST'])
+@login_required
+def request_work_order():
+    ctx = _work_order_create_context('New Work Order')
+    form = ctx['request_form']
 
     if form.validate_on_submit():
-        if facility_sites.get(form.facility_id.data) != form.site_id.data:
+        if ctx['facility_sites'].get(form.facility_id.data) != form.site_id.data:
             flash('Selected building does not belong to the selected site.', 'danger')
-            return render_template('new_work_order.html', form=form, current_page_name=current_page_name,
-                facility_sites=facility_sites, room_facilities=room_facilities)
+            return render_template('new_work_order.html', active_tab='request', **ctx)
         site_id, error = _validate_work_order_links(
             form.facility_id.data, form.room_id.data or None, None, form.category_id.data, None)
         if error:
             flash(error, 'danger')
-            return render_template('new_work_order.html', form=form, current_page_name=current_page_name,
-                facility_sites=facility_sites, room_facilities=room_facilities)
+            return render_template('new_work_order.html', active_tab='request', **ctx)
         if not can_access_site(site_id):
             abort(403)
 
@@ -3227,8 +3250,7 @@ def request_work_order():
         flash(f'Request {wo.wo_number} submitted. The M&O team will review it.', 'success')
         return redirect(url_for('routes.edit_work_order', work_order_id=wo.id))
 
-    return render_template('new_work_order.html', form=form, current_page_name=current_page_name,
-        facility_sites=facility_sites, room_facilities=room_facilities)
+    return render_template('new_work_order.html', active_tab='request', **ctx)
 
 
 def _fill_staff_form_choices(form, current=None):
@@ -3245,6 +3267,20 @@ def _fill_staff_form_choices(form, current=None):
         vendor_qs.append(current.vendor)
     form.vendor_id.choices = [(0, '-- No vendor --')] + [(v.id, v.name) for v in vendor_qs]
     form.project_id.choices = _project_choices(current.project if current else None)
+
+    # Site -> Facility -> Room/Asset cascading is a client-side filter only
+    # (work_order_fields.html's JS), same technique as new_work_order.html's
+    # Site -> Building -> Room — built from exactly the ids already in the
+    # choices lists above so an edit page's "current" facility/room/asset
+    # (appended by _location_choices even when inactive/out of the normal
+    # scope) stays consistent with what's actually rendered.
+    fac_ids = [c[0] for c in form.facility_id.choices if c[0]]
+    room_ids = [c[0] for c in form.room_id.choices if c[0]]
+    asset_ids = [c[0] for c in form.asset_id.choices if c[0]]
+    facility_sites = {f.id: f.site_id for f in Facility.query.filter(Facility.id.in_(fac_ids)).all()} if fac_ids else {}
+    room_facilities = {r.id: r.facility_id for r in Room.query.filter(Room.id.in_(room_ids)).all()} if room_ids else {}
+    asset_facilities = {a.id: a.facility_id for a in Asset.query.filter(Asset.id.in_(asset_ids)).all()} if asset_ids else {}
+    return dict(facility_sites=facility_sites, room_facilities=room_facilities, asset_facilities=asset_facilities)
 
 
 def _apply_staff_form(form, wo):
@@ -3281,19 +3317,16 @@ def _apply_staff_form(form, wo):
 @routes_blueprint.route('/add_work_order', methods=['GET', 'POST'])
 @login_required
 def add_work_order():
-    current_page_name = 'New Work Order'
     is_staff()
-    form = WorkOrderForm()
-    _fill_staff_form_choices(form)
-    if request.method == 'GET':
-        form.site_id.data = current_user.site_id
+    ctx = _work_order_create_context('New Work Order')
+    form = ctx['full_form']  # guaranteed non-None: is_staff() already passed
 
     if form.validate_on_submit():
         wo = WorkOrder(source=workflow.SOURCE_MANUAL, status=workflow.NEW, created_by_id=current_user.id)
         error = _apply_staff_form(form, wo)
         if error:
             flash(error, 'danger')
-            return render_template('add_work_order.html', form=form, current_page_name=current_page_name)
+            return render_template('new_work_order.html', active_tab='full', **ctx)
         db.session.add(wo)
         db.session.flush()
         wo.assign_number()
@@ -3313,7 +3346,7 @@ def add_work_order():
         flash(f'Work order {wo.wo_number} created.', 'success')
         return redirect(url_for('routes.edit_work_order', work_order_id=wo.id))
 
-    return render_template('add_work_order.html', form=form, current_page_name=current_page_name)
+    return render_template('new_work_order.html', active_tab='full', **ctx)
 
 
 # ****************** Work Order detail / edit *******************************
@@ -3327,7 +3360,7 @@ def edit_work_order(work_order_id):
     manage = can_manage_work_order(wo)
 
     form = WorkOrderForm(obj=wo)
-    _fill_staff_form_choices(form, wo)
+    location_maps = _fill_staff_form_choices(form, wo)
     status_form = WorkOrderStatusForm()
     status_form.new_status.choices = [(s, s) for s in workflow.allowed_transitions(wo.status)]
     comment_form = WorkOrderCommentForm()
@@ -3355,7 +3388,7 @@ def edit_work_order(work_order_id):
                 return render_template('edit_work_order.html', form=form, status_form=status_form,
                     comment_form=comment_form, labor_form=labor_form, material_form=material_form,
                     cost_form=cost_form, wo=wo, manage=manage, current_page_name=current_page_name,
-                    status_badge=workflow.STATUS_BADGE)
+                    status_badge=workflow.STATUS_BADGE, **location_maps)
             assignee_changed = wo.assigned_to_id != old_assignee_id
             if assignee_changed and wo.assigned_to_id and wo.status == workflow.NEW:
                 workflow.apply_transition(wo, workflow.ASSIGNED, current_user, note='Assigned')
@@ -3375,7 +3408,7 @@ def edit_work_order(work_order_id):
     return render_template('edit_work_order.html', form=form, status_form=status_form,
         comment_form=comment_form, labor_form=labor_form, material_form=material_form,
         cost_form=cost_form, wo=wo, manage=manage, current_page_name=current_page_name,
-        status_badge=workflow.STATUS_BADGE, recurring_groups=analytics.related_recurring_groups(wo))
+        status_badge=workflow.STATUS_BADGE, recurring_groups=analytics.related_recurring_groups(wo), **location_maps)
 
 
 # ****************** Labor / Materials / Cost Record (Phase 7) *************

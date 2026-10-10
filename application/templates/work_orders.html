@@ -124,10 +124,7 @@
                 </form>
               </div>
               <div class="col-auto text-end d-flex gap-2">
-                <a href="{{ url_for('routes.request_work_order') }}" class="btn bg-gradient-main add-table-button shadow-dark">New Request</a>
-                {% if staff %}
-                <a href="{{ url_for('routes.add_work_order') }}" class="btn reset-button-box shadow-dark add-table-button">New Work Order</a>
-                {% endif %}
+                <a href="{{ url_for('routes.request_work_order') }}" class="btn bg-gradient-main add-table-button shadow-dark">New Work Order</a>
               </div>
           </div>
         </div>

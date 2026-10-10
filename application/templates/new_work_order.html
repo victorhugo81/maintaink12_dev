@@ -6,59 +6,112 @@
         <div class="main-card-box card my-4">
             <div class="card-header p-0 position-relative mt-n4 z-index-2">
                 <div class="bg-gradient-main shadow-dark border-radius-lg pt-4 pb-3">
-                    <h2 class="text-white text-capitalize ps-3">Request Maintenance</h2>
+                    <h2 class="text-white text-capitalize ps-3">New Work Order</h2>
                 </div>
             </div>
             <div class="card-body px-4 pb-4">
-                {% if not form.facility_id.choices %}
-                <p class="text-secondary text-sm">No buildings are set up for your site yet — please contact the M&amp;O office.</p>
+
+                {% if full_form %}
+                <ul class="nav nav-tabs mb-4" id="workOrderTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link{% if active_tab == 'request' %} active{% endif %}" id="request-tab"
+                                data-bs-toggle="tab" data-bs-target="#request-pane" type="button" role="tab"
+                                aria-controls="request-pane" aria-selected="{{ 'true' if active_tab == 'request' else 'false' }}">
+                            <i class="material-symbols-rounded position-relative me-1" style="font-size:1rem; vertical-align:middle;">front_hand</i>
+                            Request Maintenance
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link{% if active_tab == 'full' %} active{% endif %}" id="full-tab"
+                                data-bs-toggle="tab" data-bs-target="#full-pane" type="button" role="tab"
+                                aria-controls="full-pane" aria-selected="{{ 'true' if active_tab == 'full' else 'false' }}">
+                            <i class="material-symbols-rounded position-relative me-1" style="font-size:1rem; vertical-align:middle;">build</i>
+                            Full Work Order
+                        </button>
+                    </li>
+                </ul>
                 {% endif %}
-                <form method="POST" enctype="multipart/form-data">
-                    {{ form.hidden_tag() }}
-                    <div class="row g-3 mt-1">
-                        <div class="col-12">
-                            <span aria-hidden="true" class="text-danger ms-1">*</span>
-                            {{ form.title.label(class="form-label") }}
-                            {{ form.title(class="form-control form-control-lg", placeholder="e.g. Classroom too hot, leaking sink, broken door latch", autofocus=True) }}
-                        </div>
-                        <div class="col-12 col-sm-6">
-                            <span aria-hidden="true" class="text-danger ms-1">*</span>
-                            {{ form.site_id.label(class="form-label") }}
-                            {{ form.site_id(class="form-select-box form-select form-select-lg", id="request-site") }}
-                        </div>
-                        <div class="col-12 col-sm-6">
-                            <span aria-hidden="true" class="text-danger ms-1">*</span>
-                            {{ form.facility_id.label(class="form-label") }}
-                            {{ form.facility_id(class="form-select-box form-select form-select-lg", id="request-facility") }}
-                        </div>
-                        <div class="col-12 col-sm-6">
-                            {{ form.room_id.label(class="form-label") }}
-                            {{ form.room_id(class="form-select-box form-select form-select-lg", id="request-room") }}
-                        </div>
-                        <div class="col-12 col-sm-6">
-                            <span aria-hidden="true" class="text-danger ms-1">*</span>
-                            {{ form.category_id.label(class="form-label") }}
-                            {{ form.category_id(class="form-select-box form-select form-select-lg") }}
-                        </div>
-                        <div class="col-12 col-sm-6">
-                            <span aria-hidden="true" class="text-danger ms-1">*</span>
-                            {{ form.priority_id.label(class="form-label") }}
-                            {{ form.priority_id(class="form-select-box form-select form-select-lg") }}
-                        </div>
-                        <div class="col-12">
-                            {{ form.description.label(class="form-label") }}
-                            {{ form.description(class="form-control", rows=4, placeholder="Anything that helps the technician find and fix it") }}
-                        </div>
-                        <div class="col-12">
-                            {{ form.attachment.label(class="form-label") }}
-                            {{ form.attachment(class="form-control form-control-lg", accept="image/jpeg,image/png", capture="environment") }}
-                        </div>
-                        <div class="col-12 d-grid gap-2 mt-4">
-                            {{ form.submit(class="btn btn-lg bg-gradient-main") }}
-                            <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.work_orders') }}">Cancel</a>
-                        </div>
+
+                <div class="tab-content" id="workOrderTabContent">
+
+                    <!-- Request Maintenance (lightweight, everyone) -->
+                    <div class="tab-pane fade{% if active_tab == 'request' %} show active{% endif %}" id="request-pane" role="tabpanel" aria-labelledby="request-tab">
+                        {% if not request_form.facility_id.choices %}
+                        <p class="text-secondary text-sm">No buildings are set up for your site yet — please contact the M&amp;O office.</p>
+                        {% endif %}
+                        <form method="POST" action="{{ url_for('routes.request_work_order') }}" enctype="multipart/form-data">
+                            {{ request_form.hidden_tag() }}
+                            <div class="row g-3 mt-1">
+                                <div class="col-12">
+                                    <span aria-hidden="true" class="text-danger ms-1">*</span>
+                                    {{ request_form.title.label(class="form-label") }}
+                                    {{ request_form.title(class="form-control form-control-lg", placeholder="e.g. Classroom too hot, leaking sink, broken door latch", autofocus=True) }}
+                                </div>
+                                <div class="col-12 col-sm-6">
+                                    <span aria-hidden="true" class="text-danger ms-1">*</span>
+                                    {{ request_form.site_id.label(class="form-label") }}
+                                    {{ request_form.site_id(class="form-select-box form-select form-select-lg", id="request-site") }}
+                                </div>
+                                <div class="col-12 col-sm-6">
+                                    <span aria-hidden="true" class="text-danger ms-1">*</span>
+                                    {{ request_form.facility_id.label(class="form-label") }}
+                                    {{ request_form.facility_id(class="form-select-box form-select form-select-lg", id="request-facility") }}
+                                </div>
+                                <div class="col-12 col-sm-6">
+                                    {{ request_form.room_id.label(class="form-label") }}
+                                    {{ request_form.room_id(class="form-select-box form-select form-select-lg", id="request-room") }}
+                                </div>
+                                <div class="col-12 col-sm-6">
+                                    <span aria-hidden="true" class="text-danger ms-1">*</span>
+                                    {{ request_form.category_id.label(class="form-label") }}
+                                    {{ request_form.category_id(class="form-select-box form-select form-select-lg") }}
+                                </div>
+                                <div class="col-12 col-sm-6">
+                                    <span aria-hidden="true" class="text-danger ms-1">*</span>
+                                    {{ request_form.priority_id.label(class="form-label") }}
+                                    {{ request_form.priority_id(class="form-select-box form-select form-select-lg") }}
+                                </div>
+                                <div class="col-12">
+                                    {{ request_form.description.label(class="form-label") }}
+                                    {{ request_form.description(class="form-control", rows=4, placeholder="Anything that helps the technician find and fix it") }}
+                                </div>
+                                <div class="col-12">
+                                    {{ request_form.attachment.label(class="form-label") }}
+                                    {{ request_form.attachment(class="form-control form-control-lg", accept="image/jpeg,image/png", capture="environment") }}
+                                </div>
+                                <div class="col-12 d-grid gap-2 mt-4">
+                                    {{ request_form.submit(class="btn btn-lg bg-gradient-main") }}
+                                    <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.work_orders') }}">Cancel</a>
+                                </div>
+                            </div>
+                        </form>
                     </div>
-                </form>
+
+                    <!-- Full Work Order (M&O staff only) -->
+                    {% if full_form %}
+                    <div class="tab-pane fade{% if active_tab == 'full' %} show active{% endif %}" id="full-pane" role="tabpanel" aria-labelledby="full-tab">
+                        <form method="POST" action="{{ url_for('routes.add_work_order') }}" enctype="multipart/form-data">
+                            {{ full_form.hidden_tag() }}
+                            <div class="col-12 d-flex justify-content-end align-items-center sticky-top bg-white py-2 mb-4 border-bottom">
+                                <div class="d-flex gap-2 mt-3">
+                                    {{ full_form.submit(class="btn bg-gradient-main") }}
+                                    <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.work_orders') }}">Back</a>
+                                </div>
+                            </div>
+                            {% with form = full_form %}{% include 'includes/work_order_fields.html' %}{% endwith %}
+                            <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Attachment</p>
+                            <hr class="mt-0 mb-3">
+                            <div class="row g-3">
+                                <div class="col-12 col-sm-6">
+                                    {{ full_form.attachment.label(class="form-label") }}
+                                    {{ full_form.attachment(class="form-control", accept="image/jpeg,image/png,application/pdf") }}
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    {% endif %}
+
+                </div>
             </div>
         </div>
     </div>

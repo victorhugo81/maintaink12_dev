@@ -117,6 +117,36 @@ class TestRequesterFlow:
         assert r.status_code == 200
         assert b'WO Test Building' in r.data
 
+    def test_regular_user_does_not_see_full_work_order_tab(self, app, user_client):
+        # /request_work_order and /add_work_order share one page
+        # (new_work_order.html) with a staff-only "Full Work Order" tab —
+        # a non-staff user must only ever get the lightweight request form.
+        _seed_facility(app)
+        r = user_client.get('/request_work_order')
+        assert b'id="full-tab"' not in r.data
+        assert b'id="full-pane"' not in r.data
+        assert b'nav-tabs' not in r.data
+
+    def test_staff_sees_both_tabs_with_full_active_on_add_work_order(self, app, admin_client):
+        _seed_facility(app)
+        r = admin_client.get('/add_work_order')
+        assert r.status_code == 200
+        body = r.get_data(as_text=True)
+        assert 'Full Work Order' in body and 'Request Maintenance' in body
+        assert 'id="full-pane" role="tabpanel" aria-labelledby="full-tab">' in body
+        # the Full Work Order pane is the active one on /add_work_order
+        assert 'tab-pane fade show active" id="full-pane"' in body
+        assert 'tab-pane fade" id="request-pane"' in body
+
+    def test_staff_sees_both_tabs_with_request_active_on_request_work_order(self, app, admin_client):
+        _seed_facility(app)
+        r = admin_client.get('/request_work_order')
+        assert r.status_code == 200
+        body = r.get_data(as_text=True)
+        assert 'Full Work Order' in body and 'Request Maintenance' in body
+        assert 'tab-pane fade show active" id="request-pane"' in body
+        assert 'tab-pane fade" id="full-pane"' in body
+
     def test_submit_request(self, app, user_client):
         facility_id, room_id = _seed_facility(app)
         pri, cat = _ids(app)
