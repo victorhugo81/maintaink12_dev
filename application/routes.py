@@ -3080,7 +3080,7 @@ def work_orders():
     current_path = request.path
     current_page_name = page_names.get(current_path, 'Unknown Page')
 
-    status_filter = request.args.get('status_filter', 'open')
+    status_filter = request.args.get('status_filter', workflow.OPEN)
     priority_filter = request.args.get('priority_filter', '')
     category_filter = request.args.get('category_filter', '')
     site_filter = request.args.get('site_filter', '')

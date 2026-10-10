@@ -3,7 +3,7 @@
 {% set staff = current_user.role_id in [1, 2, 3] %}
 {% macro hidden_except(skip) -%}
   {% for key in ['search', 'status_filter', 'priority_filter', 'category_filter', 'site_filter', 'assigned_filter', 'source_filter'] if key != skip -%}
-  <input type="hidden" name="{{ key }}" value="{{ request.args.get(key, 'open' if key == 'status_filter' else '') }}">
+  <input type="hidden" name="{{ key }}" value="{{ request.args.get(key, 'Open' if key == 'status_filter' else '') }}">
   {% endfor -%}
 {%- endmacro %}
 
@@ -32,8 +32,7 @@
             <form method="get" class="d-flex">
               {{ hidden_except('status_filter') }}
               <select name="status_filter" class="form-select-box form-select" data-autosubmit>
-                <option value="open" {% if status_filter == 'open' %}selected{% endif %}>All Open</option>
-                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Everything</option>
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Status</option>
                 {% for s in statuses %}
                 <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s }}</option>
                 {% endfor %}
