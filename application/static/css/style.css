@@ -1251,7 +1251,13 @@ hr.horizontal.dark { background-color: var(--color-border-strong); }
 
 @media (max-width: 1199.98px) {
   .g-sidenav-show .sidenav { transform: translateX(-16.5rem); }
-  .g-sidenav-show .sidenav.fixed-start + .main-content { margin-left: 0 !important; }
+  /* General-sibling (~), not adjacent-sibling (+): #sidenavBackdrop sits
+     between </aside> and <main> in nav.html, so "+" silently stopped
+     matching .main-content entirely the moment that div was added — margin
+     collapsed to 0 at every width and the sidenav visually overlapped the
+     page. If anything else is ever inserted there, "~" still reaches
+     .main-content; "+" would quietly break again. */
+  .g-sidenav-show .sidenav.fixed-start ~ .main-content { margin-left: 0 !important; }
   .g-sidenav-show.g-sidenav-pinned .sidenav { transform: translateX(0); }
 
   /* Backdrop behind the sidenav when pinned open as a mobile off-canvas
@@ -1266,7 +1272,7 @@ hr.horizontal.dark { background-color: var(--color-border-strong); }
   .g-sidenav-pinned #sidenavBackdrop { display: block; }
 }
 @media (min-width: 1200px) {
-  .sidenav.fixed-start + .main-content { margin-left: 15.5rem; }
+  .sidenav.fixed-start ~ .main-content { margin-left: 15.5rem; }
 }
 
 /* ==========================================================================

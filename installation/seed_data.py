@@ -113,11 +113,8 @@ with app.app_context():
         # with a relevant subset of the preset questions just seeded above
         # (same subsets used to backfill these templates in the dev DB).
         SAFETY = [
-            'Exit signs illuminated and visible?',
             'Fire extinguisher present, charged, and accessible?',
             'Smoke detector present and functional?',
-            'Emergency lighting operational?',
-            'Exits and aisles unobstructed?',
             'Floors free of trip/slip hazards?',
         ]
         ELECTRICAL = [
@@ -135,7 +132,6 @@ with app.app_context():
             'Ceiling tiles in place and undamaged?',
             'Walls and doors in good repair?',
             'Windows functioning and free of damage?',
-            'Room clean and free of clutter?',
         ]
         PLAYGROUND = [
             'Playground equipment free of visible damage?',
@@ -143,7 +139,6 @@ with app.app_context():
             'Fencing and gates secure?',
         ]
         TECH = [
-            'Projector/display equipment functioning?',
             'Network/data jacks functional?',
         ]
         DEFAULT_INSPECTION_TEMPLATES = (
