@@ -65,40 +65,39 @@
 
 
 
-<!-- Mobile menu toggle -->
+<!-- Mobile sidenav: closing affordances on top of material-dashboard.js's
+     toggleSidenav() (bound to #iconNavbarSidenav/#iconSidenav, flips
+     body.g-sidenav-pinned — see static/css/style.css's
+     @media (max-width: 1199.98px) block for what that class actually does).
+     Manipulates the class directly rather than calling toggleSidenav()
+     itself so load order relative to material-dashboard.js doesn't matter. -->
 <script nonce="{{ g.csp_nonce }}">
 (function () {
-  const toggle = document.querySelector('.mobile-menu-toggle');
-  const wrapper = document.getElementById('menuToggle');
-  if (!toggle || !wrapper) return;
+  var className = 'g-sidenav-pinned';
+  var backdrop = document.getElementById('sidenavBackdrop');
+  var toggleBtn = document.getElementById('iconNavbarSidenav');
 
-  function openMenu() {
-    wrapper.classList.add('is-open');
-    toggle.setAttribute('aria-expanded', 'true');
-    toggle.setAttribute('aria-label', 'Close navigation menu');
+  function closeSidenav() {
+    document.body.classList.remove(className);
   }
 
-  function closeMenu() {
-    wrapper.classList.remove('is-open');
-    toggle.setAttribute('aria-expanded', 'false');
-    toggle.setAttribute('aria-label', 'Open navigation menu');
+  // Tap outside the sidenav to close
+  if (backdrop) {
+    backdrop.addEventListener('click', closeSidenav);
   }
 
-  toggle.addEventListener('click', function () {
-    wrapper.classList.contains('is-open') ? closeMenu() : openMenu();
-  });
-
-  // Close on Escape key
+  // Close on Escape
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && wrapper.classList.contains('is-open')) {
-      closeMenu();
-      toggle.focus();
+    if (e.key === 'Escape' && document.body.classList.contains(className)) {
+      closeSidenav();
+      if (toggleBtn) { toggleBtn.focus(); }
     }
   });
 
-  // Close when a nav link is clicked
-  document.querySelectorAll('#menu a').forEach(function (link) {
-    link.addEventListener('click', closeMenu);
+  // Close when a nav link is clicked (desktop width: no-op, since this
+  // class has no visual effect there — see the media query above)
+  document.querySelectorAll('#sidenav-main .nav-link').forEach(function (link) {
+    link.addEventListener('click', closeSidenav);
   });
 })();
 </script>
