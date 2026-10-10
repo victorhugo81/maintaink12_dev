@@ -89,12 +89,6 @@
         </li>
         {% if current_user.is_admin %}
         <li class="nav-item">
-          <a class="nav-link{% if request.endpoint == 'routes.sla_rules' or request.endpoint == 'routes.edit_sla_rule' %} active{% endif %}" href="{{ url_for('routes.sla_rules') }}">
-            <i class="material-symbols-rounded">rule</i>
-            <span class="nav-link-text ms-1">SLA Rules</span>
-          </a>
-        </li>
-        <li class="nav-item">
           <a class="nav-link{% if request.endpoint in ['routes.csv_import_index', 'routes.csv_import_upload'] %} active{% endif %}" href="{{ url_for('routes.csv_import_index') }}">
             <i class="material-symbols-rounded">upload_file</i>
             <span class="nav-link-text ms-1">CSV Import</span>
@@ -133,12 +127,6 @@
           <a class="nav-link{% if request.endpoint in ['routes.profile'] %} active{% endif %}" href="{{ url_for('routes.profile') }}">
             <i class="material-symbols-rounded">badge</i>
             <span class="nav-link-text ms-1">Profile</span>
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link{% if request.endpoint == 'routes.notification_preferences' %} active{% endif %}" href="{{ url_for('routes.notification_preferences') }}">
-            <i class="material-symbols-rounded">notifications</i>
-            <span class="nav-link-text ms-1">Notification Preferences</span>
           </a>
         </li>
 
@@ -193,39 +181,15 @@
           </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link{% if request.endpoint in ['routes.notifications', 'routes.add_notification', 'routes.edit_notification'] %} active{% endif %}" href="{{ url_for('routes.notifications') }}">
-              <i class="material-symbols-rounded">notifications</i>
-              <span class="nav-link-text ms-1">Notifications</span>
-            </a>
-          </li>
-          <li class="nav-item">
             <a class="nav-link{% if request.endpoint in ['routes.asset_types', 'routes.add_asset_type', 'routes.edit_asset_type'] %} active{% endif %}" href="{{ url_for('routes.asset_types') }}">
               <i class="material-symbols-rounded">category</i>
               <span class="nav-link-text ms-1">Asset Types</span>
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link{% if request.endpoint in ['routes.priorities', 'routes.add_priority', 'routes.edit_priority'] %} active{% endif %}" href="{{ url_for('routes.priorities') }}">
-              <i class="material-symbols-rounded">priority_high</i>
-              <span class="nav-link-text ms-1">Priorities</span>
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link{% if request.endpoint in ['routes.categories', 'routes.add_category', 'routes.edit_category'] %} active{% endif %}" href="{{ url_for('routes.categories') }}">
-              <i class="material-symbols-rounded">label</i>
-              <span class="nav-link-text ms-1">Categories</span>
-            </a>
-          </li>
-          <li class="nav-item">
             <a class="nav-link{% if request.endpoint in ['routes.maintenance_plans', 'routes.add_maintenance_plan', 'routes.edit_maintenance_plan'] %} active{% endif %}" href="{{ url_for('routes.maintenance_plans') }}">
               <i class="material-symbols-rounded">event_repeat</i>
               <span class="nav-link-text ms-1">PM Plans</span>
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link{% if request.endpoint in ['routes.inspection_templates', 'routes.add_inspection_template', 'routes.edit_inspection_template'] %} active{% endif %}" href="{{ url_for('routes.inspection_templates') }}">
-              <i class="material-symbols-rounded">checklist</i>
-              <span class="nav-link-text ms-1">Inspection Templates</span>
             </a>
           </li>
           <li class="nav-item">
