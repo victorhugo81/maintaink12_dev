@@ -181,6 +181,20 @@ document.querySelectorAll('[data-autosubmit]').forEach(function (el) {
 });
 </script>
 
+<!-- Clickable table rows: any <tr data-href="..."> navigates there when
+     clicked, except clicks that start on a real interactive element inside
+     the row (a link, button, form field) — those keep their own behavior
+     (e.g. opening the WO number link in a new tab via middle-click/ctrl-click,
+     still works normally since it's a real <a>, not just text). -->
+<script nonce="{{ g.csp_nonce }}">
+document.addEventListener('click', function (e) {
+  var row = e.target.closest('tr[data-href]');
+  if (!row) { return; }
+  if (e.target.closest('a, button, input, select, textarea, label')) { return; }
+  window.location = row.dataset.href;
+});
+</script>
+
 <!-- Unsaved changes warning -->
 <script nonce="{{ g.csp_nonce }}">
 (function () {

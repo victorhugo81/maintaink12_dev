@@ -750,6 +750,7 @@ a.user-welcome:hover { color: var(--color-primary); text-decoration: none; }
   --bs-table-bg-state: var(--color-primary);
   background-color: var(--color-primary) !important;
 }
+.table-highlight-row[data-href] { cursor: pointer; }
 .table-highlight-row:hover td,
 .table-highlight-row:hover th,
 .table-highlight-row:hover h6,
