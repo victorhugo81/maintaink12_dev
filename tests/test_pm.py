@@ -216,7 +216,7 @@ class TestScheduleGeneration:
             created = generate_due_work_orders(today=date(2026, 5, 2))
             assert not any(w.asset_id == asset_id for w in created)
 
-    def test_assigned_plan_generates_pre_assigned_work_order(self, app, admin_client):
+    def test_assigned_plan_generates_work_order_with_assignee_but_open_status(self, app, admin_client):
         asset_id, _ = _asset(app, 'PM-ASSIGNED', asset_type_name='PM Assigned Type')
         pri, cat = _ids(app)
         with app.app_context():
@@ -245,8 +245,11 @@ class TestScheduleGeneration:
             created = generate_due_work_orders(today=date(2026, 4, 1))
             wo = next(w for w in created if w.asset_id == asset_id)
             assert wo.assigned_to_id == tech_id
-            assert wo.status == 'Assigned'
-            assert [h.to_status for h in wo.status_history] == ['Assigned', 'New']
+            # Assigning no longer changes status (New/Assigned/Scheduled
+            # collapsed into one OPEN status) — a plan with a default
+            # assignee still generates an Open work order, just pre-filled.
+            assert wo.status == 'Open'
+            assert [h.to_status for h in wo.status_history] == ['Open']
 
 
 class TestPMDashboard:

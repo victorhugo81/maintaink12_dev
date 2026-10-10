@@ -38,7 +38,7 @@ def _make_vendor(app, name='Acme HVAC Services', **kwargs):
         return v.id
 
 
-def _make_work_order(app, vendor_id, title, status='New', actual_cost=None, created_days_ago=0, completed_days_ago=None):
+def _make_work_order(app, vendor_id, title, status='Open', actual_cost=None, created_days_ago=0, completed_days_ago=None):
     """Create a work order directly via the ORM, linked to a vendor, for aggregation tests."""
     with app.app_context():
         from application.models import WorkOrder
@@ -149,7 +149,7 @@ class TestVendorPerformance:
 
     def test_cost_and_count_aggregation(self, app, admin_client):
         vendor_id = _make_vendor(app, name='Aggregation Test Vendor')
-        _make_work_order(app, vendor_id, 'AggTest WO 1', status='New', actual_cost=100)
+        _make_work_order(app, vendor_id, 'AggTest WO 1', status='Open', actual_cost=100)
         _make_work_order(app, vendor_id, 'AggTest WO 2', status='Completed', actual_cost=250)
         _make_work_order(app, vendor_id, 'AggTest WO 3', status='In Progress', actual_cost=None)
 
@@ -164,7 +164,7 @@ class TestVendorPerformance:
             wos = WorkOrder.query.filter_by(vendor_id=vendor_id).all()
             stats = compute_vendor_stats(wos)
             assert stats['total_count'] == 3
-            assert stats['open_count'] == 2  # New + In Progress are open; Completed is not
+            assert stats['open_count'] == 2  # Open + In Progress are open; Completed is not
             assert stats['total_cost'] == 350
 
     def test_average_completion_time(self, app):
@@ -173,7 +173,7 @@ class TestVendorPerformance:
                          created_days_ago=2, completed_days_ago=0)
         _make_work_order(app, vendor_id, 'Completed in 4 days', status='Completed',
                          created_days_ago=4, completed_days_ago=0)
-        _make_work_order(app, vendor_id, 'Still open, excluded from average', status='New')
+        _make_work_order(app, vendor_id, 'Still open, excluded from average', status='Open')
 
         with app.app_context():
             from application.models import WorkOrder

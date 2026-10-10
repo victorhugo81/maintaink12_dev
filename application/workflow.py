@@ -4,9 +4,7 @@ and applied. Statuses and rules come from docs/PROJECT_PLAN.md.
 """
 from datetime import datetime, timezone
 
-NEW = 'New'
-ASSIGNED = 'Assigned'
-SCHEDULED = 'Scheduled'
+OPEN = 'Open'
 IN_PROGRESS = 'In Progress'
 WAITING_PARTS = 'Waiting for Parts'
 WAITING_VENDOR = 'Waiting for Vendor'
@@ -16,26 +14,28 @@ COMPLETED = 'Completed'
 CANCELLED = 'Cancelled'
 CLOSED = 'Closed'
 
-ALL_STATUSES = (NEW, ASSIGNED, SCHEDULED, IN_PROGRESS, WAITING_PARTS, WAITING_VENDOR,
+ALL_STATUSES = (OPEN, IN_PROGRESS, WAITING_PARTS, WAITING_VENDOR,
                 WAITING_APPROVAL, ON_HOLD, COMPLETED, CANCELLED, CLOSED)
 WAITING_STATUSES = (WAITING_PARTS, WAITING_VENDOR, WAITING_APPROVAL, ON_HOLD)
 TERMINAL_STATUSES = (COMPLETED, CANCELLED, CLOSED)
 OPEN_STATUSES = tuple(s for s in ALL_STATUSES if s not in TERMINAL_STATUSES)
 
-_ACTIVE_WORK = (ASSIGNED, SCHEDULED, IN_PROGRESS)
+# New/Assigned/Scheduled used to be three separate pre-work statuses; they
+# collapsed into one OPEN status (assignment is tracked by assigned_to_id,
+# not by status — see routes.py/pm.py, which no longer auto-transition on
+# assignment). _ACTIVE_WORK is what "not yet paused, not yet done" means now.
+_ACTIVE_WORK = (OPEN, IN_PROGRESS)
 _PAUSED = (WAITING_PARTS, WAITING_VENDOR, WAITING_APPROVAL, ON_HOLD)
 
 TRANSITIONS = {
-    NEW: set(_ACTIVE_WORK) | {WAITING_APPROVAL, ON_HOLD, CANCELLED},
-    ASSIGNED: {SCHEDULED, IN_PROGRESS, *_PAUSED, CANCELLED},
-    SCHEDULED: {ASSIGNED, IN_PROGRESS, *_PAUSED, CANCELLED},
+    OPEN: {IN_PROGRESS, *_PAUSED, CANCELLED},
     IN_PROGRESS: {*_PAUSED, COMPLETED, CANCELLED},
     WAITING_PARTS: {*_ACTIVE_WORK, ON_HOLD, CANCELLED},
     WAITING_VENDOR: {*_ACTIVE_WORK, ON_HOLD, CANCELLED},
     WAITING_APPROVAL: {*_ACTIVE_WORK, ON_HOLD, CANCELLED},
     ON_HOLD: {*_ACTIVE_WORK, CANCELLED},
     COMPLETED: {CLOSED, IN_PROGRESS},   # IN_PROGRESS = reopen
-    CANCELLED: {NEW},                   # reopen
+    CANCELLED: {OPEN},                  # reopen
     CLOSED: {IN_PROGRESS},              # reopen
 }
 
@@ -46,7 +46,7 @@ SOURCE_INSPECTION = 'Inspection'
 SOURCES = (SOURCE_REQUEST, SOURCE_MANUAL, SOURCE_PM, SOURCE_INSPECTION)
 
 STATUS_BADGE = {
-    NEW: 'warning', ASSIGNED: 'info', SCHEDULED: 'info', IN_PROGRESS: 'primary',
+    OPEN: 'warning', IN_PROGRESS: 'primary',
     WAITING_PARTS: 'secondary', WAITING_VENDOR: 'secondary', WAITING_APPROVAL: 'secondary',
     ON_HOLD: 'dark', COMPLETED: 'success', CANCELLED: 'danger', CLOSED: 'success',
 }
@@ -107,7 +107,7 @@ def apply_transition(work_order, to_status, user=None, note=None, completed_at=N
         work_order.closed_at = None
     elif to_status == CANCELLED:
         work_order.closed_at = now
-    elif to_status == NEW:
+    elif to_status == OPEN:
         work_order.closed_at = None
         work_order.completed_at = None
 

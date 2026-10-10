@@ -148,12 +148,12 @@ class TestSites:
 
             def make(title, status):
                 wo = WorkOrder(site_id=1, title=title, source=workflow.SOURCE_MANUAL,
-                               status=workflow.NEW, priority_id=pri, category_id=cat)
+                               status=workflow.OPEN, priority_id=pri, category_id=cat)
                 db.session.add(wo)
                 db.session.flush()
                 wo.assign_number()
                 workflow.record_initial_status(wo)
-                if status != workflow.NEW:
+                if status != workflow.OPEN:
                     workflow.apply_transition(wo, status)
                 db.session.commit()
 
@@ -189,12 +189,12 @@ class TestSites:
 
             def make(title, status):
                 wo = WorkOrder(site_id=1, title=title, source=workflow.SOURCE_MANUAL,
-                               status=workflow.NEW, priority_id=pri, category_id=cat)
+                               status=workflow.OPEN, priority_id=pri, category_id=cat)
                 db.session.add(wo)
                 db.session.flush()
                 wo.assign_number()
                 workflow.record_initial_status(wo)
-                if status != workflow.NEW:
+                if status != workflow.OPEN:
                     workflow.apply_transition(wo, status)
                 db.session.commit()
 

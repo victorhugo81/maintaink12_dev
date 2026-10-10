@@ -3229,7 +3229,7 @@ def request_work_order():
             title=form.title.data,
             description=form.description.data,
             source=workflow.SOURCE_REQUEST,
-            status=workflow.NEW,
+            status=workflow.OPEN,
             priority_id=form.priority_id.data,
             category_id=form.category_id.data,
             requester_id=current_user.id,
@@ -3322,7 +3322,7 @@ def add_work_order():
     form = ctx['full_form']  # guaranteed non-None: is_staff() already passed
 
     if form.validate_on_submit():
-        wo = WorkOrder(source=workflow.SOURCE_MANUAL, status=workflow.NEW, created_by_id=current_user.id)
+        wo = WorkOrder(source=workflow.SOURCE_MANUAL, status=workflow.OPEN, created_by_id=current_user.id)
         error = _apply_staff_form(form, wo)
         if error:
             flash(error, 'danger')
@@ -3331,8 +3331,6 @@ def add_work_order():
         db.session.flush()
         wo.assign_number()
         workflow.record_initial_status(wo, current_user)
-        if wo.assigned_to_id:
-            workflow.apply_transition(wo, workflow.ASSIGNED, current_user, note='Assigned at creation')
 
         error = _save_attachment(request.files.get('attachment'), 'wo', wo.id,
                                   'UPLOAD_WORK_ORDER_ATTACHMENT', WorkOrderAttachment, 'work_order_id')
@@ -3390,8 +3388,6 @@ def edit_work_order(work_order_id):
                     cost_form=cost_form, wo=wo, manage=manage, current_page_name=current_page_name,
                     status_badge=workflow.STATUS_BADGE, **location_maps)
             assignee_changed = wo.assigned_to_id != old_assignee_id
-            if assignee_changed and wo.assigned_to_id and wo.status == workflow.NEW:
-                workflow.apply_transition(wo, workflow.ASSIGNED, current_user, note='Assigned')
             wo.updated_at = datetime.now(timezone.utc)
 
             error = _save_attachment(request.files.get('attachment'), 'wo', wo.id,

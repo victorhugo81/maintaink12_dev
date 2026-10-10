@@ -64,7 +64,7 @@ def _client_as(app, user_id):
     return c
 
 
-def _wo(app, facility_id, title, status='New', priority='High', category='HVAC', created_days_ago=0,
+def _wo(app, facility_id, title, status='Open', priority='High', category='HVAC', created_days_ago=0,
         started_days_after=None, completed_days_after=None, due_in=None, **kwargs):
     with app.app_context():
         from application.models import WorkOrder
@@ -259,8 +259,8 @@ def kpi_facility(app):
     """Seven work orders with known states, isolated by facility."""
     fid = _facility(app, 'KPI Building', year_built=1985)
     tech_id = _user(app, 'kpi-tech@test.com', 3, first='Kpi')
-    _wo(app, fid, 'KPI new unassigned overdue backlog', status='New', created_days_ago=40, due_in=-1)
-    _wo(app, fid, 'KPI new assigned emergency', status='New', priority='Emergency', assigned_to_id=tech_id)
+    _wo(app, fid, 'KPI new unassigned overdue backlog', status='Open', created_days_ago=40, due_in=-1)
+    _wo(app, fid, 'KPI new assigned emergency', status='Open', priority='Emergency', assigned_to_id=tech_id)
     _wo(app, fid, 'KPI in progress', status='In Progress', created_days_ago=5, started_days_after=2, assigned_to_id=tech_id)
     _wo(app, fid, 'KPI waiting parts', status='Waiting for Parts', assigned_to_id=tech_id)
     _wo(app, fid, 'KPI completed on time', status='Completed', created_days_ago=10, completed_days_after=4, due_in=5,
@@ -276,7 +276,9 @@ class TestWorkOrderKpis:
         with app.app_context():
             k = analytics.work_order_kpis(_filters(kpi_facility), today=TODAY)
         assert k['total_open'] == 4
-        assert k['new_requests'] == 2
+        # new_requests now aliases unassigned (New/Assigned/Scheduled
+        # collapsed into one OPEN status — see analytics.py's comment).
+        assert k['new_requests'] == 1
         assert k['unassigned'] == 1
         assert k['in_progress'] == 1
         assert k['waiting'] == 1
@@ -386,7 +388,7 @@ class TestCharts:
         with app.app_context():
             charts = analytics.chart_data(_filters(kpi_facility))
         by_status = dict(zip(charts['by_status']['labels'], charts['by_status']['datasets'][0]['data']))
-        assert by_status['New'] == 2 and by_status['Cancelled'] == 1 and by_status['Closed'] == 1
+        assert by_status['Open'] == 2 and by_status['Cancelled'] == 1 and by_status['Closed'] == 1
         assert sum(charts['by_month']['datasets'][0]['data']) == 7
         assert charts['by_facility']['labels'] == ['KPI Building']
         assert charts['by_technician']['datasets'][0]['data'] == [5]
@@ -526,7 +528,7 @@ class TestQueryPlans:
             from main import db
             from sqlalchemy import text
             plan = db.session.execute(text(
-                "EXPLAIN QUERY PLAN SELECT count(id) FROM work_order WHERE facility_id = :f AND status IN ('New','Assigned')"
+                "EXPLAIN QUERY PLAN SELECT count(id) FROM work_order WHERE facility_id = :f AND status IN ('Open','In Progress')"
             ), {'f': kpi_facility}).fetchall()
             plan_text = ' '.join(str(row) for row in plan)
         assert 'USING INDEX' in plan_text and 'SCAN work_order' not in plan_text

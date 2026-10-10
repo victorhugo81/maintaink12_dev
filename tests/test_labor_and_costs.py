@@ -50,7 +50,7 @@ def _work_order(app, title, **kwargs):
         pri, cat = _ids(app)
         facility_id = _facility(app)
         wo = WorkOrder(site_id=1, facility_id=facility_id, title=title, source='Manual',
-                       status=kwargs.pop('status', 'New'), priority_id=pri, category_id=cat, **kwargs)
+                       status=kwargs.pop('status', 'Open'), priority_id=pri, category_id=cat, **kwargs)
         db.session.add(wo)
         db.session.flush()
         wo.assign_number()
@@ -362,14 +362,14 @@ class TestTechnicianWorkloadPure:
         tech = FakeTech(1)
         today = date(2026, 6, 15)
         wos = [
-            self._wo(workflow.NEW, due_date=today - timedelta(days=2)),        # open + overdue
+            self._wo(workflow.OPEN, due_date=today - timedelta(days=2)),       # open + overdue
             self._wo(workflow.IN_PROGRESS, due_date=today),                    # open + in_progress + due_today
-            self._wo(workflow.ASSIGNED, due_date=today + timedelta(days=3)),   # open + due_this_week
+            self._wo(workflow.OPEN, due_date=today + timedelta(days=3)),       # open + due_this_week
             self._wo(workflow.COMPLETED, due_date=today - timedelta(days=10)), # not open, excluded entirely
         ]
         rows = technician_workload([tech], {1: wos}, today=today)
         row = rows[0]
-        assert row['open'] == 3          # NEW, IN_PROGRESS, ASSIGNED (COMPLETED excluded)
+        assert row['open'] == 3          # OPEN x2, IN_PROGRESS (COMPLETED excluded)
         assert row['in_progress'] == 1
         assert row['overdue'] == 1
         assert row['due_today'] == 1

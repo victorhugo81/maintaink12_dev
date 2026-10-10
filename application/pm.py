@@ -119,7 +119,7 @@ def generate_due_work_orders(today=None, user=None):
             title=f"PM: {plan.name} — {asset.asset_tag}",
             description=plan.description,
             source=workflow.SOURCE_PM,
-            status=workflow.NEW,
+            status=workflow.OPEN,
             priority_id=plan.priority_id,
             category_id=plan.category_id,
             assigned_to_id=plan.assigned_to_id,
@@ -130,8 +130,6 @@ def generate_due_work_orders(today=None, user=None):
         db.session.flush()
         wo.assign_number()
         workflow.record_initial_status(wo, user)
-        if wo.assigned_to_id:
-            workflow.apply_transition(wo, workflow.ASSIGNED, user, note='Assigned at PM generation')
 
         sched.last_work_order_id = wo.id
         sched.last_generated_at = datetime.now(timezone.utc)

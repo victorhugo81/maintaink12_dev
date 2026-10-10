@@ -241,7 +241,6 @@ def work_order_kpis(f, today=None):
 
     open_row = db.session.query(
         func.count(WorkOrder.id),
-        flag(WorkOrder.status == workflow.NEW),
         flag(WorkOrder.assigned_to_id.is_(None)),
         flag(WorkOrder.status == workflow.IN_PROGRESS),
         flag(WorkOrder.status.in_(workflow.WAITING_STATUSES)),
@@ -279,16 +278,23 @@ def work_order_kpis(f, today=None):
 
     return {
         'total_open': int(open_row[0] or 0),
+        # New/Assigned/Scheduled collapsed into one OPEN status (Phase 15),
+        # so "a new request" is no longer a distinct status value — it's the
+        # same signal as "unassigned" now. Kept as its own dict key (rather
+        # than deleted) since mo_dashboard.html's School Staff view still
+        # shows it as "New (not yet assigned)", a meaningful distinct tile
+        # in that scoped-to-me view even though it duplicates 'unassigned'
+        # in the Manager view (which is why that tile was removed there).
         'new_requests': int(open_row[1]),
-        'unassigned': int(open_row[2]),
-        'in_progress': int(open_row[3]),
-        'waiting': int(open_row[4]),
-        'overdue': int(open_row[5]),
-        'due_today': int(open_row[6]),
-        'due_this_week': int(open_row[7]),
-        'critical': int(open_row[8]),
-        'emergency': int(open_row[9]),
-        'backlog': int(open_row[10]),
+        'unassigned': int(open_row[1]),
+        'in_progress': int(open_row[2]),
+        'waiting': int(open_row[3]),
+        'overdue': int(open_row[4]),
+        'due_today': int(open_row[5]),
+        'due_this_week': int(open_row[6]),
+        'critical': int(open_row[7]),
+        'emergency': int(open_row[8]),
+        'backlog': int(open_row[9]),
         'created_in_period': created,
         'completed': completed,
         'completion_rate': pct(done_of_created, created),

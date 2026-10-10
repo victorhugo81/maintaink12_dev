@@ -78,7 +78,7 @@ def _wo(app, facility_id, title, site_id=1, **kwargs):
         from application.models import WorkOrder
         from main import db
         pri, cat = _ids(app)
-        wo = WorkOrder(site_id=site_id, facility_id=facility_id, title=title, source='Manual', status='New',
+        wo = WorkOrder(site_id=site_id, facility_id=facility_id, title=title, source='Manual', status='Open',
                        priority_id=pri, category_id=cat, **kwargs)
         db.session.add(wo)
         db.session.flush()
@@ -139,7 +139,7 @@ class TestAuditCapture:
             workflow.apply_transition(db.session.get(WorkOrder, wo_id), workflow.IN_PROGRESS)
             db.session.commit()
         rows = {r.field: r for r in _audit_rows(app, entity_type='WorkOrder', entity_id=wo_id, action='update')}
-        assert rows['status'].old_value == 'New' and rows['status'].new_value == 'In Progress'
+        assert rows['status'].old_value == 'Open' and rows['status'].new_value == 'In Progress'
         assert rows['status'].user_id is None  # no request context -> System
 
     def test_second_edit_after_commit_still_captures_old_value(self, app):
@@ -267,7 +267,7 @@ class TestIdorOtherSiteTechnician:
         assert r.status_code == 403
 
     @pytest.mark.parametrize('url_tpl, data', [
-        ('/change_work_order_status/{wo}', {'new_status': 'Assigned'}),
+        ('/change_work_order_status/{wo}', {'new_status': 'In Progress'}),
         ('/add_work_order_comment/{wo}', {'comment': 'x'}),
         ('/add_work_order_labor/{wo}', {'technician_id': '1', 'labor_hours': '1', 'labor_type': 'Regular'}),
         ('/add_asset_condition/{asset}', {'assessed_at': '2026-01-01', 'score': '50'}),

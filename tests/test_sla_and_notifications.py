@@ -59,7 +59,7 @@ def _client_as(app, user_id):
     return c
 
 
-def _wo(app, facility_id, title, status='New', priority='High', category='HVAC',
+def _wo(app, facility_id, title, status='Open', priority='High', category='HVAC',
         created_hours_ago=0, started_hours_after=None, completed_hours_after=None, **kwargs):
     with app.app_context():
         from application.models import WorkOrder
@@ -87,7 +87,7 @@ def _rule(response_hours=4, resolution_hours=48):
 
 class _Wo:
     """A bare namespace standing in for a WorkOrder in pure sla.py tests."""
-    def __init__(self, created_at, started_at=None, completed_at=None, priority_id=1, status='New'):
+    def __init__(self, created_at, started_at=None, completed_at=None, priority_id=1, status='Open'):
         self.created_at, self.started_at, self.completed_at = created_at, started_at, completed_at
         self.priority_id, self.status = priority_id, status
 
@@ -164,7 +164,7 @@ class TestAggregateCompliance:
         rule = _rule(resolution_hours=48)
         met = _Wo(created_at=NOW - timedelta(hours=60), completed_at=NOW - timedelta(hours=20), status='Completed')
         missed = _Wo(created_at=NOW - timedelta(hours=60), completed_at=NOW - timedelta(hours=5), status='Closed')
-        still_open = _Wo(created_at=NOW - timedelta(hours=60), status='New')
+        still_open = _Wo(created_at=NOW - timedelta(hours=60), status='Open')
         met_n, total = sla.aggregate_compliance([met, missed, still_open], rules=[rule])
         assert (met_n, total) == (1, 2)
 
@@ -240,7 +240,7 @@ class TestAnalyticsIntegration:
             else:
                 rule.response_hours, rule.resolution_hours, rule.is_active = 2, 1000, True
             db.session.commit()
-        _wo(app, fid, 'Summary breach WO', status='New', priority='Critical', created_hours_ago=10)
+        _wo(app, fid, 'Summary breach WO', status='Open', priority='Critical', created_hours_ago=10)
         with app.app_context():
             f = {'start': TODAY - timedelta(days=10), 'end': TODAY, 'facility_id': fid, 'site_ids': None}
             summary = analytics.sla_summary(f, today=TODAY)
@@ -410,7 +410,7 @@ class TestNotificationSweepDedup:
             else:
                 rule.response_hours, rule.resolution_hours, rule.is_active = 2, 1000, True
             db.session.commit()
-        wo_id = _wo(app, fid, 'Notif SLA breach WO', status='New', priority='Critical',
+        wo_id = _wo(app, fid, 'Notif SLA breach WO', status='Open', priority='Critical',
                    created_hours_ago=10, assigned_to_id=tech_id)
         with app.app_context():
             from application.models import NotificationLog

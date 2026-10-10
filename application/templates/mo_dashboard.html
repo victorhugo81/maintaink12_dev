@@ -216,7 +216,6 @@
               {{ kpi_card('Unassigned', wo.unassigned, 'person_off', url_for('routes.work_orders', assigned_filter='unassigned')) }}
               {{ kpi_card('Emergency / Critical', wo.emergency ~ ' / ' ~ wo.critical, 'emergency', None, 'text-danger' if (wo.emergency or wo.critical) else '') }}
               {% if view == 'manager' %}
-              {{ kpi_card('New Requests', wo.new_requests, 'inbox', url_for('routes.work_orders', status_filter='New')) }}
               {{ kpi_card('In Progress', wo.in_progress, 'progress_activity', url_for('routes.work_orders', status_filter='In Progress')) }}
               {{ kpi_card('Waiting', wo.waiting, 'hourglass_top') }}
               {{ kpi_card('Backlog (open > 30 days)', wo.backlog, 'inventory') }}

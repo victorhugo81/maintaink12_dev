@@ -66,7 +66,7 @@ def _client_as(app, user_id):
     return c
 
 
-def _wo(app, facility_id, title, status='New', priority='High', category='HVAC', created_days_ago=0,
+def _wo(app, facility_id, title, status='Open', priority='High', category='HVAC', created_days_ago=0,
         completed_days_after=None, due_in=None, **kwargs):
     with app.app_context():
         from application.models import WorkOrder
@@ -131,7 +131,7 @@ class TestCsvExport:
 
     def test_to_csv_round_trips_a_full_report(self, app):
         fid = _facility(app, 'CSV Correctness Building')
-        wo_id = _wo(app, fid, 'CSV export WO', estimated_cost=Decimal('100.005'), status='New')
+        wo_id = _wo(app, fid, 'CSV export WO', estimated_cost=Decimal('100.005'), status='Open')
         with app.app_context():
             headers, rows, truncated = reports.report_work_orders(_filters(fid))
             text = reports.to_csv(headers, rows)
@@ -183,10 +183,10 @@ class TestParseFilters:
 @pytest.fixture(scope='module')
 def wo_facility(app):
     fid = _facility(app, 'RPT WorkOrders Building')
-    _wo(app, fid, 'RPT recent new', status='New', created_days_ago=5, estimated_cost=100)
+    _wo(app, fid, 'RPT recent new', status='Open', created_days_ago=5, estimated_cost=100)
     _wo(app, fid, 'RPT completed on time', status='Completed', created_days_ago=10, completed_days_after=2,
         due_in=5, estimated_cost=200, actual_cost=999)
-    _wo(app, fid, 'RPT too old', status='New', created_days_ago=200, estimated_cost=50)
+    _wo(app, fid, 'RPT too old', status='Open', created_days_ago=200, estimated_cost=50)
     _wo(app, fid, 'RPT overdue open', status='Waiting for Parts', created_days_ago=3, due_in=-1)
     return fid
 
@@ -295,7 +295,7 @@ class TestAssetConditionReport:
 class TestFacilityConditionReport:
     def test_includes_facility_with_health_score(self, app):
         fid = _facility(app, 'RPT Facility Health Building', year_built=2000)
-        _wo(app, fid, 'RPT health WO', status='New')
+        _wo(app, fid, 'RPT health WO', status='Open')
         with app.app_context():
             headers, rows, _ = reports.report_facility_condition(_filters(fid, days=90))
         assert len(rows) == 1
@@ -370,7 +370,7 @@ class TestVendorPerformanceReport:
             db.session.add(vendor)
             db.session.commit()
             vendor_id = vendor.id
-        _wo(app, fid, 'RPT vendor open', status='New', vendor_id=vendor_id, actual_cost=None)
+        _wo(app, fid, 'RPT vendor open', status='Open', vendor_id=vendor_id, actual_cost=None)
         _wo(app, fid, 'RPT vendor closed', status='Closed', vendor_id=vendor_id, actual_cost=250, completed_days_after=3, created_days_ago=10)
         with app.app_context():
             headers, rows, _ = reports.report_vendor_performance(_filters(fid, days=30, vendor_id=vendor_id))
@@ -487,7 +487,7 @@ class TestReportRoutes:
 
     def test_csv_download_matches_known_data(self, app, admin_client):
         fid = _facility(app, 'RPT CSV Route Building')
-        _wo(app, fid, 'RPT csv route WO', status='New', estimated_cost=42)
+        _wo(app, fid, 'RPT csv route WO', status='Open', estimated_cost=42)
         r = admin_client.get(f'/reports/work_orders?format=csv&preset=all&facility_id={fid}')
         parsed = list(csv.reader(io.StringIO(r.data.decode())))
         assert len(parsed) == 2

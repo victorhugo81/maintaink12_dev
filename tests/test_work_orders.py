@@ -166,12 +166,12 @@ class TestRequesterFlow:
             assert wo is not None
             assert wo.wo_number == f'WO-{wo.id:06d}'
             assert wo.source == workflow.SOURCE_REQUEST
-            assert wo.status == workflow.NEW
+            assert wo.status == workflow.OPEN
             assert wo.site_id == 1 and wo.facility_id == facility_id and wo.room_id == room_id
             assert wo.requester_id == _user_id(app, 'user@test.com')
             assert wo.assigned_to_id is None
             assert len(wo.status_history) == 1
-            assert wo.status_history[0].from_status is None and wo.status_history[0].to_status == 'New'
+            assert wo.status_history[0].from_status is None and wo.status_history[0].to_status == 'Open'
 
     def test_room_from_other_facility_rejected(self, app, user_client):
         _, room_id = _seed_facility(app)
@@ -239,8 +239,11 @@ class TestStaffFlow:
             assert wo.source == workflow.SOURCE_MANUAL
             assert wo.requester_id is None
             assert wo.assigned_to_id == tech_id
-            assert wo.status == workflow.ASSIGNED
-            assert [h.to_status for h in wo.status_history] == ['Assigned', 'New']
+            # Assigning no longer changes status (New/Assigned/Scheduled
+            # collapsed into one OPEN status) — setting an assignee at
+            # creation just leaves it Open, same as creating it unassigned.
+            assert wo.status == workflow.OPEN
+            assert [h.to_status for h in wo.status_history] == ['Open']
 
     def test_technician_at_other_site_cannot_see_it(self, app):
         wo = _wo(app)
@@ -259,8 +262,9 @@ class TestStaffFlow:
         assert c.get(f'/edit_work_order/{wo.id}').status_code == 403
         assert c.post(f'/change_work_order_status/{wo.id}', data={'new_status': 'In Progress'}).status_code == 403
 
-    def test_assigning_a_new_work_order_moves_it_to_assigned(self, app, admin_client):
+    def test_assigning_a_work_order_does_not_change_status(self, app, admin_client):
         wo = _wo(app)
+        status_before = wo.status
         tech_id = _user_id(app, 'wo-tech@test.com')
         pri, cat = _ids(app)
         r = admin_client.post(f'/edit_work_order/{wo.id}', data={
@@ -271,19 +275,19 @@ class TestStaffFlow:
         assert r.status_code == 200
         wo = _wo(app)
         assert wo.assigned_to_id == tech_id
-        assert wo.status == 'Assigned'
+        assert wo.status == status_before
 
 
 class TestWorkflow:
     def test_transition_matrix(self):
         from application import workflow as w
-        assert w.can_transition(w.NEW, w.IN_PROGRESS)
+        assert w.can_transition(w.OPEN, w.IN_PROGRESS)
         assert w.can_transition(w.IN_PROGRESS, w.COMPLETED)
         assert w.can_transition(w.COMPLETED, w.CLOSED)
-        assert not w.can_transition(w.NEW, w.CLOSED)
-        assert not w.can_transition(w.NEW, w.COMPLETED)
+        assert not w.can_transition(w.OPEN, w.CLOSED)
+        assert not w.can_transition(w.OPEN, w.COMPLETED)
         assert not w.can_transition(w.CLOSED, w.COMPLETED)
-        assert w.can_transition(w.CANCELLED, w.NEW)  # reopen
+        assert w.can_transition(w.CANCELLED, w.OPEN)  # reopen
         for s in w.ALL_STATUSES:
             assert not w.can_transition(s, s)
 
@@ -298,10 +302,10 @@ class TestWorkflow:
             db.session.rollback()
 
     def test_invalid_transition_via_route_is_rejected(self, app, admin_client):
-        wo = _wo(app)  # currently Assigned
+        wo = _wo(app)  # currently Open
         r = admin_client.post(f'/change_work_order_status/{wo.id}', data={'new_status': 'Closed'}, follow_redirects=True)
         assert b'valid status' in r.data or b'Cannot move' in r.data
-        assert _wo(app).status == 'Assigned'
+        assert _wo(app).status == 'Open'
 
     def test_in_progress_sets_started_at(self, app, admin_client):
         wo = _wo(app)
@@ -352,7 +356,7 @@ class TestWorkflow:
             from main import db
             wo = db.session.merge(wo)
             trail = [h.to_status for h in reversed(wo.status_history)]
-            assert trail == ['New', 'Assigned', 'In Progress', 'Completed', 'Closed']
+            assert trail == ['Open', 'In Progress', 'Completed', 'Closed']
 
     def test_reopen_closed_work_order(self, app, admin_client):
         wo = _wo(app)

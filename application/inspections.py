@@ -59,7 +59,7 @@ def generate_work_order_for_failures(inspection, user=None):
         title=f"Inspection Follow-up: {template.name} — {inspection.target_label}",
         description=description,
         source=workflow.SOURCE_INSPECTION,
-        status=workflow.NEW,
+        status=workflow.OPEN,
         priority_id=template.priority_id,
         category_id=template.category_id,
     )
