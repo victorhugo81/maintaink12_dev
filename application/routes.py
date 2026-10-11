@@ -3248,7 +3248,7 @@ def request_work_order():
             return redirect(request.url)
         db.session.commit()
         flash(f'Request {wo.wo_number} submitted. The M&O team will review it.', 'success')
-        return redirect(url_for('routes.edit_work_order', work_order_id=wo.id))
+        return redirect(url_for('routes.work_orders'))
 
     return render_template('new_work_order.html', active_tab='request', **ctx)
 
@@ -3342,7 +3342,7 @@ def add_work_order():
         if wo.assigned_to_id:
             send_work_order_notification('created', wo)
         flash(f'Work order {wo.wo_number} created.', 'success')
-        return redirect(url_for('routes.edit_work_order', work_order_id=wo.id))
+        return redirect(url_for('routes.work_orders'))
 
     return render_template('new_work_order.html', active_tab='full', **ctx)
 
@@ -4221,7 +4221,7 @@ def start_walkthrough():
 
     # A building fully audited under one cycle+template may still have
     # every room pending under another, so "pending" is recomputed per
-    # (cycle, template) combo — start_walkthrough.html filters the School/
+    # (cycle, template) combo — facility_inspections.html filters the School/
     # Building lists live as the user changes either dropdown, using this
     # matrix (small: a handful of cycles x templates, a few queries each).
     # Not every template applies to every building (e.g. Playground Safety
@@ -4247,7 +4247,7 @@ def start_walkthrough():
     if form.validate_on_submit():
         if facility_sites.get(form.facility_id.data) != form.site_id.data:
             flash('Selected building does not belong to the selected site.', 'danger')
-            return render_template('start_walkthrough.html', form=form, pending_matrix=pending_matrix,
+            return render_template('facility_inspections.html', form=form, pending_matrix=pending_matrix,
                 current_path=request.path, current_page_name=current_page_name, facility_sites=facility_sites)
         facility = Facility.query.get_or_404(form.facility_id.data)
         if not can_access_site(facility.site_id):
@@ -4269,7 +4269,7 @@ def start_walkthrough():
               'success' if created else 'info')
         return redirect(url_for('routes.walkthrough_room', inspection_id=first.id))
 
-    return render_template('start_walkthrough.html', form=form, facility_sites=facility_sites, pending_matrix=pending_matrix,
+    return render_template('facility_inspections.html', form=form, facility_sites=facility_sites, pending_matrix=pending_matrix,
         current_path=request.path, current_page_name=current_page_name)
 
 
@@ -4285,10 +4285,10 @@ def walkthrough_room(inspection_id):
         abort(404)
 
     if inspection.status == 'Completed':
-        nxt = inspections_module.next_incomplete_room_inspection(inspection)
+        nxt = inspections_module.next_incomplete_room_inspection(inspection, site_ids=_visible_site_ids())
         if nxt:
             return redirect(url_for('routes.walkthrough_room', inspection_id=nxt.id))
-        flash('This room was already inspected and the facilities audit is complete.', 'info')
+        flash('This room was already inspected and every facilities audit you can see is complete.', 'info')
         return redirect(url_for('routes.edit_facility', facility_id=inspection.room.facility_id))
 
     results_form = InspectionResultsForm()
@@ -4302,7 +4302,7 @@ def walkthrough_room(inspection_id):
         .filter(Room.facility_id == facility.id, Inspection.cycle_id == inspection.cycle_id,
                 Inspection.template_id == inspection.template_id, Inspection.status == 'Scheduled').count()
 
-    return render_template('walkthrough_room.html', inspection=inspection, results_form=results_form,
+    return render_template('inspection.html', inspection=inspection, results_form=results_form,
         active_items=active_items, facility=facility, total_rooms=total_rooms, remaining=remaining,
         current_page_name=current_page_name)
 
@@ -4373,10 +4373,12 @@ def record_inspection_results(inspection_id):
         flash('Inspection completed — all items passed.', 'success')
 
     if request.form.get('walkthrough') == '1':
-        next_insp = inspections_module.next_incomplete_room_inspection(inspection)
+        next_insp = inspections_module.next_incomplete_room_inspection(inspection, site_ids=_visible_site_ids())
         if next_insp:
+            if next_insp.room.facility_id != inspection.room.facility_id:
+                flash(f'{inspection.room.facility.name} complete — continuing to {next_insp.room.facility.name}.', 'success')
             return redirect(url_for('routes.walkthrough_room', inspection_id=next_insp.id))
-        flash('Facilities audit complete for this building — every room has been inspected.', 'success')
+        flash('Facilities audit complete — every room you can see has been inspected.', 'success')
         return redirect(url_for('routes.edit_facility', facility_id=inspection.room.facility_id))
     return redirect(url_for('routes.edit_inspection', inspection_id=inspection.id))
 

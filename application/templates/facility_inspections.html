@@ -33,6 +33,7 @@
                             {{ form.facility_id(class="form-select-box form-select form-select-lg", id="audit-facility") }}
                         </div>
                         <p class="text-xs text-secondary mb-0">Only schools/buildings that use the selected Checklist Template and still have a pending audit for the selected Inspection Cycle are listed.</p>
+                        <p class="text-xs fw-bold mb-0" id="pending-count"></p>
                         <p class="text-xs text-warning mb-0" id="no-eligible-buildings" hidden>No school/building is set up for this Checklist Template yet &mdash; use <a href="{{ url_for('routes.add_inspection') }}">Schedule Inspection</a> to assign it somewhere first.</p>
                         <div class="col-12 d-grid gap-2 mt-4">
                             {{ form.submit(class="btn btn-lg bg-gradient-main") }}
@@ -58,6 +59,7 @@
   var siteSelect = document.getElementById('audit-site');
   var facilitySelect = document.getElementById('audit-facility');
   var noEligibleMsg = document.getElementById('no-eligible-buildings');
+  var pendingCountEl = document.getElementById('pending-count');
   var submitBtn = document.querySelector('form button[type="submit"], form input[type="submit"]');
   if (!cycleSelect || !templateSelect || !siteSelect || !facilitySelect) { return; }
 
@@ -96,10 +98,12 @@
     // Facilities: show only ones in the chosen (now possibly corrected) site AND pending.
     var siteId = parseInt(siteSelect.value, 10);
     var sawSelectedFacility = false;
+    var facilityCount = 0;
     Array.prototype.forEach.call(facilitySelect.options, function (opt) {
       var match = facilitySites[opt.value] === siteId && pending.has(opt.value);
       opt.hidden = !match;
       opt.disabled = !match;
+      if (match) { facilityCount++; }
       if (match && opt.selected) { sawSelectedFacility = true; }
     });
     if (!sawSelectedFacility) {
@@ -107,6 +111,15 @@
         return facilitySites[opt.value] === siteId && pending.has(opt.value);
       });
       if (firstFacility) { facilitySelect.value = firstFacility.value; }
+    }
+
+    if (pendingCountEl && hasEligible) {
+      var siteWord = facilityCount === 1 ? 'building' : 'buildings';
+      var totalWord = pending.size === 1 ? 'building' : 'buildings';
+      pendingCountEl.textContent = facilityCount + ' ' + siteWord + ' pending in this site ('
+        + pending.size + ' ' + totalWord + ' pending district-wide)';
+    } else if (pendingCountEl) {
+      pendingCountEl.textContent = '';
     }
   }
 

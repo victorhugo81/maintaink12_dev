@@ -1140,9 +1140,11 @@ def build_dashboard(view, f, user, today=None):
             cycle = InspectionCycle.query.filter_by(is_active=True).order_by(InspectionCycle.id.desc()).first()
         progress = inspections_module.inspection_progress(cycle.id if cycle else None, f)
         charts['district_gauge'] = {'labels': [], 'datasets': [{'label': 'Completion', 'data': [progress['district']['pct'] or 0]}]}
+        issue_health = inspections_module.issue_resolution_health(f)
+        charts['issue_health_gauge'] = {'labels': [], 'datasets': [{'label': 'Issue Resolution', 'data': [issue_health['pct'] or 0]}]}
         data.update({'facility': facility, 'maintenance': maintenance, 'cost': cost, 'charts': charts,
                      'recurring': groups, 'health': health, 'sla': sla, 'insights': insights,
-                     'progress': progress, 'cycle': cycle})
+                     'progress': progress, 'cycle': cycle, 'issue_health': issue_health})
     elif view == 'technician':
         maintenance = maintenance_kpis({'site_ids': f['site_ids'], 'facility_id': f.get('facility_id'),
                                         'start': f['start'], 'end': f['end']}, today)

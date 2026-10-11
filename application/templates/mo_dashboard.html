@@ -145,7 +145,7 @@
         {# ============================ EXECUTIVE / MANAGER ============================ #}
         {% if view in ('executive', 'manager') %}
         {% set fac = data.facility %}{% set m = data.maintenance %}{% set cost = data.cost %}
-        {% set prog = data.progress %}{% set cyc = data.cycle %}
+        {% set prog = data.progress %}{% set cyc = data.cycle %}{% set ih = data.issue_health %}
 
         <div class="dashboard-hero mb-3">
           <div class="dashboard-hero-gauge-card">
@@ -153,6 +153,12 @@
               <canvas data-chart="district_gauge" data-type="gauge" height="150"></canvas>
             </div>
             <p class="dashboard-hero-gauge-caption">{{ prog.district.rooms_inspected }} / {{ prog.district.rooms_total }} rooms</p>
+          </div>
+          <div class="dashboard-hero-gauge-card">
+            <div class="district-gauge-wrap">
+              <canvas data-chart="issue_health_gauge" data-type="gauge" height="150"></canvas>
+            </div>
+            <p class="dashboard-hero-gauge-caption">{{ ih.clean }} / {{ ih.total }} issues clean</p>
           </div>
           <div class="dashboard-hero-stats">
             <div class="hero-stat">
@@ -170,6 +176,10 @@
             <div class="hero-stat">
               <div class="hero-stat-value">{% if prog.district.pct is none %}&mdash;{% else %}{{ prog.district.pct }}%{% endif %}</div>
               <div class="hero-stat-label">Facilities Audit{% if cyc %} &mdash; {{ cyc.name }}{% endif %}</div>
+            </div>
+            <div class="hero-stat{% if ih.issues_outstanding %} hero-stat-alert{% endif %}">
+              <div class="hero-stat-value">{% if ih.pct is none %}&mdash;{% else %}{{ ih.pct }}%{% endif %}</div>
+              <div class="hero-stat-label">Issue Resolution</div>
             </div>
           </div>
         </div>

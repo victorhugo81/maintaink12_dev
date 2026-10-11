@@ -14,6 +14,23 @@
                 <br>
 
                 <div class="row g-4 mb-4">
+                    <!-- Facilities audit completion gauge -->
+                    <div class="col-12 col-lg-7">
+                        <div class="card h-100">
+                            <div class="card-body px-4 py-3 d-flex flex-column align-items-center justify-content-center text-center">
+                                <h6 class="mb-3 align-self-start">Facilities Audit{% if cycle %} &mdash; {{ cycle.name }}{% endif %}</h6>
+                                <div class="district-gauge-wrap">
+                                    <canvas data-chart="site_gauge" data-type="gauge" height="200"></canvas>
+                                </div>
+                                <p class="text-sm text-secondary mt-2 mb-0">{{ progress.district.rooms_inspected }} / {{ progress.district.rooms_total }} rooms inspected</p>
+                                {% if not cycle %}
+                                <p class="text-xs text-danger mt-1 mb-0">No active inspection cycle &mdash; <a href="{{ url_for('routes.add_inspection_cycle') }}">create one</a> to start tracking.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+
                     <!-- Site info -->
                     <div class="col-12 col-lg-5">
                         <div class="card h-100">
@@ -62,21 +79,7 @@
                         </div>
                     </div>
 
-                    <!-- Facilities audit completion gauge -->
-                    <div class="col-12 col-lg-7">
-                        <div class="card h-100">
-                            <div class="card-body px-4 py-3 d-flex flex-column align-items-center justify-content-center text-center">
-                                <h6 class="mb-3 align-self-start">Facilities Audit{% if cycle %} &mdash; {{ cycle.name }}{% endif %}</h6>
-                                <div class="district-gauge-wrap">
-                                    <canvas data-chart="site_gauge" data-type="gauge" height="200"></canvas>
-                                </div>
-                                <p class="text-sm text-secondary mt-2 mb-0">{{ progress.district.rooms_inspected }} / {{ progress.district.rooms_total }} rooms inspected</p>
-                                {% if not cycle %}
-                                <p class="text-xs text-danger mt-1 mb-0">No active inspection cycle &mdash; <a href="{{ url_for('routes.add_inspection_cycle') }}">create one</a> to start tracking.</p>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
+
                 </div>
 
                 <!-- Work Order status -->

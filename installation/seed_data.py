@@ -124,9 +124,7 @@ with app.app_context():
         ]
         HVAC_PLUMBING = [
             'HVAC system operating properly?',
-            'No signs of water leaks or damage?',
-            'Plumbing fixtures functioning properly?',
-            'Pressure gauge in operable range?',
+            'Clean filters and ducts?',
         ]
         STRUCTURAL = [
             'Ceiling tiles in place and undamaged?',
@@ -138,17 +136,14 @@ with app.app_context():
             'Surfacing material adequate and free of hazards?',
             'Fencing and gates secure?',
         ]
-        TECH = [
-            'Network/data jacks functional?',
-        ]
         DEFAULT_INSPECTION_TEMPLATES = (
             # name, category name, priority name, questions
             ('Annual Facility Audit', 'General Maintenance', 'Medium',
-             SAFETY + ELECTRICAL + HVAC_PLUMBING + STRUCTURAL + PLAYGROUND + TECH),
+             SAFETY + ELECTRICAL + HVAC_PLUMBING + STRUCTURAL + PLAYGROUND),
             ('Playgrounds & Outdoor Facilities', 'Playground', 'Medium', PLAYGROUND),
             ('Safety & Equipment', 'Fire/Life Safety', 'Medium', SAFETY),
-            ('Office Spaces', 'HVAC', 'Medium', ELECTRICAL + STRUCTURAL + TECH),
-            ('Classrooms', 'Other', 'Medium', SAFETY + STRUCTURAL + TECH),
+            ('Office Spaces', 'HVAC', 'Medium', ELECTRICAL + STRUCTURAL),
+            ('Classrooms', 'Other', 'Medium', SAFETY + STRUCTURAL),
             ('HVAC Systems', 'HVAC', 'Medium', HVAC_PLUMBING),
         )
         templates_added = 0

@@ -664,7 +664,7 @@ class TestStartWalkthrough:
     def test_building_dropdown_excludes_fully_audited_facility(self, app, admin_client):
         # The School/Building lists are now filtered client-side (JS reads
         # pending_matrix and hides/hides options live as Cycle/Template
-        # change — see start_walkthrough.html), so both buildings are still
+        # change — see facility_inspections.html), so both buildings are still
         # in the server-rendered <option> markup; what must actually differ
         # is which facility ids pending_matrix lists as pending for this
         # (cycle, template) combo.
@@ -796,6 +796,48 @@ class TestWalkthroughRoomFlow:
             assert insp2.status == 'Completed'
             assert insp2.generated_work_order_id is not None
 
+    def test_finishing_a_building_continues_into_the_next_pending_building(self, app, admin_client):
+        # Two single-room buildings started under the same cycle+template —
+        # finishing the first building's only room should NOT drop back to
+        # edit_facility.html; it should roll straight into the second
+        # building's room instead.
+        building_a = _walkthrough_facility(app, name='Rollover Building A', active_rooms=1)
+        building_b = _walkthrough_facility(app, name='Rollover Building B', active_rooms=1)
+        cycle_id = _make_cycle(app, name='Rollover Cycle')
+        template_id = _make_template(app, name='Rollover Template', questions=['Only Q?'])
+        admin_client.post('/start_walkthrough', data={
+            'site_id': '1', 'facility_id': str(building_a), 'cycle_id': str(cycle_id), 'template_id': str(template_id),
+        }, follow_redirects=True)
+        admin_client.post('/start_walkthrough', data={
+            'site_id': '1', 'facility_id': str(building_b), 'cycle_id': str(cycle_id), 'template_id': str(template_id),
+        }, follow_redirects=True)
+
+        with app.app_context():
+            from application.models import Inspection, Room
+            insp_a_id = Inspection.query.join(Room, Inspection.room_id == Room.id) \
+                .filter(Room.facility_id == building_a, Inspection.cycle_id == cycle_id).first().id
+            insp_b_id = Inspection.query.join(Room, Inspection.room_id == Room.id) \
+                .filter(Room.facility_id == building_b, Inspection.cycle_id == cycle_id).first().id
+
+        r = admin_client.post(f'/record_inspection_results/{insp_a_id}', data={
+            'items-0-result': 'Pass', 'generate_work_order': 'y', 'walkthrough': '1',
+        }, follow_redirects=True)
+        assert r.status_code == 200
+        assert b'continuing to Rollover Building B' in r.data
+        assert b'Facilities audit complete' not in r.data
+
+        with app.app_context():
+            from application.models import Inspection
+            from main import db
+            assert db.session.get(Inspection, insp_a_id).status == 'Completed'
+            assert db.session.get(Inspection, insp_b_id).status == 'Scheduled'  # not yet touched, just routed to
+
+        # Finish building B's room too — now everything really is done.
+        r2 = admin_client.post(f'/record_inspection_results/{insp_b_id}', data={
+            'items-0-result': 'Pass', 'generate_work_order': 'y', 'walkthrough': '1',
+        }, follow_redirects=True)
+        assert b'Facilities audit complete' in r2.data
+
     def test_non_walkthrough_submission_unaffected(self, app, admin_client):
         """A plain (non-walkthrough) record_inspection_results POST still
         redirects to edit_inspection, matching pre-existing behavior."""
@@ -881,3 +923,129 @@ class TestInspectionProgress:
             assert row['rooms_inspected'] == 1
             assert row['issues_open'] == 0
             assert row['critical_count'] == 0
+
+    def test_room_with_two_completed_inspections_counted_once(self, app):
+        """A room can end up with more than one completed Inspection in the
+        same cycle (e.g. a second template's walkthrough, or an ad hoc
+        /add_inspection on top of the bulk walkthrough) — rooms_inspected
+        must count distinct rooms, not raw Inspection rows, or it can exceed
+        rooms_total (the dashboard gauge showing e.g. "114 / 111 rooms")."""
+        facility_id = _walkthrough_facility(app, name='Double Inspected Building', active_rooms=1)
+        cycle_id = _make_cycle(app, name='Double Inspected Cycle')
+        template_id = _make_template(app, name='Double Inspected Template A', questions=['Q1?'])
+        template2_id = _make_template(app, name='Double Inspected Template B', questions=['Q1?'])
+
+        with app.app_context():
+            from application.models import Facility, Inspection, InspectionCycle, InspectionTemplate, Room
+            from application import inspections as inspections_module
+            from main import db
+            facility = db.session.get(Facility, facility_id)
+            cycle_obj = db.session.get(InspectionCycle, cycle_id)
+            template_obj = db.session.get(InspectionTemplate, template_id)
+            template2_obj = db.session.get(InspectionTemplate, template2_id)
+            inspections_module.start_walkthrough(facility, cycle_obj, template_obj)
+            inspections_module.start_walkthrough(facility, cycle_obj, template2_obj)
+            db.session.commit()
+
+            room = Room.query.filter_by(facility_id=facility_id).first()
+            Inspection.query.filter_by(room_id=room.id, cycle_id=cycle_id).update({'status': 'Completed'})
+            db.session.commit()
+
+            progress = inspections_module.inspection_progress(cycle_id, {'facility_id': facility_id})
+            row = progress['facilities'][0]
+            assert row['rooms_total'] == 1
+            assert row['rooms_inspected'] == 1
+            assert row['pct'] == 100.0
+
+
+class TestIssueResolutionHealth:
+    """
+    The district-wide dashboard gauge: a checklist result counts as "clean"
+    if it's a Pass, or a Fail/Needs Attention whose generated work order is
+    already resolved (Completed/Closed/Cancelled) — otherwise it counts
+    against the score. N/A is excluded entirely, same convention as every
+    other inspection rollup in this file.
+    """
+    def test_mixed_results_compute_expected_percentage(self, app):
+        # issue_resolution_health() only filters by site_ids (no
+        # cycle/facility scoping), and this session-scoped test DB
+        # accumulates inspection results from every other test — so this
+        # needs its own brand-new Site, not the shared site_id=1 fixtures,
+        # or the asserted counts below would pick up unrelated data.
+        template_id = _make_template(app, name='Issue Health Template',
+                                      questions=['Q1?', 'Q2?', 'Q3?', 'Q4?', 'Q5?'])
+
+        with app.app_context():
+            from application.models import (Inspection, InspectionResult, InspectionTemplate,
+                                             WorkOrder, Priority, Category, Site, Facility, Room)
+            from application import inspections as inspections_module
+            from main import db
+
+            site = Site(site_name='Issue Health Site', site_acronyms='IH', site_code='901',
+                        site_cds='901', site_address='x', site_type='Elementary')
+            db.session.add(site)
+            db.session.flush()
+            facility = Facility(site_id=site.id, name='Issue Health Building')
+            db.session.add(facility)
+            db.session.flush()
+            room = Room(site_id=site.id, facility_id=facility.id, room_number='IH-1')
+            db.session.add(room)
+            db.session.flush()
+            site_id, room_id = site.id, room.id
+
+            template = db.session.get(InspectionTemplate, template_id)
+            items = template.items
+            pri = Priority.query.filter_by(name='High').first().id
+            cat = Category.query.filter_by(name='HVAC').first().id
+
+            def _insp():
+                insp = Inspection(template_id=template_id, site_id=site_id, room_id=room_id,
+                                   due_date=db.func.current_date(), status='Completed')
+                db.session.add(insp)
+                db.session.flush()
+                return insp
+
+            def _wo(status):
+                wo = WorkOrder(site_id=site_id, title='Issue health WO', source='Inspection',
+                                status=status, priority_id=pri, category_id=cat)
+                db.session.add(wo)
+                db.session.flush()
+                return wo
+
+            # 1) Plain Pass — clean.
+            insp1 = _insp()
+            db.session.add(InspectionResult(inspection_id=insp1.id, inspection_item_id=items[0].id, result='Pass'))
+
+            # 2) Fail with a resolved (Closed) work order — clean, since it's fixed.
+            closed_wo = _wo('Closed')
+            insp2 = _insp()
+            insp2.generated_work_order_id = closed_wo.id
+            db.session.add(InspectionResult(inspection_id=insp2.id, inspection_item_id=items[1].id, result='Fail'))
+
+            # 3) Fail with a still-open work order — counts against.
+            open_wo = _wo('Open')
+            insp3 = _insp()
+            insp3.generated_work_order_id = open_wo.id
+            db.session.add(InspectionResult(inspection_id=insp3.id, inspection_item_id=items[2].id, result='Fail'))
+
+            # 4) Needs Attention, no work order at all (never auto-generated) — counts against.
+            insp4 = _insp()
+            db.session.add(InspectionResult(inspection_id=insp4.id, inspection_item_id=items[3].id, result='Needs Attention'))
+
+            # 5) N/A — excluded entirely, shouldn't affect total or pct.
+            insp5 = _insp()
+            db.session.add(InspectionResult(inspection_id=insp5.id, inspection_item_id=items[4].id, result='N/A'))
+
+            # 6) A standalone open ticket with no inspection link at all — still
+            # counts as a live issue (and must not double-count open_wo above,
+            # which IS linked via insp3.generated_work_order_id).
+            standalone_open_wo = _wo('Open')
+
+            db.session.commit()
+
+            health = inspections_module.issue_resolution_health({'site_ids': [site_id]})
+            assert health['total'] == 5           # 4 inspection results (N/A excluded) + 1 standalone ticket
+            assert health['clean'] == 2           # Pass + resolved Fail
+            assert health['issues_outstanding'] == 3
+            assert health['open_tickets'] == 1
+            assert health['pct'] == 40.0
