@@ -44,14 +44,6 @@
       <div class="card-header p-0 position-relative mt-n4 z-index-2">
         <div class="bg-gradient-main custom-title-card d-flex flex-wrap justify-content-between align-items-center gap-2 pe-3">
           <h2 class="text-white text-capitalize ps-3 mb-0"><i class="material-symbols-rounded opacity-5">insights</i> {{ current_page_name }} &mdash; {{ view_labels[view] }}</h2>
-          {% if allowed_views|length > 1 %}
-          <div class="btn-group btn-group-sm">
-            {% for v in allowed_views %}
-            <a class="btn btn-sm {% if v == view %}btn-light{% else %}btn-outline-light{% endif %} mb-0 text-nowrap"
-               href="{{ url_for('routes.mo_dashboard', view=v, preset=f.preset, start=f.start if f.preset == 'custom' else None, end=f.end if f.preset == 'custom' else None) }}">{{ view_labels[v] }}</a>
-            {% endfor %}
-          </div>
-          {% endif %}
         </div>
       </div>
       <div class="card-body px-4 pb-4">
@@ -94,67 +86,18 @@
               </select>
             </div>
             {% endif %}
-            {% if options.facilities is defined %}
-            <div class="col-md-2 col-6">
-              <label class="filter-labels text-sm mb-0">Facility</label>
-              <select class="form-select-box form-select" name="facility_id" data-autosubmit>
-                <option value="">All Facilities</option>
-                {% for fac in options.facilities %}<option value="{{ fac.id }}" {% if f.facility_id == fac.id %}selected{% endif %}>{{ fac.name }}</option>{% endfor %}
-              </select>
-            </div>
-            <div class="col-md-2 col-6">
-              <label class="filter-labels text-sm mb-0">Department (Team)</label>
-              <select class="form-select-box form-select" name="team" data-autosubmit>
-                <option value="">All Teams</option>
-                {% for t in options.teams %}<option value="{{ t }}" {% if f.team == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
-              </select>
-            </div>
-            <div class="col-md-2 col-6">
-              <label class="filter-labels text-sm mb-0">Technician</label>
-              <select class="form-select-box form-select" name="technician_id" data-autosubmit>
-                <option value="">All Technicians</option>
-                {% for t in options.technicians %}<option value="{{ t.id }}" {% if f.technician_id == t.id %}selected{% endif %}>{{ t.get_full_name() }}</option>{% endfor %}
-              </select>
-            </div>
-            {% endif %}
-            <div class="col-md-2 col-6">
-              <label class="filter-labels text-sm mb-0">Category</label>
-              <select class="form-select-box form-select" name="category_id" data-autosubmit>
-                <option value="">All Categories</option>
-                {% for c in options.categories %}<option value="{{ c.id }}" {% if f.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
-              </select>
-            </div>
-            <div class="col-md-2 col-6">
-              <label class="filter-labels text-sm mb-0">Priority</label>
-              <select class="form-select-box form-select" name="priority_id" data-autosubmit>
-                <option value="">All Priorities</option>
-                {% for p in options.priorities %}<option value="{{ p.id }}" {% if f.priority_id == p.id %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
-              </select>
-            </div>
-            <div class="col-md-2 col-6">
-              <label class="filter-labels text-sm mb-0">Status</label>
-              <select class="form-select-box form-select" name="status" data-autosubmit>
-                <option value="">All Statuses</option>
-                {% for s in options.statuses %}<option value="{{ s }}" {% if f.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
-              </select>
-            </div>
           </div>
           <p class="text-xs text-secondary mt-2 mb-0">Period: {{ f.start.strftime('%b %d, %Y') }} &ndash; {{ f.end.strftime('%b %d, %Y') }}. "Current" figures describe the filtered scope right now; "in period" figures count work orders opened (or completed) within these dates.</p>
         </form>
 
         {# ============================ EXECUTIVE / MANAGER ============================ #}
-        {% if view in ('executive', 'manager') %}
+        {% if view == 'manager' %}
         {% set fac = data.facility %}{% set m = data.maintenance %}{% set cost = data.cost %}
         {% set prog = data.progress %}{% set cyc = data.cycle %}{% set ih = data.issue_health %}
 
         <div class="dashboard-hero mb-3">
           <div class="dashboard-hero-gauge-card">
-            <div class="district-gauge-wrap">
-              <canvas data-chart="district_gauge" data-type="gauge" height="150"></canvas>
-            </div>
-            <p class="dashboard-hero-gauge-caption">{{ prog.district.rooms_inspected }} / {{ prog.district.rooms_total }} rooms</p>
-          </div>
-          <div class="dashboard-hero-gauge-card">
+            <p class="dashboard-hero-gauge-title mb-0">Issue Resolution</p>
             <div class="district-gauge-wrap">
               <canvas data-chart="issue_health_gauge" data-type="gauge" height="150"></canvas>
             </div>
@@ -193,6 +136,7 @@
           {{ kpi_card('Schools Not Started', prog.not_started_count, 'radio_button_unchecked') }}
           {{ kpi_card('Open Audit Issues', prog.district.issues_open, 'report', None, 'text-warning' if prog.district.issues_open else '') }}
           {{ kpi_card('Critical Audit Issues', prog.district.critical_count, 'emergency', None, 'text-danger' if prog.district.critical_count else '') }}
+          {{ kpi_card('Facilities Audit Completion', pct(prog.district.pct), 'fact_check', url_for('routes.facilities')) }}
         </div>
 
         <!-- Operational Insights — the plain-English "what's going on" summary comes
@@ -225,11 +169,9 @@
               {{ kpi_card('Overdue', wo.overdue, 'alarm', None, 'text-danger' if wo.overdue else '') }}
               {{ kpi_card('Unassigned', wo.unassigned, 'person_off', url_for('routes.work_orders', assigned_filter='unassigned')) }}
               {{ kpi_card('Emergency / Critical', wo.emergency ~ ' / ' ~ wo.critical, 'emergency', None, 'text-danger' if (wo.emergency or wo.critical) else '') }}
-              {% if view == 'manager' %}
               {{ kpi_card('In Progress', wo.in_progress, 'progress_activity', url_for('routes.work_orders', status_filter='In Progress')) }}
               {{ kpi_card('Waiting', wo.waiting, 'hourglass_top') }}
               {{ kpi_card('Backlog (open > 30 days)', wo.backlog, 'inventory') }}
-              {% endif %}
             </div>
             <p class="text-xxs mb-2 mt-2">{{ f.period_label }}</p>
             <div class="row mb-0">
@@ -237,12 +179,10 @@
               {{ kpi_card('Completed', wo.completed, 'task_alt') }}
               {{ kpi_card('Completion Rate', pct(wo.completion_rate), 'percent') }}
               {{ kpi_card('SLA Compliance (due date)', pct(wo.sla_compliance), 'verified') }}
-              {% if view == 'manager' %}
               {{ kpi_card('Avg Response', days(wo.avg_response_days), 'timer') }}
               {{ kpi_card('Avg Resolution', days(wo.avg_resolution_days), 'schedule') }}
               {{ kpi_card('Repeat Work', pct(wo.repeat_work_pct), 'repeat') }}
               {{ kpi_card('Labor Hours', m.labor_hours, 'engineering') }}
-              {% endif %}
             </div>
           </div>
         </div>
@@ -263,7 +203,6 @@
               {{ kpi_card('Maintenance Cost (' ~ f.period_label ~ ')', money(cost.actual_total), 'payments', url_for('routes.cost_rollups')) }}
               {{ kpi_card('Estimated vs Actual', money(cost.estimated_total) ~ ' / ' ~ money(cost.actual_total), 'balance') }}
               {{ kpi_card('Preventive vs Corrective', pct(m.preventive_pct) ~ ' PM', 'autorenew') }}
-              {% if view == 'manager' %}
               {{ kpi_card('Assets Requiring Attention', fac.assets_requiring_attention, 'priority_high') }}
               {{ kpi_card('Cost per Work Order', money(cost.cost_per_work_order), 'receipt_long') }}
               {{ kpi_card('Labor / Material / Vendor', money(cost.labor_cost) ~ ' / ' ~ money(cost.material_cost) ~ ' / ' ~ money(cost.vendor_cost), 'stacked_bar_chart') }}
@@ -272,7 +211,6 @@
               {{ kpi_card('SLA Breaches', data.sla.breach_count, 'gpp_bad', None, 'text-danger' if data.sla.breach_count else '') }}
               {{ kpi_card('SLA Warnings', data.sla.warning_count, 'warning', None, 'text-warning' if data.sla.warning_count else '') }}
               {% endif %}
-              {% endif %}
             </div>
           </div>
         </div>
@@ -280,14 +218,6 @@
         <!-- Charts -->
         <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">Trends &amp; Breakdown</h6>
         <div class="row">
-          {% if view == 'executive' %}
-          {{ chart_box('by_facility', 'Work Orders by Facility', 'Opened ' ~ f.period_label ~ ' (top 10)') }}
-          {{ chart_box('cost_over_time', 'Cost Over Time', 'Actual cost by month', 'line') }}
-          {{ chart_box('pm_vs_corrective', 'Preventive vs Corrective', 'By work order source', 'doughnut') }}
-          {{ chart_box('condition_distribution', 'Asset Condition', 'Current condition of active assets', 'doughnut') }}
-          {{ chart_box('by_month', 'Work Orders by Month', 'Opened per month') }}
-          {{ chart_box('by_category', 'Work Orders by Category', 'Opened ' ~ f.period_label ~ ' (top 10)') }}
-          {% else %}
           {{ chart_box('by_status', 'Work Orders by Status', 'Opened ' ~ f.period_label) }}
           {{ chart_box('by_priority', 'Work Orders by Priority', 'Opened ' ~ f.period_label) }}
           {{ chart_box('by_facility', 'Work Orders by Facility', 'Opened ' ~ f.period_label ~ ' (top 10)') }}
@@ -298,7 +228,6 @@
           {{ chart_box('trends', 'Response & Completion Trends', 'Average days, by month opened', 'line') }}
           {{ chart_box('pm_vs_corrective', 'Preventive vs Corrective', 'By work order source', 'doughnut') }}
           {{ chart_box('condition_distribution', 'Asset Condition', 'Current condition of active assets', 'doughnut') }}
-          {% endif %}
         </div>
 
         <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2 mt-2">Details</h6>
@@ -343,7 +272,7 @@
         <div class="ticket-content-box mb-4" id="recurring">
           <h3>Recurring Issues</h3>
           <p class="text-xs text-secondary">Work orders repeating {{ f.period_label }} on the same asset, the same room or facility within one category, or with the same description (3 or more).</p>
-          {% set groups = data.recurring if view == 'manager' else data.recurring[:5] %}
+          {% set groups = data.recurring %}
           {% if groups %}
           <div class="table-responsive p-0">
             <table class="table align-items-left mb-0 table-striped">
@@ -365,13 +294,12 @@
               </tbody>
             </table>
           </div>
-          {% if view == 'executive' and data.recurring|length > 5 %}<p class="text-xs text-secondary mt-2 mb-0">Showing 5 of {{ data.recurring|length }} &mdash; switch to the M&amp;O Manager view for the full list.</p>{% endif %}
           {% else %}
           <p class="text-sm text-secondary mb-0">No recurring issues detected {{ f.period_label }}.</p>
           {% endif %}
         </div>
 
-        {% if view == 'manager' and fac.open_issues_by_facility %}
+        {% if fac.open_issues_by_facility %}
         <div class="ticket-content-box mb-4" id="open-by-facility">
           <h3>Open Issues by Facility</h3>
           <div class="table-responsive">

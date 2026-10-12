@@ -1,5 +1,5 @@
 // M&O Dashboard charts (Phase 9). Reads window.MO_DASHBOARD (set by an
-// inline nonce'd script in mo_dashboard.html) and draws one Chart.js chart
+// inline nonce'd script in dashboard.html) and draws one Chart.js chart
 // per <canvas data-chart="key"> found on the page. Same Chart.js bundle the
 // ticket dashboard already uses.
 (function () {
@@ -14,7 +14,7 @@
   };
 
   // Gauge color thresholds match the facility progress bars in
-  // mo_dashboard.html (pct_tone macro) and the spec's suggested palette:
+  // dashboard.html (pct_tone macro) and the spec's suggested palette:
   // 90-100 success, 75-89 info, 50-74 warning, 25-49 accent, 0-24 danger.
   function gaugeColor(val) {
     if (val >= 90) { return '#15803D'; }

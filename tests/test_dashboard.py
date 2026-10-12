@@ -452,13 +452,13 @@ class TestDashboardRoutes:
         r = client.get('/')
         assert r.status_code in (302, 401)
 
-    def test_admin_default_is_executive_and_can_switch(self, admin_client):
+    def test_admin_default_is_manager(self, admin_client):
         r = admin_client.get('/')
-        assert r.status_code == 200 and b'Executive' in r.data
+        assert r.status_code == 200 and b'M&amp;O Manager' in r.data
         r = admin_client.get('/?view=manager&preset=year')
         assert r.status_code == 200 and b'M&amp;O Manager' in r.data and b'Response &amp; Completion' in r.data
         r = admin_client.get('/?view=technician')
-        assert r.status_code == 200 and b'Dashboard &mdash; Executive' in r.data   # not allowed -> default
+        assert r.status_code == 200 and b'Dashboard &mdash; M&amp;O Manager' in r.data   # not allowed -> default
 
     def test_filters_change_the_numbers(self, app, admin_client, kpi_facility):
         r = admin_client.get(f'/?view=manager&preset=custom&start={TODAY - timedelta(days=60)}&end={TODAY}&facility_id={kpi_facility}')
@@ -473,7 +473,7 @@ class TestDashboardRoutes:
         fid = _facility(app, 'Tech Dash Building')
         _wo(app, fid, 'Tech dash mine', assigned_to_id=tech_id, due_in=0)
         c = _client_as(app, tech_id)
-        r = c.get('/?view=executive')
+        r = c.get('/?view=manager')
         assert r.status_code == 200
         assert b'Technician' in r.data and b'My Open Work Orders' in r.data and b'Tech dash mine' in r.data
         assert b'Facility Health Score' not in r.data
@@ -498,7 +498,7 @@ class TestDashboardLegacyAlias:
 
     def test_dashboard_redirect_lands_on_working_page(self, admin_client):
         r = admin_client.get('/dashboard', follow_redirects=True)
-        assert r.status_code == 200 and b'Executive' in r.data
+        assert r.status_code == 200 and b'M&amp;O Manager' in r.data
 
 
 class TestDashboardCrossPageChecks:

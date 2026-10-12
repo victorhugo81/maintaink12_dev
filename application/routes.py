@@ -439,9 +439,10 @@ def test_email():
 # The main landing page. Tickets were removed as a redundant parallel track
 # to WorkOrder (see docs/PHASE_13_REPORT.md); this is the same role-based
 # dashboard that used to live at /dashboard (application/analytics.py) —
-# Admins/Specialists may switch between Executive and M&O Manager views,
-# Technicians get the Technician view pinned to their own work and site,
-# everyone else gets the School Staff view pinned to their own requests.
+# Admins/Specialists get the single M&O Manager view (the old separate
+# Executive view was merged into it), Technicians get the Technician view
+# pinned to their own work and site, everyone else gets the School Staff
+# view pinned to their own requests.
 @routes_blueprint.route('/')
 @login_required
 def index():
@@ -456,23 +457,11 @@ def index():
     data = analytics.build_dashboard(view, filters, current_user)
 
     options = {}
-    if view in ('executive', 'manager'):
-        fac_query = Facility.query.filter_by(is_active=True)
-        if filters['site_ids']:
-            fac_query = fac_query.filter(Facility.site_id.in_(filters['site_ids']))
+    if view == 'manager':
         options['sites'] = Site.query.order_by(Site.site_name).all() if site_ids is None else []
-        options['facilities'] = fac_query.order_by(Facility.name).all()
-        options['technicians'] = User.query.filter(User.role_id.in_((2, 3)), User.status == 'Active') \
-                                           .order_by(User.first_name, User.last_name).all()
-        options['teams'] = [t for (t,) in db.session.query(WorkOrder.assigned_team).distinct()
-                                                    .filter(WorkOrder.assigned_team.isnot(None)).order_by(WorkOrder.assigned_team).all()]
-    options['categories'] = Category.query.filter_by(is_active=True).order_by(Category.sort_order, Category.name).all()
-    options['priorities'] = Priority.query.filter_by(is_active=True).order_by(Priority.sort_order).all()
-    options['statuses'] = workflow.ALL_STATUSES
-    if view in ('executive', 'manager'):
         options['cycles'] = InspectionCycle.query.order_by(InspectionCycle.id.desc()).all()
 
-    return render_template('mo_dashboard.html', data=data, view=view, allowed_views=allowed,
+    return render_template('dashboard.html', data=data, view=view, allowed_views=allowed,
         view_labels=analytics.VIEW_LABELS, filters=filters, presets=analytics.PRESETS,
         preset_labels=analytics.PRESET_LABELS, options=options, health_factors=analytics.HEALTH_FACTORS,
         status_badge=workflow.STATUS_BADGE, current_path=request.path, current_page_name=current_page_name)

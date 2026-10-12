@@ -1051,6 +1051,7 @@ input.read-only { background: var(--color-surface-sunken) !important; color: var
   box-shadow: var(--shadow-md);
 }
 .dashboard-hero-gauge-card .district-gauge-wrap { max-width: 170px; height: 150px; }
+.dashboard-hero-gauge-title { font-size: 0.8rem; font-weight: 700; color: var(--color-text); text-transform: uppercase; letter-spacing: 0.03em; }
 .dashboard-hero-gauge-caption { font-size: 0.75rem; color: var(--color-text-muted); margin: 0.25rem 0 0; font-weight: 600; }
 
 .dashboard-hero-stats {

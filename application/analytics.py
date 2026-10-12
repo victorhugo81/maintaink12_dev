@@ -27,9 +27,9 @@ import re
 
 from application import workflow
 
-VIEWS = ('executive', 'manager', 'technician', 'school_staff')
+VIEWS = ('manager', 'technician', 'school_staff')
 VIEW_LABELS = {
-    'executive': 'Executive', 'manager': 'M&O Manager',
+    'manager': 'M&O Manager',
     'technician': 'Technician', 'school_staff': 'School Staff',
 }
 PRESETS = ('today', 'week', 'month', 'quarter', 'year', 'custom')
@@ -281,7 +281,7 @@ def work_order_kpis(f, today=None):
         # New/Assigned/Scheduled collapsed into one OPEN status (Phase 15),
         # so "a new request" is no longer a distinct status value — it's the
         # same signal as "unassigned" now. Kept as its own dict key (rather
-        # than deleted) since mo_dashboard.html's School Staff view still
+        # than deleted) since dashboard.html's School Staff view still
         # shows it as "New (not yet assigned)", a meaningful distinct tile
         # in that scoped-to-me view even though it duplicates 'unassigned'
         # in the Manager view (which is why that tile was removed there).
@@ -1039,7 +1039,7 @@ def _insight_queries(f, top_category, today):
 
 def sla_summary(f, today=None):
     """
-    SLA breach/warning panel for the executive/manager dashboard. Only scans
+    SLA breach/warning panel for the M&O Manager dashboard. Only scans
     when at least one active SLARule exists (one COUNT query otherwise) —
     candidates are open work orders in scope plus ones completed in the last
     SLA_LOOKBACK_DAYS, capped at sla.SLA_SCAN_LIMIT, the same bounded-scan
@@ -1067,9 +1067,7 @@ def sla_summary(f, today=None):
 
 
 def default_view(user):
-    if user.role_id == 1:
-        return 'executive'
-    if user.role_id == 2:
+    if user.role_id in (1, 2):
         return 'manager'
     if user.role_id == 3:
         return 'technician'
@@ -1078,7 +1076,7 @@ def default_view(user):
 
 def allowed_views(user):
     if user.role_id in (1, 2):
-        return ('executive', 'manager')
+        return ('manager',)
     if user.role_id == 3:
         return ('technician',)
     return ('school_staff',)
@@ -1115,7 +1113,7 @@ def build_dashboard(view, f, user, today=None):
     wo = work_order_kpis(f, today)
     data = {'view': view, 'filters': f, 'today': today, 'wo': wo}
 
-    if view in ('executive', 'manager'):
+    if view == 'manager':
         facility = facility_kpis(f, today)
         maintenance = maintenance_kpis(f, today)
         cost = cost_kpis(f)
@@ -1139,7 +1137,6 @@ def build_dashboard(view, f, user, today=None):
         if cycle is None:
             cycle = InspectionCycle.query.filter_by(is_active=True).order_by(InspectionCycle.id.desc()).first()
         progress = inspections_module.inspection_progress(cycle.id if cycle else None, f)
-        charts['district_gauge'] = {'labels': [], 'datasets': [{'label': 'Completion', 'data': [progress['district']['pct'] or 0]}]}
         issue_health = inspections_module.issue_resolution_health(f)
         charts['issue_health_gauge'] = {'labels': [], 'datasets': [{'label': 'Issue Resolution', 'data': [issue_health['pct'] or 0]}]}
         data.update({'facility': facility, 'maintenance': maintenance, 'cost': cost, 'charts': charts,

@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 
-{# Same completion-color buckets as mo_dashboard.html's pct_tone/pct_status_label. #}
+{# Same completion-color buckets as dashboard.html's pct_tone/pct_status_label. #}
 {% macro pct_tone(value) %}{% if value is none %}secondary{% elif value >= 90 %}success{% elif value >= 75 %}info{% elif value >= 50 %}warning{% elif value >= 25 %}accent{% else %}danger{% endif %}{% endmacro %}
 {% macro pct_status_label(value) %}{% if value is none %}No Data{% elif value >= 90 %}On Track{% elif value >= 75 %}Nearly There{% elif value >= 50 %}At Risk{% elif value >= 25 %}Behind{% else %}Critical{% endif %}{% endmacro %}
 
