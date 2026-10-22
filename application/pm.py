@@ -125,6 +125,7 @@ def generate_due_work_orders(today=None, user=None):
             assigned_to_id=plan.assigned_to_id,
             assigned_team=plan.assigned_team,
             due_date=due_date,
+            maintenance_plan_id=plan.id,
         )
         db.session.add(wo)
         db.session.flush()

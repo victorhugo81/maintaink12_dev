@@ -24,6 +24,7 @@
                                         </a>
                                         <ul class="nav flex-column mb-3">
                                             <li class="nav-item"><a class="nav-link text-dark d-flex" data-scroll="" href="#wodetails"><i class="material-symbols-rounded text-lg me-2">info</i><span class="text-sm">Details</span></a></li>
+                                            {% if checklist_pairs %}<li class="nav-item pt-2"><a class="nav-link text-dark d-flex" data-scroll="" href="#wochecklist"><i class="material-symbols-rounded text-lg me-2">task_alt</i><span class="text-sm">PM Checklist</span></a></li>{% endif %}
                                             <li class="nav-item pt-2"><a class="nav-link text-dark d-flex" data-scroll="" href="#wocomments"><i class="material-symbols-rounded text-lg me-2">chat</i><span class="text-sm">Comments</span></a></li>
                                             <li class="nav-item pt-2"><a class="nav-link text-dark d-flex" data-scroll="" href="#woattachments"><i class="material-symbols-rounded text-lg me-2">attach_file</i><span class="text-sm">Attachments</span></a></li>
                                             <li class="nav-item pt-2"><a class="nav-link text-dark d-flex" data-scroll="" href="#wolabor"><i class="material-symbols-rounded text-lg me-2">engineering</i><span class="text-sm">Labor</span></a></li>
@@ -88,6 +89,28 @@
                                         </div>
                                     </div>
                                 </form>
+
+                                {% if checklist_pairs %}
+                                <!-- PM Checklist: separate form, one row per active MaintenanceChecklistItem -->
+                                <div class="ticket-content-box" id="wochecklist">
+                                    <h3>PM Checklist</h3>
+                                    <p class="text-sm text-secondary">Steps from "{{ wo.maintenance_plan.name }}" — check off what was done on this visit.</p>
+                                    <form method="POST" action="{{ url_for('routes.update_work_order_checklist', work_order_id=wo.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        {% for item, result in checklist_pairs %}
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" name="checklist_{{ item.id }}" id="checklist_{{ item.id }}"
+                                                   {% if result and result.is_checked %}checked{% endif %} {% if not manage %}disabled{% endif %}>
+                                            <label class="form-check-label text-sm" for="checklist_{{ item.id }}">{{ item.task }}</label>
+                                            {% if result and result.is_checked %}
+                                            <span class="text-xs text-secondary ms-2">checked{% if result.checked_by %} by {{ result.checked_by.get_full_name() }}{% endif %}{% if result.checked_at %} &middot; {{ result.checked_at | localtime }}{% endif %}</span>
+                                            {% endif %}
+                                        </div>
+                                        {% endfor %}
+                                        {% if manage %}<button type="submit" class="btn btn-sm bg-gradient-main mt-2">Save Checklist</button>{% endif %}
+                                    </form>
+                                </div>
+                                {% endif %}
 
                                 <!-- Comments: separate form -->
                                 <div class="ticket-content-box" id="wocomments">

@@ -87,6 +87,12 @@
             <span class="nav-link-text ms-1">Reports</span>
           </a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link{% if request.endpoint == 'routes.documents' %} active{% endif %}" href="{{ url_for('routes.documents') }}">
+            <i class="material-symbols-rounded">folder_copy</i>
+            <span class="nav-link-text ms-1">Document Library</span>
+          </a>
+        </li>
         {% if current_user.is_admin %}
         <li class="nav-item">
           <a class="nav-link{% if request.endpoint in ['routes.csv_import_index', 'routes.csv_import_upload'] %} active{% endif %}" href="{{ url_for('routes.csv_import_index') }}">

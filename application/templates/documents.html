@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 z-index-2">
+                <div class="bg-gradient-main custom-title-card">
+                    <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">folder_copy</i> {{ current_page_name }}</h2>
+                </div>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <br>
+                <p class="text-sm text-secondary">Every photo, manual, and report attached anywhere in the app — facilities, rooms, assets, work orders, inspections, and projects — in one searchable place.</p>
+                <form method="GET" action="{{ url_for('routes.documents') }}" class="row g-2 align-items-end mb-4">
+                    <div class="col-12 col-sm-6 col-md-4">
+                        <label class="form-label">Filename</label>
+                        <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="Search filenames...">
+                    </div>
+                    <div class="col-8 col-sm-4 col-md-3">
+                        <label class="form-label">Type</label>
+                        <select class="form-select-box form-select" name="type">
+                            <option value="">All Types</option>
+                            {% for key, label in type_labels.items() %}
+                            <option value="{{ key }}" {% if type_filter == key %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-4 col-sm-2 col-md-2">
+                        <button class="btn bg-gradient-main w-100 mb-0" type="submit">Filter</button>
+                    </div>
+                </form>
+
+                {% if rows %}
+                <div class="table-responsive p-0">
+                  <table class="table align-items-left mb-0 table-striped">
+                    <thead><tr>
+                        <th class="text-uppercase text-xxs font-weight-bolder">Type</th>
+                        <th class="text-uppercase text-xxs font-weight-bolder">File</th>
+                        <th class="text-uppercase text-xxs font-weight-bolder">Attached To</th>
+                        <th class="text-uppercase text-xxs font-weight-bolder">Site</th>
+                        <th class="text-uppercase text-xxs font-weight-bolder">Uploaded</th>
+                    </tr></thead>
+                    <tbody>
+                      {% for row in rows %}
+                      <tr>
+                        <td><span class="badge bg-secondary"><i class="material-symbols-rounded text-sm align-middle">{{ row.icon }}</i> {{ row.type_label }}</span></td>
+                        <td>
+                          <a href="{{ url_for(row.download_endpoint, **row.download_params) }}">
+                            <i class="material-symbols-rounded text-sm align-middle">download</i>
+                            <span class="text-sm">{{ row.filename }}</span>
+                          </a>
+                        </td>
+                        <td class="text-xs">
+                          <a href="{{ url_for(row.entity_endpoint, **row.entity_params) }}">{{ row.entity_label }}</a>
+                        </td>
+                        <td class="text-xs">{{ row.site_name }}</td>
+                        <td class="text-xs">{{ row.uploaded_at | localtime }}{% if row.uploaded_by %}<br><span class="text-secondary">{{ row.uploaded_by }}</span>{% endif %}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+                {% else %}
+                <p class="text-sm text-secondary mb-0">No documents found{% if q %} for "{{ q }}"{% endif %}.</p>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

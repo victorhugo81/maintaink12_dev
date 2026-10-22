@@ -229,6 +229,12 @@ class MaintenancePlanForm(FlaskForm):
     submit = SubmitField('Save Plan')
 
 
+class MaintenanceChecklistItemForm(FlaskForm):
+    task = StringField('Checklist Task:', validators=[DataRequired(), Length(max=255)])
+    sort_order = IntegerField('Sort Order:', validators=[Optional()], default=0)
+    submit = SubmitField('Add Item')
+
+
 class InspectionTemplateForm(FlaskForm):
     name = StringField('Template Name:', validators=[DataRequired(), Length(max=150)])
     description = TextAreaField('Description:', validators=[Optional()])

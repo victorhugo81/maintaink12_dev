@@ -25,6 +25,55 @@
                     {% include 'includes/maintenance_plan_fields.html' %}
                 </form>
 
+                <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Checklist Items</p>
+                <hr class="mt-0 mb-3">
+                <p class="text-sm text-secondary">Steps a technician checks off while completing a work order this plan generates (e.g. "Replace air filter," "Check belt tension").</p>
+                {% set active_items = plan.checklist_items|selectattr('is_active')|list %}
+                {% if active_items %}
+                <table class="table table-sm align-items-left mb-3">
+                    <thead><tr>
+                        <th class="text-uppercase text-xxs font-weight-bolder">Task</th>
+                        <th class="text-uppercase text-xxs font-weight-bolder">Order</th>
+                        <th></th>
+                    </tr></thead>
+                    <tbody>
+                    {% for item in active_items %}
+                    <tr>
+                        <td>{{ item.task }}</td>
+                        <td class="text-xs">{{ item.sort_order }}</td>
+                        <td class="text-end">
+                            <form id="delete-checklist-item-{{ item.id }}" action="{{ url_for('routes.delete_maintenance_checklist_item', item_id=item.id) }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal"
+                                        data-confirm-message="Remove checklist item &quot;{{ item.task }}&quot;?"
+                                        data-form-id="delete-checklist-item-{{ item.id }}">
+                                    <i class="material-symbols-rounded position-relative text-lg">delete</i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-secondary text-sm">No checklist items yet.</p>
+                {% endif %}
+                <form method="POST" action="{{ url_for('routes.add_maintenance_checklist_item', plan_id=plan.id) }}" class="row g-2 align-items-end">
+                    {{ item_form.hidden_tag() }}
+                    <div class="col-auto" style="min-width: 320px;">
+                        {{ item_form.task.label(class="form-label") }}
+                        <span aria-hidden="true" class="text-danger ms-1">*</span>
+                        {{ item_form.task(class="form-control") }}
+                    </div>
+                    <div class="col-auto">
+                        {{ item_form.sort_order.label(class="form-label") }}
+                        {{ item_form.sort_order(class="form-control") }}
+                    </div>
+                    <div class="col-auto">
+                        {{ item_form.submit(class="btn bg-gradient-main") }}
+                    </div>
+                </form>
+
                 <p class="text-uppercase text-sm text-muted fw-bold mb-2 mt-5">Schedules</p>
                 <hr class="mt-0 mb-3">
                 {% if plan.schedules %}

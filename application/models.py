@@ -412,6 +412,11 @@ class WorkOrder(db.Model):
     assigned_team = db.Column(db.String(100), nullable=True)
     vendor_id = db.Column(db.Integer, db.ForeignKey('vendor.id'), nullable=True, index=True)  # Phase 6 addition
     project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='SET NULL'), nullable=True, index=True)  # Phase 8
+    # Set only by pm.py's generate_due_work_orders() at creation time (source=PM) —
+    # not inferred from MaintenanceSchedule.last_work_order_id, which is mutable and
+    # would point at a LATER work order once the next PM cycle fires. Lets
+    # edit_work_order.html show this plan's checklist against the right WO forever.
+    maintenance_plan_id = db.Column(db.Integer, db.ForeignKey('maintenance_plan.id', ondelete='SET NULL'), nullable=True, index=True)
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
     scheduled_date = db.Column(db.Date, nullable=True)
@@ -434,6 +439,7 @@ class WorkOrder(db.Model):
     assigned_to = db.relationship('User', foreign_keys=[assigned_to_id], backref='assigned_work_orders')
     vendor = db.relationship('Vendor', backref='work_orders')
     project = db.relationship('Project', backref='work_orders')
+    maintenance_plan = db.relationship('MaintenancePlan')
     created_by = db.relationship('User', foreign_keys=[created_by_id])
     comments = db.relationship('WorkOrderComment', backref='work_order', cascade='all, delete-orphan',
                                order_by='WorkOrderComment.created_at')
@@ -445,6 +451,7 @@ class WorkOrder(db.Model):
     materials = db.relationship('WorkOrderMaterial', backref='work_order', cascade='all, delete-orphan',
                                 order_by='WorkOrderMaterial.created_at')
     cost_record = db.relationship('CostRecord', backref='work_order', uselist=False, cascade='all, delete-orphan')
+    checklist_results = db.relationship('WorkOrderChecklistResult', backref='work_order', cascade='all, delete-orphan')
 
     def assign_number(self):
         """Call after flush; gives the human-facing WO-000123 identifier."""
@@ -526,6 +533,8 @@ class MaintenancePlan(db.Model):
     assigned_to = db.relationship('User', foreign_keys=[assigned_to_id])
     created_by = db.relationship('User', foreign_keys=[created_by_id])
     schedules = db.relationship('MaintenanceSchedule', backref='plan', cascade='all, delete-orphan')
+    checklist_items = db.relationship('MaintenanceChecklistItem', backref='plan', cascade='all, delete-orphan',
+                                      order_by='MaintenanceChecklistItem.sort_order')
 
     __table_args__ = (
         db.CheckConstraint(
@@ -537,6 +546,20 @@ class MaintenancePlan(db.Model):
     @property
     def target_label(self):
         return self.asset.asset_tag if self.asset_id else f"All {self.asset_type.name}"
+
+
+class MaintenanceChecklistItem(db.Model):
+    """A reusable step on a MaintenancePlan (e.g. "Replace air filter",
+    "Check belt tension") — mirrors InspectionItem exactly, but there is no
+    separate "run" table: completion is tracked per generated WorkOrder via
+    WorkOrderChecklistResult, since one plan generates many work orders over
+    time (one per due cycle per asset) rather than one run per template."""
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    maintenance_plan_id = db.Column(db.Integer, db.ForeignKey('maintenance_plan.id', ondelete='CASCADE'), nullable=False, index=True)
+    task = db.Column(db.String(255), nullable=False)
+    sort_order = db.Column(db.Integer, default=0, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
 
 
 class MaintenanceSchedule(db.Model):
@@ -553,6 +576,27 @@ class MaintenanceSchedule(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint('maintenance_plan_id', 'asset_id', name='uq_maintenance_schedule_plan_asset'),
+    )
+
+
+class WorkOrderChecklistResult(db.Model):
+    """One row per (PM work order, checklist item) — whether a technician
+    checked it off while completing this specific PM-generated WorkOrder.
+    Not pre-created when the WorkOrder is generated (same lazy-write
+    convention as InspectionResult): a row only exists once a technician has
+    actually ticked that box via update_work_order_checklist()."""
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    work_order_id = db.Column(db.Integer, db.ForeignKey('work_order.id', ondelete='CASCADE'), nullable=False, index=True)
+    checklist_item_id = db.Column(db.Integer, db.ForeignKey('maintenance_checklist_item.id'), nullable=False)
+    is_checked = db.Column(db.Boolean, default=False, nullable=False)
+    checked_at = db.Column(db.DateTime, nullable=True)
+    checked_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+
+    item = db.relationship('MaintenanceChecklistItem')
+    checked_by = db.relationship('User')
+
+    __table_args__ = (
+        db.UniqueConstraint('work_order_id', 'checklist_item_id', name='uq_wo_checklist_result_item'),
     )
 
 

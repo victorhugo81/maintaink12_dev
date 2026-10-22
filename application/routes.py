@@ -4,8 +4,8 @@ from flask_login import login_user, login_required, logout_user, current_user
 from flask_paginate import Pagination, get_page_args
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from .models import User, Role, Site, Notification, Organization, BulkUploadLog, Facility, Floor, Room, FacilityAttachment, RoomAttachment, AssetType, Asset, AssetConditionHistory, AssetAttachment, condition_label_for_score, CONDITION_SCALE, Priority, Category, Subcategory, WorkOrder, WorkOrderComment, WorkOrderAttachment, WorkOrderStatusHistory, MaintenancePlan, MaintenanceSchedule, InspectionTemplate, InspectionItem, InspectionQuestionPreset, Inspection, InspectionResult, INSPECTION_RESULTS, InspectionCycle, InspectionAttachment, Vendor, WorkOrderMaterial, WorkOrderLabor, CostRecord, Project, ProjectTask, ProjectCost, ProjectDocument, PROJECT_STATUSES, SLARule, NotificationPreference, NotificationLog, NOTIFICATION_EVENTS, NOTIFICATION_EVENT_LABELS, CsvImportLog, AuditLog
-from .forms import LoginForm, UserForm, RoleForm, SiteForm, NotificationForm, OrganizationForm, EmailConfigForm, FacilityForm, FloorForm, RoomForm, AssetTypeForm, AssetForm, AssetConditionForm, PriorityForm, CategoryForm, SubcategoryForm, WorkOrderRequestForm, WorkOrderForm, WorkOrderStatusForm, WorkOrderCommentForm, MaintenancePlanForm, InspectionTemplateForm, InspectionItemForm, InspectionQuestionPresetForm, InspectionForm, InspectionResultsForm, InspectionResultItemForm, InspectionCycleForm, StartWalkthroughForm, VendorForm, WorkOrderLaborForm, WorkOrderMaterialForm, CostRecordForm, ProjectForm, ProjectTaskForm, ProjectCostForm, ProjectVendorForm, AssetRiskFieldsForm, SLARuleForm, NotificationPreferenceForm, CsvImportUploadForm
+from .models import User, Role, Site, Notification, Organization, BulkUploadLog, Facility, Floor, Room, FacilityAttachment, RoomAttachment, AssetType, Asset, AssetConditionHistory, AssetAttachment, condition_label_for_score, CONDITION_SCALE, Priority, Category, Subcategory, WorkOrder, WorkOrderComment, WorkOrderAttachment, WorkOrderStatusHistory, MaintenancePlan, MaintenanceSchedule, MaintenanceChecklistItem, WorkOrderChecklistResult, InspectionTemplate, InspectionItem, InspectionQuestionPreset, Inspection, InspectionResult, INSPECTION_RESULTS, InspectionCycle, InspectionAttachment, Vendor, WorkOrderMaterial, WorkOrderLabor, CostRecord, Project, ProjectTask, ProjectCost, ProjectDocument, PROJECT_STATUSES, SLARule, NotificationPreference, NotificationLog, NOTIFICATION_EVENTS, NOTIFICATION_EVENT_LABELS, CsvImportLog, AuditLog
+from .forms import LoginForm, UserForm, RoleForm, SiteForm, NotificationForm, OrganizationForm, EmailConfigForm, FacilityForm, FloorForm, RoomForm, AssetTypeForm, AssetForm, AssetConditionForm, PriorityForm, CategoryForm, SubcategoryForm, WorkOrderRequestForm, WorkOrderForm, WorkOrderStatusForm, WorkOrderCommentForm, MaintenancePlanForm, MaintenanceChecklistItemForm, InspectionTemplateForm, InspectionItemForm, InspectionQuestionPresetForm, InspectionForm, InspectionResultsForm, InspectionResultItemForm, InspectionCycleForm, StartWalkthroughForm, VendorForm, WorkOrderLaborForm, WorkOrderMaterialForm, CostRecordForm, ProjectForm, ProjectTaskForm, ProjectCostForm, ProjectVendorForm, AssetRiskFieldsForm, SLARuleForm, NotificationPreferenceForm, CsvImportUploadForm
 from .utils import validate_password, validate_file_upload, encrypt_mail_password, decrypt_mail_password, hash_email, get_app_version
 from .email_utils import send_temp_password_email, send_password_updated_email, send_work_order_notification
 from . import workflow
@@ -21,6 +21,7 @@ from . import reports as reports_module
 from . import sla as sla_module
 from . import notifications as notifications_module
 from . import search as search_module
+from . import documents as documents_module
 from . import csv_import as csv_import_module
 from main import db, login_manager, mail, limiter, scheduler
 from flask_mail import Message
@@ -3336,6 +3337,19 @@ def add_work_order():
     return render_template('new_work_order.html', active_tab='full', **ctx)
 
 
+def _work_order_checklist_pairs(wo):
+    """[(MaintenanceChecklistItem, WorkOrderChecklistResult|None), ...] for a
+    PM-sourced work order's plan's active checklist items, or [] if this
+    work order has no linked MaintenancePlan (or it has no active items)."""
+    if not wo.maintenance_plan_id:
+        return []
+    items = [i for i in wo.maintenance_plan.checklist_items if i.is_active]
+    if not items:
+        return []
+    results = {r.checklist_item_id: r for r in wo.checklist_results}
+    return [(item, results.get(item.id)) for item in items]
+
+
 # ****************** Work Order detail / edit *******************************
 @routes_blueprint.route('/edit_work_order/<int:work_order_id>', methods=['GET', 'POST'])
 @login_required
@@ -3345,6 +3359,7 @@ def edit_work_order(work_order_id):
     if not can_access_work_order(wo):
         abort(403)
     manage = can_manage_work_order(wo)
+    checklist_pairs = _work_order_checklist_pairs(wo)
 
     form = WorkOrderForm(obj=wo)
     location_maps = _fill_staff_form_choices(form, wo)
@@ -3375,7 +3390,7 @@ def edit_work_order(work_order_id):
                 return render_template('edit_work_order.html', form=form, status_form=status_form,
                     comment_form=comment_form, labor_form=labor_form, material_form=material_form,
                     cost_form=cost_form, wo=wo, manage=manage, current_page_name=current_page_name,
-                    status_badge=workflow.STATUS_BADGE, **location_maps)
+                    status_badge=workflow.STATUS_BADGE, checklist_pairs=checklist_pairs, **location_maps)
             assignee_changed = wo.assigned_to_id != old_assignee_id
             wo.updated_at = datetime.now(timezone.utc)
 
@@ -3393,7 +3408,34 @@ def edit_work_order(work_order_id):
     return render_template('edit_work_order.html', form=form, status_form=status_form,
         comment_form=comment_form, labor_form=labor_form, material_form=material_form,
         cost_form=cost_form, wo=wo, manage=manage, current_page_name=current_page_name,
-        status_badge=workflow.STATUS_BADGE, recurring_groups=analytics.related_recurring_groups(wo), **location_maps)
+        status_badge=workflow.STATUS_BADGE, recurring_groups=analytics.related_recurring_groups(wo),
+        checklist_pairs=checklist_pairs, **location_maps)
+
+
+@routes_blueprint.route('/update_work_order_checklist/<int:work_order_id>', methods=['POST'])
+@login_required
+def update_work_order_checklist(work_order_id):
+    wo = WorkOrder.query.get_or_404(work_order_id)
+    if not can_manage_work_order(wo):
+        abort(403)
+    pairs = _work_order_checklist_pairs(wo)
+    if not pairs:
+        abort(404)
+    now = datetime.now(timezone.utc)
+    for item, result in pairs:
+        checked = request.form.get(f'checklist_{item.id}') == 'on'
+        if result is None:
+            if checked:
+                db.session.add(WorkOrderChecklistResult(
+                    work_order_id=wo.id, checklist_item_id=item.id, is_checked=True,
+                    checked_at=now, checked_by_id=current_user.id))
+        elif result.is_checked != checked:
+            result.is_checked = checked
+            result.checked_at = now if checked else None
+            result.checked_by_id = current_user.id if checked else None
+    db.session.commit()
+    flash('Checklist updated.', 'success')
+    return redirect(url_for('routes.edit_work_order', work_order_id=wo.id))
 
 
 # ****************** Labor / Materials / Cost Record (Phase 7) *************
@@ -3736,6 +3778,7 @@ def edit_maintenance_plan(plan_id):
     plan = MaintenancePlan.query.get_or_404(plan_id)
     form = MaintenancePlanForm(obj=plan)
     _fill_maintenance_plan_choices(form, plan)
+    item_form = MaintenanceChecklistItemForm()
     if request.method == 'GET':
         form.asset_id.data = plan.asset_id or 0
         form.asset_type_id.data = plan.asset_type_id or 0
@@ -3745,7 +3788,7 @@ def edit_maintenance_plan(plan_id):
         asset_id, asset_type_id, error = _validate_maintenance_plan_target(form)
         if error:
             flash(error, 'danger')
-            return render_template('edit_maintenance_plan.html', form=form, plan=plan)
+            return render_template('edit_maintenance_plan.html', form=form, plan=plan, item_form=item_form)
 
         plan.name = form.name.data
         plan.asset_id = asset_id
@@ -3764,7 +3807,7 @@ def edit_maintenance_plan(plan_id):
         flash('Maintenance plan updated successfully!', 'success')
         return redirect(url_for('routes.maintenance_plans'))
 
-    return render_template('edit_maintenance_plan.html', form=form, plan=plan)
+    return render_template('edit_maintenance_plan.html', form=form, plan=plan, item_form=item_form)
 
 
 @routes_blueprint.route('/delete_maintenance_plan/<int:plan_id>', methods=['POST'])
@@ -3777,6 +3820,39 @@ def delete_maintenance_plan(plan_id):
     db.session.commit()
     flash('Maintenance plan deactivated successfully!', 'warning')
     return redirect(url_for('routes.maintenance_plans'))
+
+
+@routes_blueprint.route('/add_maintenance_checklist_item/<int:plan_id>', methods=['POST'])
+@login_required
+def add_maintenance_checklist_item(plan_id):
+    is_admin()
+    plan = MaintenancePlan.query.get_or_404(plan_id)
+    form = MaintenanceChecklistItemForm()
+    if form.validate_on_submit():
+        db.session.add(MaintenanceChecklistItem(maintenance_plan_id=plan.id, task=form.task.data,
+                                                 sort_order=form.sort_order.data or 0))
+        db.session.commit()
+        flash('Checklist item added.', 'success')
+    else:
+        flash('A task description is required.', 'danger')
+    return redirect(url_for('routes.edit_maintenance_plan', plan_id=plan.id))
+
+
+@routes_blueprint.route('/delete_maintenance_checklist_item/<int:item_id>', methods=['POST'])
+@login_required
+def delete_maintenance_checklist_item(item_id):
+    is_admin()
+    item = MaintenanceChecklistItem.query.get_or_404(item_id)
+    plan_id = item.maintenance_plan_id
+    if WorkOrderChecklistResult.query.filter_by(checklist_item_id=item.id).count() > 0:
+        item.is_active = False
+        db.session.commit()
+        flash('Item is referenced by past work order checklists, so it was deactivated instead of deleted.', 'warning')
+    else:
+        db.session.delete(item)
+        db.session.commit()
+        flash('Checklist item removed.', 'warning')
+    return redirect(url_for('routes.edit_maintenance_plan', plan_id=plan_id))
 
 
 # ****************** PM Dashboard *******************************
@@ -5011,6 +5087,19 @@ def is_admin_bool():
     """Non-aborting admin check for places (like search scope) that need a
     plain True/False rather than is_admin()'s 403-on-failure behavior."""
     return current_user.is_authenticated and current_user.role_id == 1
+
+
+# ****************** Document Library (aggregates existing attachments) *****
+@routes_blueprint.route('/documents')
+@login_required
+def documents():
+    current_page_name = 'Document Library'
+    is_staff()
+    q = request.args.get('q', '').strip()
+    type_filter = request.args.get('type', '')
+    rows = documents_module.list_documents(_visible_site_ids(), q, type_filter)
+    return render_template('documents.html', rows=rows, q=q, type_filter=type_filter,
+        type_labels=documents_module.TYPE_LABELS, current_path=request.path, current_page_name=current_page_name)
 
 
 # *********************************************************************

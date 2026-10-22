@@ -334,3 +334,143 @@ class TestPMDashboard:
             r = c.get('/pm_dashboard')
             assert r.status_code == 200
             assert b'PM-SITE-SCOPE' not in r.data
+
+
+class TestMaintenanceChecklist:
+    """PM checklists (IncidentIQ-inspired addition): a MaintenancePlan can carry
+    reusable checklist tasks; each WorkOrder it generates gets its own
+    checked/unchecked state against those tasks, tracked separately per WO
+    since one plan generates many work orders over time."""
+
+    def test_add_and_delete_checklist_item(self, app, admin_client):
+        asset_id, _ = _asset(app, 'PM-CHECK-1', asset_type_name='PM Checklist Type')
+        pri, cat = _ids(app)
+        admin_client.post('/add_maintenance_plan', data={
+            'name': 'Boiler Service', 'asset_id': str(asset_id), 'asset_type_id': '0',
+            'frequency': 'Annual', 'category_id': str(cat), 'priority_id': str(pri),
+        }, follow_redirects=True)
+        with app.app_context():
+            from application.models import MaintenancePlan
+            plan = MaintenancePlan.query.filter_by(name='Boiler Service').first()
+            plan_id = plan.id
+
+        r = admin_client.post(f'/add_maintenance_checklist_item/{plan_id}', data={
+            'task': 'Check pressure relief valve', 'sort_order': '0',
+        }, follow_redirects=True)
+        assert r.status_code == 200
+        assert b'Check pressure relief valve' in r.data
+
+        with app.app_context():
+            from application.models import MaintenanceChecklistItem
+            item = MaintenanceChecklistItem.query.filter_by(
+                maintenance_plan_id=plan_id, task='Check pressure relief valve').first()
+            assert item is not None
+            item_id = item.id
+
+        r = admin_client.post(f'/delete_maintenance_checklist_item/{item_id}', follow_redirects=True)
+        assert r.status_code == 200
+        with app.app_context():
+            from application.models import MaintenanceChecklistItem
+            assert MaintenanceChecklistItem.query.get(item_id) is None
+
+    def test_regular_user_cannot_manage_checklist_items(self, app, user_client):
+        asset_id, _ = _asset(app, 'PM-CHECK-2', asset_type_name='PM Checklist Type 2')
+        pri, cat = _ids(app)
+        with app.app_context():
+            from application.models import MaintenancePlan
+            from main import db
+            plan = MaintenancePlan(name='User Scope Plan', asset_id=asset_id,
+                                   frequency='Monthly', category_id=cat, priority_id=pri)
+            db.session.add(plan)
+            db.session.commit()
+            plan_id = plan.id
+        assert user_client.post(f'/add_maintenance_checklist_item/{plan_id}',
+                                 data={'task': 'x', 'sort_order': '0'}).status_code == 403
+
+    def test_generated_work_order_links_to_plan_and_shows_checklist(self, app, admin_client):
+        asset_id, _ = _asset(app, 'PM-CHECK-3', asset_type_name='PM Checklist Type 3')
+        pri, cat = _ids(app)
+        with app.app_context():
+            from application.models import MaintenancePlan, MaintenanceChecklistItem
+            from main import db
+            plan = MaintenancePlan(name='Filter Swap Plan', asset_id=asset_id,
+                                   frequency='Monthly', category_id=cat, priority_id=pri)
+            db.session.add(plan)
+            db.session.flush()
+            db.session.add(MaintenanceChecklistItem(maintenance_plan_id=plan.id, task='Replace air filter', sort_order=0))
+            db.session.add(MaintenanceChecklistItem(maintenance_plan_id=plan.id, task='Check belt tension', sort_order=1))
+            db.session.commit()
+            plan_id = plan.id
+
+            from application.pm import generate_due_work_orders
+            created = generate_due_work_orders(today=date(2026, 4, 1))
+            wo = next(w for w in created if w.asset_id == asset_id)
+            wo_id = wo.id
+            assert wo.maintenance_plan_id == plan_id
+
+        r = admin_client.get(f'/edit_work_order/{wo_id}')
+        assert r.status_code == 200
+        assert b'PM Checklist' in r.data
+        assert b'Replace air filter' in r.data
+        assert b'Check belt tension' in r.data
+
+    def test_update_checklist_records_checked_state_and_author(self, app, admin_client):
+        asset_id, _ = _asset(app, 'PM-CHECK-4', asset_type_name='PM Checklist Type 4')
+        pri, cat = _ids(app)
+        with app.app_context():
+            from application.models import MaintenancePlan, MaintenanceChecklistItem, User
+            from main import db
+            plan = MaintenancePlan(name='Pump Check Plan', asset_id=asset_id,
+                                   frequency='Monthly', category_id=cat, priority_id=pri)
+            db.session.add(plan)
+            db.session.flush()
+            item1 = MaintenanceChecklistItem(maintenance_plan_id=plan.id, task='Grease bearings', sort_order=0)
+            item2 = MaintenanceChecklistItem(maintenance_plan_id=plan.id, task='Inspect seals', sort_order=1)
+            db.session.add_all([item1, item2])
+            db.session.commit()
+            item1_id, item2_id = item1.id, item2.id
+
+            from application.pm import generate_due_work_orders
+            created = generate_due_work_orders(today=date(2026, 4, 1))
+            wo_id = next(w for w in created if w.asset_id == asset_id).id
+            admin_id = User.query.filter_by(role_id=1).first().id
+
+        r = admin_client.post(f'/update_work_order_checklist/{wo_id}', data={
+            f'checklist_{item1_id}': 'on',
+        }, follow_redirects=True)
+        assert r.status_code == 200
+
+        with app.app_context():
+            from application.models import WorkOrderChecklistResult
+            r1 = WorkOrderChecklistResult.query.filter_by(checklist_item_id=item1_id).first()
+            r2 = WorkOrderChecklistResult.query.filter_by(checklist_item_id=item2_id).first()
+            assert r1.is_checked is True
+            assert r1.checked_by_id == admin_id
+            assert r1.checked_at is not None
+            assert r2 is None  # never checked -> no row created at all
+
+        # Uncheck item1 in a second submission: row flips back, not deleted.
+        admin_client.post(f'/update_work_order_checklist/{wo_id}', data={}, follow_redirects=True)
+        with app.app_context():
+            from application.models import WorkOrderChecklistResult
+            r1 = WorkOrderChecklistResult.query.filter_by(checklist_item_id=item1_id).first()
+            assert r1.is_checked is False
+            assert r1.checked_at is None
+
+    def test_non_pm_work_order_has_no_checklist_section(self, app, admin_client):
+        asset_id, _ = _asset(app, 'PM-CHECK-5', asset_type_name='PM Checklist Type 5')
+        pri, cat = _ids(app)
+        with app.app_context():
+            from application.models import Facility, WorkOrder
+            from application import workflow
+            from main import db
+            fac = Facility.query.filter_by(name='PM Test Building').first()
+            wo = WorkOrder(site_id=1, facility_id=fac.id, title='Manual WO, not PM',
+                          source='Manual', status=workflow.OPEN, priority_id=pri, category_id=cat)
+            db.session.add(wo)
+            db.session.commit()
+            wo_id = wo.id
+
+        r = admin_client.get(f'/edit_work_order/{wo_id}')
+        assert r.status_code == 200
+        assert b'PM Checklist' not in r.data
