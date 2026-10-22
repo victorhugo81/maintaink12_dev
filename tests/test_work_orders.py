@@ -380,3 +380,92 @@ class TestWorkflow:
         assert b'still use' in r.data
 
 
+def _board_wo(app, title, status='Open'):
+    """A work order at the given status, for board tests — bypasses
+    apply_transition() (direct status set) since these tests are about the
+    BOARD route's own validation, not about proving the transition engine
+    works (that's TestWorkflow's job)."""
+    with app.app_context():
+        from application.models import WorkOrder
+        from main import db
+        pri, cat = _ids(app)
+        wo = WorkOrder(site_id=1, title=title, source='Manual', status=status,
+                      priority_id=pri, category_id=cat)
+        db.session.add(wo)
+        db.session.flush()
+        wo.assign_number()
+        db.session.commit()
+        return wo.id
+
+
+class TestWorkOrdersBoard:
+    """The Work Orders Kanban board (modern-SaaS redesign, phase 1) — unlike
+    the Project task board, WorkOrder.status is governed by workflow.py's
+    transition matrix, so the drop handler must go through
+    allowed_transitions()/apply_transition(), never a raw status set."""
+
+    def test_board_view_groups_by_status(self, app, admin_client):
+        wo_id = _board_wo(app, 'Board Group Test WO', status='Open')
+        r = admin_client.get('/work_orders?view=board')
+        assert r.status_code == 200
+        assert b'board-scroll-x' in r.data
+        assert b'data-status="Open"' in r.data
+        assert b'data-status="In Progress"' in r.data
+
+    def test_valid_drop_applies_transition_and_writes_history(self, app, admin_client):
+        wo_id = _board_wo(app, 'Board Valid Drop WO', status='Open')
+        r = admin_client.post(f'/update_work_order_status_board/{wo_id}', data={
+            'status': 'In Progress',
+        }, follow_redirects=True)
+        assert r.status_code == 200
+        with app.app_context():
+            from application.models import WorkOrder, WorkOrderStatusHistory
+            from main import db
+            wo = db.session.get(WorkOrder, wo_id)
+            assert wo.status == 'In Progress'
+            assert wo.started_at is not None
+            hist = WorkOrderStatusHistory.query.filter_by(work_order_id=wo_id).order_by(
+                WorkOrderStatusHistory.id.desc()).first()
+            assert hist.from_status == 'Open' and hist.to_status == 'In Progress'
+
+    def test_invalid_drop_rejected_no_state_change(self, app, admin_client):
+        """In Progress -> Open is not in workflow.allowed_transitions —
+        card must stay put, no history row written."""
+        wo_id = _board_wo(app, 'Board Invalid Drop WO', status='In Progress')
+        r = admin_client.post(f'/update_work_order_status_board/{wo_id}', data={
+            'status': 'Open',
+        }, follow_redirects=True)
+        assert r.status_code == 200
+        assert b'Cannot move a work order' in r.data
+        with app.app_context():
+            from application.models import WorkOrder, WorkOrderStatusHistory
+            from main import db
+            wo = db.session.get(WorkOrder, wo_id)
+            assert wo.status == 'In Progress'
+            assert WorkOrderStatusHistory.query.filter_by(work_order_id=wo_id).count() == 0
+
+    def test_not_in_allowed_transitions_rejected_before_apply(self, app, admin_client):
+        """A status string that's technically a real ALL_STATUSES value but
+        not reachable from the current one (e.g. Open -> Closed) is caught
+        by the allowed_transitions() check, same guard as the general case."""
+        wo_id = _board_wo(app, 'Board Closed Skip WO', status='Open')
+        r = admin_client.post(f'/update_work_order_status_board/{wo_id}', data={
+            'status': 'Closed',
+        }, follow_redirects=True)
+        assert b'Cannot move a work order' in r.data
+        with app.app_context():
+            from application.models import WorkOrder
+            from main import db
+            assert db.session.get(WorkOrder, wo_id).status == 'Open'
+
+    def test_regular_user_cannot_drop(self, app, user_client):
+        wo_id = _board_wo(app, 'Board Perm Test WO', status='Open')
+        r = user_client.post(f'/update_work_order_status_board/{wo_id}', data={'status': 'In Progress'})
+        assert r.status_code == 403
+
+    def test_board_view_preserves_other_filters_in_toggle_links(self, app, admin_client):
+        r = admin_client.get('/work_orders?view=table&priority_filter=1')
+        assert r.status_code == 200
+        assert b'priority_filter=1' in r.data  # the Board toggle link must carry it along
+
+

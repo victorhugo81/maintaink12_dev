@@ -919,12 +919,45 @@ class ProjectTask(db.Model):
     description = db.Column(db.Text, nullable=True)
     status = db.Column(db.String(20), nullable=False, default='Not Started')
     assigned_to_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    # start_date/due_date together define the Gantt bar's span; a milestone
+    # ignores start_date (the bar collapses to a single point at due_date).
+    start_date = db.Column(db.Date, nullable=True)
     due_date = db.Column(db.Date, nullable=True)
+    percent_complete = db.Column(db.Integer, nullable=False, server_default='0')
+    is_milestone = db.Column(db.Boolean, nullable=False, server_default='0')
     completed_at = db.Column(db.DateTime, nullable=True)
     sort_order = db.Column(db.Integer, default=0, nullable=False)
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, onupdate=_utcnow, nullable=True)
 
     assigned_to = db.relationship('User')
+
+    __table_args__ = (
+        db.CheckConstraint('percent_complete >= 0 AND percent_complete <= 100', name='ck_project_task_percent_complete_range'),
+    )
+
+
+class ProjectTaskDependency(db.Model):
+    """One finish-to-start edge between two tasks of the SAME project
+    (predecessor must finish — plus lag_days — before successor starts).
+    No other dependency type is supported in this slice (see
+    application/projects.py's would_create_cycle/dependency_violated)."""
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    predecessor_id = db.Column(db.Integer, db.ForeignKey('project_task.id', ondelete='CASCADE'), nullable=False, index=True)
+    successor_id = db.Column(db.Integer, db.ForeignKey('project_task.id', ondelete='CASCADE'), nullable=False, index=True)
+    dependency_type = db.Column(db.String(2), nullable=False, default='FS')
+    lag_days = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+
+    predecessor = db.relationship('ProjectTask', foreign_keys=[predecessor_id],
+                                  backref=db.backref('dependencies_as_predecessor', cascade='all, delete-orphan'))
+    successor = db.relationship('ProjectTask', foreign_keys=[successor_id],
+                                backref=db.backref('dependencies_as_successor', cascade='all, delete-orphan'))
+
+    __table_args__ = (
+        db.UniqueConstraint('predecessor_id', 'successor_id', name='uq_project_task_dependency_pair'),
+        db.CheckConstraint('predecessor_id != successor_id', name='ck_project_task_dependency_not_self'),
+    )
 
 
 class ProjectCost(db.Model):

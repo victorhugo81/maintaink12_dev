@@ -4,8 +4,8 @@ from flask_login import login_user, login_required, logout_user, current_user
 from flask_paginate import Pagination, get_page_args
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from .models import User, Role, Site, Notification, Organization, BulkUploadLog, Facility, Floor, Room, FacilityAttachment, RoomAttachment, AssetType, Asset, AssetConditionHistory, AssetAttachment, condition_label_for_score, CONDITION_SCALE, Priority, Category, Subcategory, WorkOrder, WorkOrderComment, WorkOrderAttachment, WorkOrderStatusHistory, MaintenancePlan, MaintenanceSchedule, MaintenanceChecklistItem, WorkOrderChecklistResult, InspectionTemplate, InspectionItem, InspectionQuestionPreset, Inspection, InspectionResult, INSPECTION_RESULTS, InspectionCycle, InspectionAttachment, Vendor, WorkOrderMaterial, WorkOrderLabor, CostRecord, Project, ProjectTask, ProjectCost, ProjectDocument, PROJECT_STATUSES, SLARule, NotificationPreference, NotificationLog, NOTIFICATION_EVENTS, NOTIFICATION_EVENT_LABELS, CsvImportLog, AuditLog
-from .forms import LoginForm, UserForm, RoleForm, SiteForm, NotificationForm, OrganizationForm, EmailConfigForm, FacilityForm, FloorForm, RoomForm, AssetTypeForm, AssetForm, AssetConditionForm, PriorityForm, CategoryForm, SubcategoryForm, WorkOrderRequestForm, WorkOrderForm, WorkOrderStatusForm, WorkOrderCommentForm, MaintenancePlanForm, MaintenanceChecklistItemForm, InspectionTemplateForm, InspectionItemForm, InspectionQuestionPresetForm, InspectionForm, InspectionResultsForm, InspectionResultItemForm, InspectionCycleForm, StartWalkthroughForm, VendorForm, WorkOrderLaborForm, WorkOrderMaterialForm, CostRecordForm, ProjectForm, ProjectTaskForm, ProjectCostForm, ProjectVendorForm, AssetRiskFieldsForm, SLARuleForm, NotificationPreferenceForm, CsvImportUploadForm
+from .models import User, Role, Site, Notification, Organization, BulkUploadLog, Facility, Floor, Room, FacilityAttachment, RoomAttachment, AssetType, Asset, AssetConditionHistory, AssetAttachment, condition_label_for_score, CONDITION_SCALE, Priority, Category, Subcategory, WorkOrder, WorkOrderComment, WorkOrderAttachment, WorkOrderStatusHistory, MaintenancePlan, MaintenanceSchedule, MaintenanceChecklistItem, WorkOrderChecklistResult, InspectionTemplate, InspectionItem, InspectionQuestionPreset, Inspection, InspectionResult, INSPECTION_RESULTS, InspectionCycle, InspectionAttachment, Vendor, WorkOrderMaterial, WorkOrderLabor, CostRecord, Project, ProjectTask, ProjectTaskDependency, ProjectCost, ProjectDocument, PROJECT_STATUSES, PROJECT_TASK_STATUSES, SLARule, NotificationPreference, NotificationLog, NOTIFICATION_EVENTS, NOTIFICATION_EVENT_LABELS, CsvImportLog, AuditLog
+from .forms import LoginForm, UserForm, RoleForm, SiteForm, NotificationForm, OrganizationForm, EmailConfigForm, FacilityForm, FloorForm, RoomForm, AssetTypeForm, AssetForm, AssetConditionForm, PriorityForm, CategoryForm, SubcategoryForm, WorkOrderRequestForm, WorkOrderForm, WorkOrderStatusForm, WorkOrderCommentForm, MaintenancePlanForm, MaintenanceChecklistItemForm, InspectionTemplateForm, InspectionItemForm, InspectionQuestionPresetForm, InspectionForm, InspectionResultsForm, InspectionResultItemForm, InspectionCycleForm, StartWalkthroughForm, VendorForm, WorkOrderLaborForm, WorkOrderMaterialForm, CostRecordForm, ProjectForm, ProjectTaskForm, ProjectTaskDependencyForm, ProjectCostForm, ProjectVendorForm, AssetRiskFieldsForm, SLARuleForm, NotificationPreferenceForm, CsvImportUploadForm
 from .utils import validate_password, validate_file_upload, encrypt_mail_password, decrypt_mail_password, hash_email, get_app_version
 from .email_utils import send_temp_password_email, send_password_updated_email, send_work_order_notification
 from . import workflow
@@ -458,11 +458,51 @@ def index():
     data = analytics.build_dashboard(view, filters, current_user)
 
     options = {}
+    project_metrics = None
     if view == 'manager':
         options['sites'] = Site.query.order_by(Site.site_name).all() if site_ids is None else []
         options['cycles'] = InspectionCycle.query.order_by(InspectionCycle.id.desc()).all()
+        project_query = Project.query
+        if filters['site_ids'] is not None:
+            project_query = project_query.filter(Project.site_id.in_(filters['site_ids']))
+        project_metrics = {
+            'total': project_query.count(),
+            'active': project_query.filter(Project.status.notin_(('Completed', 'Cancelled'))).count(),
+        }
+        active_projects = project_query.filter(Project.status.notin_(('Completed', 'Cancelled')))
+        task_completion, task_count = db.session.query(
+            func.avg(ProjectTask.percent_complete), func.count(ProjectTask.id)
+        ).join(Project, ProjectTask.project_id == Project.id).filter(
+            Project.id.in_(active_projects.with_entities(Project.id))
+        ).one()
+        project_metrics['task_completion_pct'] = round(float(task_completion), 1) if task_count else None
+        project_metrics['active_task_count'] = int(task_count or 0)
 
-    return render_template('dashboard.html', data=data, view=view, allowed_views=allowed,
+        audit_pct = data['progress']['district']['pct']
+        health = analytics.district_health_score(
+            audit_pct, project_metrics['task_completion_pct'],
+            data['wo']['total_open'], data['wo']['overdue'],
+        )
+        project_metrics['district_health_pct'] = health['score']
+        project_metrics['health_component_count'] = health['component_count']
+        project_metrics['work_order_health_pct'] = health['work_order_pct']
+
+        data['charts']['audit_completion_gauge'] = {
+            'labels': [],
+            'datasets': [{'label': 'Facilities Audit Completion', 'data': [audit_pct]}],
+        }
+        data['charts']['project_progress_gauge'] = {
+            'labels': [],
+            'datasets': [{'label': 'Active Project Task Completion',
+                          'data': [project_metrics['task_completion_pct']]}],
+        }
+        data['charts']['district_health_gauge'] = {
+            'labels': [],
+            'datasets': [{'label': 'District Overall Health', 'data': [health['score']]}],
+        }
+
+    return render_template('dashboard.html', data=data, project_metrics=project_metrics,
+        view=view, allowed_views=allowed,
         view_labels=analytics.VIEW_LABELS, filters=filters, presets=analytics.PRESETS,
         preset_labels=analytics.PRESET_LABELS, options=options, health_factors=analytics.HEALTH_FACTORS,
         status_badge=workflow.STATUS_BADGE, current_path=request.path, current_page_name=current_page_name)
@@ -3063,12 +3103,18 @@ def delete_subcategory(subcategory_id):
 
 
 # ****************** Work Order list *******************************
+BOARD_LIMIT = 500
+
+
 @routes_blueprint.route('/work_orders', methods=['GET'])
 @login_required
 def work_orders():
     page_names = {'/work_orders': 'Work Orders'}
     current_path = request.path
     current_page_name = page_names.get(current_path, 'Unknown Page')
+    view = request.args.get('view', 'table')
+    if view not in ('table', 'board'):
+        view = 'table'
 
     status_filter = request.args.get('status_filter', workflow.OPEN)
     priority_filter = request.args.get('priority_filter', '')
@@ -3094,14 +3140,17 @@ def work_orders():
                                     WorkOrder.assigned_to_id == current_user.id))
         sites = []
 
-    if status_filter == 'open':
-        query = query.filter(WorkOrder.status.in_(workflow.OPEN_STATUSES))
-    elif status_filter == 'pending':
-        query = query.filter(WorkOrder.status.in_(workflow.WAITING_STATUSES))
-    elif status_filter == 'closed':
-        query = query.filter(WorkOrder.status.in_(workflow.TERMINAL_STATUSES))
-    elif status_filter and status_filter != 'all':
-        query = query.filter(WorkOrder.status == status_filter)
+    # Board view shows every status as its own column, so the single
+    # status_filter dropdown doesn't apply there — it stays table-only.
+    if view != 'board':
+        if status_filter == 'open':
+            query = query.filter(WorkOrder.status.in_(workflow.OPEN_STATUSES))
+        elif status_filter == 'pending':
+            query = query.filter(WorkOrder.status.in_(workflow.WAITING_STATUSES))
+        elif status_filter == 'closed':
+            query = query.filter(WorkOrder.status.in_(workflow.TERMINAL_STATUSES))
+        elif status_filter and status_filter != 'all':
+            query = query.filter(WorkOrder.status == status_filter)
 
     for raw, column in ((priority_filter, WorkOrder.priority_id), (category_filter, WorkOrder.category_id)):
         if raw:
@@ -3124,13 +3173,36 @@ def work_orders():
         like = f"%{search}%"
         query = query.filter(db.or_(WorkOrder.wo_number.ilike(like), WorkOrder.title.ilike(like)))
 
-    page, per_page, offset = get_page_args(page_parameter="page", per_page_parameter="per_page")
-    total = query.count()
-    items = query.options(
+    query = query.options(
         db.joinedload(WorkOrder.facility), db.joinedload(WorkOrder.room), db.joinedload(WorkOrder.site),
         db.joinedload(WorkOrder.assigned_to), db.joinedload(WorkOrder.requester), db.joinedload(WorkOrder.category),
-    ).order_by(Priority.sort_order.asc(), WorkOrder.created_at.desc()).offset(offset).limit(per_page).all()
-    pagination = Pagination(page=page, per_page=per_page, total=total, css_framework='bootstrap5')
+    )
+
+    board_columns = None
+    board_truncated = False
+    pagination = None
+    per_page = None
+    total = None
+    items = []
+    board_total = 0
+    if view == 'board':
+        all_items = query.order_by(Priority.sort_order.asc(), WorkOrder.created_at.desc()).limit(BOARD_LIMIT + 1).all()
+        board_truncated = len(all_items) > BOARD_LIMIT
+        all_items = all_items[:BOARD_LIMIT]
+        board_total = len(all_items)
+        board_columns = {s: [] for s in workflow.ALL_STATUSES}
+        for wo in all_items:
+            board_columns.setdefault(wo.status, []).append(wo)
+    else:
+        page, per_page, offset = get_page_args(page_parameter="page", per_page_parameter="per_page")
+        total = query.count()
+        items = query.order_by(Priority.sort_order.asc(), WorkOrder.created_at.desc()).offset(offset).limit(per_page).all()
+        pagination = Pagination(page=page, per_page=per_page, total=total, css_framework='bootstrap5')
+
+    base_args = request.args.to_dict()
+    base_args.pop('view', None)
+    table_view_url = url_for('routes.work_orders', view='table', **base_args)
+    board_view_url = url_for('routes.work_orders', view='board', **base_args)
 
     return render_template(
         'work_orders.html',
@@ -3142,6 +3214,9 @@ def work_orders():
         assignees=_assignee_choices(_visible_site_ids())[1:] if current_user.role_id in (1, 2, 3) else [],
         statuses=workflow.ALL_STATUSES, sources=workflow.SOURCES, status_badge=workflow.STATUS_BADGE,
         status_filter=status_filter, search=search,
+        today=datetime.now(timezone.utc).date(), terminal_statuses=workflow.TERMINAL_STATUSES,
+        view=view, board_columns=board_columns, board_truncated=board_truncated, board_total=board_total,
+        table_view_url=table_view_url, board_view_url=board_view_url,
     )
 
 
@@ -3630,6 +3705,39 @@ def change_work_order_status(work_order_id):
     send_work_order_notification('status', wo, old_status=old_status, new_status=wo.status)
     flash(f'Status changed to {wo.status}.', 'success')
     return redirect(url_for('routes.edit_work_order', work_order_id=wo.id))
+
+
+@routes_blueprint.route('/update_work_order_status_board/<int:work_order_id>', methods=['POST'])
+@login_required
+def update_work_order_status_board(work_order_id):
+    """The Work Orders board's drop handler — mirrors change_work_order_status()
+    but redirects back to the board (not the WO's own edit page) and has no
+    note/completed_at/resolution fields to fill in: apply_transition() already
+    defaults completed_at to now and raises WorkflowError on a Closed drop
+    with no resolution set, so an invalid-for-this-WO drop is rejected the
+    same way a missing-field full-form submission would be — flash + the
+    card simply stays wherever the server says it is on reload, since no
+    client-side validation exists here (same no-fetch/no-JSON convention as
+    the Project board)."""
+    wo = WorkOrder.query.get_or_404(work_order_id)
+    if not can_manage_work_order(wo):
+        abort(403)
+    new_status = request.form.get('status')
+    if new_status not in workflow.allowed_transitions(wo.status):
+        flash(f'Cannot move a work order from "{wo.status}" to "{new_status}".', 'danger')
+        return redirect(url_for('routes.work_orders', view='board'))
+
+    old_status = wo.status
+    try:
+        workflow.apply_transition(wo, new_status, current_user)
+    except WorkflowError as e:
+        db.session.rollback()
+        flash(str(e), 'danger')
+        return redirect(url_for('routes.work_orders', view='board'))
+    db.session.commit()
+    send_work_order_notification('status', wo, old_status=old_status, new_status=wo.status)
+    flash(f'{wo.wo_number} moved to {wo.status}.', 'success')
+    return redirect(url_for('routes.work_orders', view='board'))
 
 
 @routes_blueprint.route('/add_work_order_comment/<int:work_order_id>', methods=['POST'])
@@ -4637,6 +4745,7 @@ def projects():
     current_page_name = 'Capital Projects'
     is_staff()
     status_filter = request.args.get('status_filter', 'active')
+    search = request.args.get('search', '').strip()
     query = Project.query
     site_ids = _visible_site_ids()
     if site_ids:
@@ -4645,9 +4754,18 @@ def projects():
         query = query.filter(Project.status.notin_(('Completed', 'Cancelled')))
     elif status_filter in PROJECT_STATUSES:
         query = query.filter(Project.status == status_filter)
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter(db.or_(Project.name.ilike(pattern), Project.description.ilike(pattern)))
+    query = query.options(
+        db.joinedload(Project.site),
+        db.joinedload(Project.created_by),
+        db.selectinload(Project.tasks),
+    )
     items = query.order_by(Project.name).all()
     return render_template('projects.html', projects=items, statuses=PROJECT_STATUSES,
-        status_filter=status_filter, current_path=request.path, current_page_name=current_page_name)
+        status_filter=status_filter, search=search, current_path=request.path,
+        current_page_name=current_page_name)
 
 
 @routes_blueprint.route('/add_project', methods=['GET', 'POST'])
@@ -4680,6 +4798,7 @@ def add_project():
 @login_required
 def edit_project(project_id):
     current_page_name = 'Capital Project'
+    active_tab = request.args.get('tab', 'details')
     project = Project.query.get_or_404(project_id)
     if not can_access_site(project.site_id):
         abort(403)
@@ -4695,6 +4814,12 @@ def edit_project(project_id):
     vendor_form = ProjectVendorForm()
     vendor_form.vendor_id.choices = [(v.id, v.name) for v in Vendor.query.filter_by(is_active=True)
                                      .order_by(Vendor.name).all() if v not in project.vendors]
+    dependency_form = ProjectTaskDependencyForm()
+    task_choices = [(t.id, t.name) for t in project.tasks]
+    dependency_form.predecessor_id.choices = task_choices
+    dependency_form.successor_id.choices = task_choices
+    dependency_rows = [(dep, projects_module.dependency_violated(dep))
+                       for t in project.tasks for dep in t.dependencies_as_predecessor]
 
     if request.method == 'POST':
         is_admin()
@@ -4714,8 +4839,10 @@ def edit_project(project_id):
 
     rollup = projects_module.project_cost_rollup(project)
     return render_template('edit_project.html', form=form, task_form=task_form, cost_form=cost_form,
-        vendor_form=vendor_form, project=project, rollup=rollup, status_badge=workflow.STATUS_BADGE,
-        current_page_name=current_page_name)
+        vendor_form=vendor_form, dependency_form=dependency_form, dependency_rows=dependency_rows,
+        gantt_tasks=projects_module.gantt_payload(project), task_statuses=PROJECT_TASK_STATUSES,
+        project=project, rollup=rollup, status_badge=workflow.STATUS_BADGE,
+        active_tab=active_tab, current_page_name=current_page_name)
 
 
 @routes_blueprint.route('/delete_project/<int:project_id>', methods=['POST'])
@@ -4740,14 +4867,52 @@ def add_project_task(project_id):
     if form.validate_on_submit():
         db.session.add(ProjectTask(
             project_id=project.id, name=form.name.data, description=form.description.data,
-            assigned_to_id=form.assigned_to_id.data or None, due_date=form.due_date.data,
+            assigned_to_id=form.assigned_to_id.data or None,
+            start_date=form.start_date.data, due_date=form.due_date.data,
+            percent_complete=form.percent_complete.data or 0, is_milestone=form.is_milestone.data,
             sort_order=form.sort_order.data or 0,
         ))
         db.session.commit()
         flash('Task added.', 'success')
     else:
         flash('A task name is required.', 'danger')
-    return redirect(url_for('routes.edit_project', project_id=project.id))
+    return redirect(url_for('routes.edit_project', project_id=project.id, tab='tasks'))
+
+
+@routes_blueprint.route('/edit_project_task/<int:task_id>', methods=['GET', 'POST'])
+@login_required
+def edit_project_task(task_id):
+    current_page_name = 'Project Task'
+    is_admin()
+    task = ProjectTask.query.get_or_404(task_id)
+    form = ProjectTaskForm(obj=task)
+    form.assigned_to_id.choices = _assignee_choices(_visible_site_ids())
+    form.status.choices = [(s, s) for s in PROJECT_TASK_STATUSES]
+    if request.method == 'GET':
+        form.assigned_to_id.data = task.assigned_to_id or 0
+        form.status.data = task.status
+
+    if form.validate_on_submit():
+        task.name = form.name.data
+        task.description = form.description.data
+        task.assigned_to_id = form.assigned_to_id.data or None
+        task.start_date = form.start_date.data
+        task.due_date = form.due_date.data
+        task.percent_complete = form.percent_complete.data or 0
+        task.is_milestone = form.is_milestone.data
+        task.sort_order = form.sort_order.data or 0
+        was_completed = task.status == 'Completed'
+        task.status = form.status.data
+        if task.status == 'Completed' and not was_completed:
+            task.completed_at = datetime.now(timezone.utc)
+        elif task.status != 'Completed':
+            task.completed_at = None
+        task.updated_at = datetime.now(timezone.utc)
+        db.session.commit()
+        flash('Task updated successfully!', 'success')
+        return redirect(url_for('routes.edit_project', project_id=task.project_id, tab='tasks'))
+
+    return render_template('edit_project_task.html', form=form, task=task, current_page_name=current_page_name)
 
 
 @routes_blueprint.route('/toggle_project_task/<int:task_id>', methods=['POST'])
@@ -4759,11 +4924,37 @@ def toggle_project_task(task_id):
     if task.status == 'Completed':
         task.status = 'Not Started'
         task.completed_at = None
+        task.percent_complete = 0
     else:
         task.status = 'Completed'
         task.completed_at = datetime.now(timezone.utc)
+        task.percent_complete = 100
     db.session.commit()
-    return redirect(url_for('routes.edit_project', project_id=project_id))
+    return redirect(url_for('routes.edit_project', project_id=project_id, tab='tasks'))
+
+
+@routes_blueprint.route('/update_project_task_status/<int:task_id>', methods=['POST'])
+@login_required
+def update_project_task_status(task_id):
+    """The Kanban board's drop handler — a tiny per-card hidden form submits
+    here via requestSubmit() (no fetch/JSON anywhere in this app)."""
+    is_admin()
+    task = ProjectTask.query.get_or_404(task_id)
+    new_status = request.form.get('status')
+    if new_status not in PROJECT_TASK_STATUSES:
+        abort(400)
+    task.status = new_status
+    if new_status == 'Completed':
+        task.completed_at = datetime.now(timezone.utc)
+        task.percent_complete = 100
+    elif new_status == 'Not Started':
+        task.completed_at = None
+        task.percent_complete = 0
+    else:
+        task.completed_at = None
+    task.updated_at = datetime.now(timezone.utc)
+    db.session.commit()
+    return redirect(url_for('routes.edit_project', project_id=task.project_id, tab='board'))
 
 
 @routes_blueprint.route('/delete_project_task/<int:task_id>', methods=['POST'])
@@ -4775,7 +4966,50 @@ def delete_project_task(task_id):
     db.session.delete(task)
     db.session.commit()
     flash('Task removed.', 'warning')
-    return redirect(url_for('routes.edit_project', project_id=project_id))
+    return redirect(url_for('routes.edit_project', project_id=project_id, tab='tasks'))
+
+
+@routes_blueprint.route('/add_project_task_dependency/<int:project_id>', methods=['POST'])
+@login_required
+def add_project_task_dependency(project_id):
+    is_admin()
+    project = Project.query.get_or_404(project_id)
+    form = ProjectTaskDependencyForm()
+    task_choices = [(t.id, t.name) for t in project.tasks]
+    form.predecessor_id.choices = task_choices
+    form.successor_id.choices = task_choices
+    if not form.validate_on_submit():
+        flash('Choose both a predecessor and a successor task.', 'danger')
+        return redirect(url_for('routes.edit_project', project_id=project.id, tab='tasks'))
+
+    task_ids = {t.id for t in project.tasks}
+    pred_id, succ_id = form.predecessor_id.data, form.successor_id.data
+    if pred_id not in task_ids or succ_id not in task_ids:
+        abort(404)
+    if pred_id == succ_id:
+        flash('A task cannot depend on itself.', 'danger')
+    elif ProjectTaskDependency.query.filter_by(predecessor_id=pred_id, successor_id=succ_id).first():
+        flash('That dependency already exists.', 'danger')
+    elif projects_module.would_create_cycle(project.id, pred_id, succ_id):
+        flash('That would create a circular dependency.', 'danger')
+    else:
+        db.session.add(ProjectTaskDependency(predecessor_id=pred_id, successor_id=succ_id,
+                                             lag_days=form.lag_days.data or 0))
+        db.session.commit()
+        flash('Dependency added.', 'success')
+    return redirect(url_for('routes.edit_project', project_id=project.id, tab='tasks'))
+
+
+@routes_blueprint.route('/delete_project_task_dependency/<int:dependency_id>', methods=['POST'])
+@login_required
+def delete_project_task_dependency(dependency_id):
+    is_admin()
+    dep = ProjectTaskDependency.query.get_or_404(dependency_id)
+    project_id = dep.predecessor.project_id
+    db.session.delete(dep)
+    db.session.commit()
+    flash('Dependency removed.', 'warning')
+    return redirect(url_for('routes.edit_project', project_id=project_id, tab='tasks'))
 
 
 @routes_blueprint.route('/add_project_cost/<int:project_id>', methods=['POST'])
@@ -4796,7 +5030,7 @@ def add_project_cost(project_id):
         flash('Cost added.', 'success')
     else:
         flash('A description and amount are required.', 'danger')
-    return redirect(url_for('routes.edit_project', project_id=project.id))
+    return redirect(url_for('routes.edit_project', project_id=project.id, tab='costs'))
 
 
 @routes_blueprint.route('/delete_project_cost/<int:cost_id>', methods=['POST'])
@@ -4808,7 +5042,7 @@ def delete_project_cost(cost_id):
     db.session.delete(cost)
     db.session.commit()
     flash('Cost entry removed.', 'warning')
-    return redirect(url_for('routes.edit_project', project_id=project_id))
+    return redirect(url_for('routes.edit_project', project_id=project_id, tab='costs'))
 
 
 @routes_blueprint.route('/add_project_vendor/<int:project_id>', methods=['POST'])
@@ -4824,7 +5058,7 @@ def add_project_vendor(project_id):
             project.vendors.append(vendor)
             db.session.commit()
             flash(f'{vendor.name} added to project.', 'success')
-    return redirect(url_for('routes.edit_project', project_id=project.id))
+    return redirect(url_for('routes.edit_project', project_id=project.id, tab='vendors'))
 
 
 @routes_blueprint.route('/remove_project_vendor/<int:project_id>/<int:vendor_id>', methods=['POST'])
@@ -4837,7 +5071,7 @@ def remove_project_vendor(project_id, vendor_id):
         project.vendors.remove(vendor)
         db.session.commit()
         flash(f'{vendor.name} removed from project.', 'warning')
-    return redirect(url_for('routes.edit_project', project_id=project.id))
+    return redirect(url_for('routes.edit_project', project_id=project.id, tab='vendors'))
 
 
 @routes_blueprint.route('/download_project_document/<int:document_id>')
@@ -4850,7 +5084,7 @@ def download_project_document(document_id):
     upload_folder = current_app.config['UPLOAD_PROJECT_DOCUMENT']
     if not os.path.exists(os.path.join(upload_folder, document.attach_file)):
         flash('File not found.', 'error')
-        return redirect(url_for('routes.edit_project', project_id=project.id))
+        return redirect(url_for('routes.edit_project', project_id=project.id, tab='documents'))
     return send_from_directory(upload_folder, document.attach_file, as_attachment=True)
 
 
@@ -4865,7 +5099,7 @@ def upload_project_document(project_id):
         flash(error, 'danger')
     else:
         flash('Document uploaded.', 'success')
-    return redirect(url_for('routes.edit_project', project_id=project.id))
+    return redirect(url_for('routes.edit_project', project_id=project.id, tab='documents'))
 
 
 @routes_blueprint.route('/delete_project_document/<int:document_id>', methods=['POST'])
@@ -4880,7 +5114,7 @@ def delete_project_document(document_id):
     db.session.delete(document)
     db.session.commit()
     flash('Document removed.', 'warning')
-    return redirect(url_for('routes.edit_project', project_id=project_id))
+    return redirect(url_for('routes.edit_project', project_id=project_id, tab='documents'))
 
 
 # ****************** Capital Replacement (Asset Risk Score) ***************

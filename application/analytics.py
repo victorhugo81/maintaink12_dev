@@ -197,6 +197,22 @@ def pct(part, whole):
     return round(100.0 * part / whole, 1) if whole else None
 
 
+def district_health_score(audit_pct, project_pct, open_work_orders, overdue_work_orders):
+    """Equal-weight available audit, project, and on-time open-work measures."""
+    components = [float(value) for value in (audit_pct, project_pct) if value is not None]
+    work_order_pct = None
+    if open_work_orders:
+        work_order_pct = round(
+            100.0 * (open_work_orders - overdue_work_orders) / open_work_orders, 1
+        )
+        components.append(work_order_pct)
+    return {
+        'score': round(sum(components) / len(components)) if components else None,
+        'work_order_pct': work_order_pct,
+        'component_count': len(components),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Work Order KPIs
 # ---------------------------------------------------------------------------
@@ -250,6 +266,7 @@ def work_order_kpis(f, today=None):
         flag(WorkOrder.priority_id == pri.get('Critical', -1)),
         flag(WorkOrder.priority_id == pri.get('Emergency', -1)),
         flag(WorkOrder.created_at < backlog_before),
+        flag(WorkOrder.status == workflow.WAITING_APPROVAL),
     ).filter(*_wo_clauses(f, dated=False), WorkOrder.status.in_(workflow.OPEN_STATUSES)).one()
 
     created_row = db.session.query(
@@ -295,6 +312,7 @@ def work_order_kpis(f, today=None):
         'critical': int(open_row[7]),
         'emergency': int(open_row[8]),
         'backlog': int(open_row[9]),
+        'waiting_approval': int(open_row[10]),
         'created_in_period': created,
         'completed': completed,
         'completion_rate': pct(done_of_created, created),

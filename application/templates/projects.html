@@ -9,18 +9,22 @@
           <h2 class="text-white text-capitalize ps-3"><i class="material-symbols-rounded opacity-5">construction</i> {{ current_page_name }}</h2>
           </div>
           <div class="card-body px-4 pb-4">
-            <br>
-            <div class="d-flex justify-content-between mb-4">
-              <form method="get" class="d-flex">
-                <select name="status_filter" class="form-select-box form-select" data-autosubmit>
-                  <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active (not Completed/Cancelled)</option>
-                  <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+            <div class="projects-toolbar mb-4">
+              <form method="get" class="projects-filters">
+                <label class="visually-hidden" for="project-search">Search projects</label>
+                <input id="project-search" type="search" name="search" value="{{ search }}"
+                       class="form-control" placeholder="Search projects">
+                <label class="visually-hidden" for="project-status-filter">Filter by status</label>
+                <select id="project-status-filter" name="status_filter" class="form-select-box form-select">
+                  <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active projects</option>
+                  <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All statuses</option>
                   {% for s in statuses %}
                   <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s }}</option>
                   {% endfor %}
                 </select>
+                <button class="btn btn-outline-secondary mb-0" type="submit">Apply</button>
               </form>
-              <div class="d-flex gap-2">
+              <div class="d-flex gap-2 flex-wrap">
                 <a href="{{ url_for('routes.capital_replacement') }}" class="btn reset-button-box shadow-dark">Capital Replacement</a>
                 {% if current_user.is_admin %}
                 <a href="{{ url_for('routes.add_project') }}" class="btn bg-gradient-main add-table-button shadow-dark">Add Project</a>
@@ -34,7 +38,9 @@
                 <tr>
                   <th class="text-uppercase text-xxs font-weight-bolder">Project</th>
                   <th class="text-uppercase text-xxs font-weight-bolder">Site</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Created By</th>
                   <th class="text-uppercase text-xxs font-weight-bolder">Status</th>
+                  <th class="text-uppercase text-xxs font-weight-bolder">Tasks</th>
                   <th class="text-uppercase text-xxs font-weight-bolder">Budget</th>
                   <th class="text-uppercase text-xxs font-weight-bolder">Target End</th>
                 </tr>
@@ -43,19 +49,34 @@
                 {% for p in projects %}
                 <tr class="table-highlight-row">
                   <td>
-                    <div class="d-flex px-2 py-1"><div class="d-flex flex-column justify-content-center">
-                      <a href="{{ url_for('routes.edit_project', project_id=p.id) }}"><h6 class="mb-0 text-sm">{{ p.name }}</h6></a>
-                    </div></div>
+                    <a href="{{ url_for('routes.edit_project', project_id=p.id) }}" class="project-name">{{ p.name }}</a>
+                    {% if p.description %}<span class="project-description">{{ p.description|striptags|truncate(110) }}</span>{% endif %}
                   </td>
                   <td><span class="text-secondary text-xs font-weight-bold">{{ p.site.site_name }}</span></td>
+                  <td><span class="text-secondary text-xs">{{ p.created_by.get_full_name() if p.created_by else '—' }}</span></td>
                   <td>
                     <span class="badge {% if p.status == 'Completed' %}bg-success{% elif p.status == 'Cancelled' %}bg-secondary{% elif p.status == 'On Hold' %}bg-warning{% else %}bg-info{% endif %}">{{ p.status }}</span>
+                  </td>
+                  <td class="project-task-progress">
+                    {% set completed_tasks = p.tasks|selectattr('status', 'equalto', 'Completed')|list|length %}
+                    {% set task_count = p.tasks|length %}
+                    {% if task_count %}
+                    {% set ns = namespace(total=0) %}
+                    {% for task in p.tasks %}{% set ns.total = ns.total + task.percent_complete %}{% endfor %}
+                    {% set progress = (ns.total / task_count)|round|int %}
+                    <div class="d-flex align-items-center gap-2">
+                      <div class="progress flex-grow-1" role="progressbar" aria-label="{{ p.name }} task progress" aria-valuenow="{{ progress }}" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar" style="width: {{ progress }}%"></div>
+                      </div>
+                      <span class="text-xs text-nowrap">{{ completed_tasks }}/{{ task_count }}</span>
+                    </div>
+                    {% else %}<span class="text-xs text-secondary">No tasks</span>{% endif %}
                   </td>
                   <td><span class="text-secondary text-xs font-weight-bold">{{ '$%.2f'|format(p.budget) if p.budget else 'N/A' }}</span></td>
                   <td><span class="text-secondary text-xs font-weight-bold">{{ p.target_end_date.strftime('%m-%d-%Y') if p.target_end_date else 'N/A' }}</span></td>
                 </tr>
                 {% else %}
-                <tr><td colspan="5" class="text-center text-secondary text-sm py-4">No projects found.</td></tr>
+                <tr><td colspan="7" class="text-center text-secondary text-sm py-4">No projects match these filters.</td></tr>
                 {% endfor %}
               </tbody>
             </table>

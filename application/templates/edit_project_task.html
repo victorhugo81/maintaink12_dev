@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="main-card-box card my-4">
+            <div class="card-header p-0 position-relative mt-n4 z-index-2">
+                <div class="bg-gradient-main shadow-dark border-radius-lg pt-4 pb-3">
+                    <h2 class="text-white text-capitalize ps-3">Edit Task</h2>
+                </div>
+            </div>
+            <div class="card-body px-4 pb-4">
+                <form method="POST" action="{{ url_for('routes.edit_project_task', task_id=task.id) }}">
+                    {{ form.hidden_tag() }}
+                    <div class="col-12 d-flex justify-content-end align-items-center sticky-top bg-white py-2 mb-4 border-bottom">
+                        <div class="d-flex gap-2 mt-3 align-items-center">
+                            {{ form.submit(value="Save Task", class="btn bg-gradient-main") }}
+                            <a class="btn reset-button-box shadow-dark" href="{{ url_for('routes.edit_project', project_id=task.project_id) }}#ptasks">Back</a>
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <span aria-hidden="true" class="text-danger ms-1">*</span>
+                            {{ form.name.label(class="form-label") }}
+                            {{ form.name(class="form-control") }}
+                        </div>
+                        <div class="col-12">
+                            {{ form.description.label(class="form-label") }}
+                            {{ form.description(class="form-control") }}
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            {{ form.assigned_to_id.label(class="form-label") }}
+                            {{ form.assigned_to_id(class="form-select-box form-select") }}
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            {{ form.status.label(class="form-label") }}
+                            {{ form.status(class="form-select-box form-select") }}
+                        </div>
+                        <div class="col-12 col-sm-4">
+                            {{ form.start_date.label(class="form-label") }}
+                            {{ form.start_date(class="form-control", type="date") }}
+                        </div>
+                        <div class="col-12 col-sm-4">
+                            {{ form.due_date.label(class="form-label") }}
+                            {{ form.due_date(class="form-control", type="date") }}
+                        </div>
+                        <div class="col-12 col-sm-4">
+                            {{ form.percent_complete.label(class="form-label") }}
+                            {{ form.percent_complete(class="form-control") }}
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                {{ form.is_milestone(class="form-check-input") }}
+                                {{ form.is_milestone.label(class="form-check-label") }}
+                            </div>
+                            <small class="text-secondary text-xs">A milestone marks a single date on the Gantt chart (a diamond) rather than a date range — Start Date is ignored.</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

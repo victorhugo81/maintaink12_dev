@@ -1,8 +1,8 @@
 {% extends 'base.html' %}
 {% block content %}
 
-{% macro kpi_card(label, value, icon, href=None, tone='') %}
-<div class="col-xl-3 col-md-4 col-sm-6 mb-4">
+{% macro kpi_card(label, value, icon, href=None, tone='', cols='col-xl-3 col-md-4 col-sm-6') %}
+<div class="{{ cols }} mb-4">
   {% if href %}<a href="{{ href }}">{% endif %}
   <div class="small-cards-dashboard card">
     <div class="card-header p-2 ps-3">
@@ -31,6 +31,22 @@
 </div>
 {% endmacro %}
 
+{% macro gauge_card(key, title, description, value, detail) %}
+<div class="col-lg-4 col-md-6 mb-3">
+  <section class="dashboard-gauge-card" aria-labelledby="{{ key }}-title">
+    <div class="dashboard-gauge-copy">
+      <h3 id="{{ key }}-title">{{ title }}</h3>
+      <p>{{ description }}</p>
+    </div>
+    <div class="dashboard-gauge-visual">
+      <canvas data-chart="{{ key }}" data-type="gauge" role="img"
+              aria-label="{{ title }}: {{ value if value is not none else 'not available' }}{% if value is not none %}%{% endif %}. {{ detail }}"></canvas>
+    </div>
+    <p class="dashboard-gauge-detail">{{ detail }}</p>
+  </section>
+</div>
+{% endmacro %}
+
 {% macro pct(value) %}{% if value is none %}&mdash;{% else %}{{ value }}%{% endif %}{% endmacro %}
 {% macro days(value) %}{% if value is none %}&mdash;{% else %}{{ value }} d{% endif %}{% endmacro %}
 {% macro money(value) %}${{ '{:,.2f}'.format(value|float) }}{% endmacro %}
@@ -40,29 +56,36 @@
 
 <div class="row">
   <div class="col-12">
-    <div class="main-card-box card my-4">
-      <div class="card-header p-0 position-relative mt-n4 z-index-2">
-        <div class="bg-gradient-main custom-title-card d-flex flex-wrap justify-content-between align-items-center gap-2 pe-3">
-          <h2 class="text-white text-capitalize ps-3 mb-0"><i class="material-symbols-rounded opacity-5">insights</i> {{ current_page_name }} &mdash; {{ view_labels[view] }}</h2>
+    <div class="main-card-box card my-4 dashboard-shell dashboard-shell-{{ view }}">
+      <div class="dashboard-page-header">
+        <div>
+          <p class="dashboard-eyebrow mb-1">Dashboard &mdash; {{ view_labels[view] }}</p>
+          <h1 class="dashboard-page-title mb-1">Operations overview</h1>
+          <p class="dashboard-page-subtitle mb-0">
+            {% if view == 'manager' %}Your district operations at a glance.{% elif view == 'technician' %}Your assigned work and upcoming deadlines.{% else %}Track your requests and their progress.{% endif %}
+          </p>
+        </div>
+        <div class="dashboard-header-actions">
+          <a class="btn btn-outline-secondary mb-0" href="{{ url_for('routes.work_orders') }}">View work orders</a>
+          <a class="btn btn-primary mb-0" href="{{ url_for('routes.request_work_order') }}"><i class="material-symbols-rounded align-middle me-1" aria-hidden="true">add</i>New work order</a>
         </div>
       </div>
-      <div class="card-body px-4 pb-4">
-        <br>
+      <div class="card-body dashboard-content">
 
         <!-- Filters: one GET form, every widget below uses the same filter dict -->
-        <form id="dashboard-filters" method="GET" action="{{ url_for('routes.mo_dashboard') }}" class="filter-container mb-4">
+        <form id="dashboard-filters" method="GET" action="{{ url_for('routes.mo_dashboard') }}" class="filter-container dashboard-filters mb-4">
           <input type="hidden" name="view" value="{{ view }}">
           <div class="row g-2">
             <div class="col-md-2 col-6">
-              <label class="filter-labels text-sm mb-0">Period</label>
-              <select class="form-select-box form-select" name="preset">
+              <label class="filter-labels text-sm mb-0" for="dashboard-period">Period</label>
+              <select id="dashboard-period" class="form-select-box form-select" name="preset">
                 {% for p in presets %}<option value="{{ p }}" {% if f.preset == p %}selected{% endif %}>{{ preset_labels[p] }}</option>{% endfor %}
               </select>
             </div>
             {% if options.cycles is defined %}
             <div class="col-md-3 col-6">
-              <label class="filter-labels text-sm mb-0">Inspection Cycle</label>
-              <select class="form-select-box form-select" name="cycle_id" data-autosubmit>
+              <label class="filter-labels text-sm mb-0" for="dashboard-cycle">Inspection Cycle</label>
+              <select id="dashboard-cycle" class="form-select-box form-select" name="cycle_id" data-autosubmit>
                 <option value="">Current / Active Cycle</option>
                 {% for c in options.cycles %}<option value="{{ c.id }}" {% if f.cycle_id == c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
               </select>
@@ -79,15 +102,15 @@
             </div>
             {% if options.sites %}
             <div class="col-md-2 col-6">
-              <label class="filter-labels text-sm mb-0">Site</label>
-              <select class="form-select-box form-select" name="site_id" data-autosubmit>
+              <label class="filter-labels text-sm mb-0" for="dashboard-site">Site</label>
+              <select id="dashboard-site" class="form-select-box form-select" name="site_id" data-autosubmit>
                 <option value="">All Sites</option>
                 {% for s in options.sites %}<option value="{{ s.id }}" {% if f.site_id == s.id %}selected{% endif %}>{{ s.site_name }}</option>{% endfor %}
               </select>
             </div>
             {% endif %}
           </div>
-          <p class="text-xs text-secondary mt-2 mb-0">Period: {{ f.start.strftime('%b %d, %Y') }} &ndash; {{ f.end.strftime('%b %d, %Y') }}. "Current" figures describe the filtered scope right now; "in period" figures count work orders opened (or completed) within these dates.</p>
+          <p class="text-xs text-secondary mt-2 mb-0">Date range: {{ f.start.strftime('%b %d, %Y') }} &ndash; {{ f.end.strftime('%b %d, %Y') }}. Headline workload counts show current open work; completion and charts use this period.</p>
         </form>
 
         {# ============================ EXECUTIVE / MANAGER ============================ #}
@@ -95,140 +118,146 @@
         {% set fac = data.facility %}{% set m = data.maintenance %}{% set cost = data.cost %}
         {% set prog = data.progress %}{% set cyc = data.cycle %}{% set ih = data.issue_health %}
 
-        <div class="dashboard-hero mb-3">
-          <div class="dashboard-hero-gauge-card">
-            <p class="dashboard-hero-gauge-title mb-0">Issue Resolution</p>
-            <div class="district-gauge-wrap">
-              <canvas data-chart="issue_health_gauge" data-type="gauge" height="150"></canvas>
-            </div>
-            <p class="dashboard-hero-gauge-caption">{{ ih.clean }} / {{ ih.total }} issues clean</p>
+        <div class="dashboard-section-heading-row">
+          <div>
+            <h2 class="dashboard-section-heading mb-1">Operational overview</h2>
+            <p class="dashboard-section-subtitle mb-0">District-wide workload and project health</p>
           </div>
-          <div class="dashboard-hero-stats">
-            <div class="hero-stat">
-              <div class="hero-stat-value">{{ wo.total_open }}</div>
-              <div class="hero-stat-label">Open Work Orders</div>
-            </div>
-            <div class="hero-stat hero-stat-alert">
-              <div class="hero-stat-value">{{ wo.critical }}</div>
-              <div class="hero-stat-label">Critical</div>
-            </div>
-            <div class="hero-stat hero-stat-alert">
-              <div class="hero-stat-value">{{ wo.overdue }}</div>
-              <div class="hero-stat-label">Overdue</div>
-            </div>
-            <div class="hero-stat">
-              <div class="hero-stat-value">{% if prog.district.pct is none %}&mdash;{% else %}{{ prog.district.pct }}%{% endif %}</div>
-              <div class="hero-stat-label">Facilities Audit{% if cyc %} &mdash; {{ cyc.name }}{% endif %}</div>
-            </div>
-            <div class="hero-stat{% if ih.issues_outstanding %} hero-stat-alert{% endif %}">
-              <div class="hero-stat-value">{% if ih.pct is none %}&mdash;{% else %}{{ ih.pct }}%{% endif %}</div>
-              <div class="hero-stat-label">Issue Resolution</div>
+          <span class="dashboard-period-chip"><i class="material-symbols-rounded" aria-hidden="true">calendar_today</i>{{ f.start.strftime('%b %d') }} – {{ f.end.strftime('%b %d, %Y') }}</span>
+        </div>
+        <div class="row dashboard-snapshot mb-3">
+          {{ kpi_card('Total Projects', project_metrics.total, 'construction', url_for('routes.projects', status_filter='all'), '', 'col-xl-2 col-md-4 col-sm-6') }}
+          {{ kpi_card('Active Projects', project_metrics.active, 'engineering', url_for('routes.projects'), '', 'col-xl-2 col-md-4 col-sm-6') }}
+          {{ kpi_card('Open Work Orders', wo.total_open, 'build', url_for('routes.work_orders'), '', 'col-xl-2 col-md-4 col-sm-6') }}
+          {{ kpi_card('Overdue Work Orders', wo.overdue, 'alarm', url_for('routes.work_orders', status_filter='open'), 'text-danger' if wo.overdue else '', 'col-xl-2 col-md-4 col-sm-6') }}
+          {{ kpi_card('Completed in Period', wo.completed, 'task_alt', None, '', 'col-xl-2 col-md-4 col-sm-6') }}
+          {{ kpi_card('Awaiting Approval', wo.waiting_approval, 'hourglass_top', url_for('routes.work_orders', status_filter='Waiting for Approval'), '', 'col-xl-2 col-md-4 col-sm-6') }}
+        </div>
+        <div class="dashboard-gauge-section mb-4">
+          <div class="dashboard-section-heading-row">
+            <div>
+              <h2 class="dashboard-section-heading mb-1">District health</h2>
+              <p class="dashboard-section-subtitle mb-0">A current-state view of audit, project, and work-order health</p>
             </div>
           </div>
+          <div class="row dashboard-gauge-grid">
+            {% set audit_detail = (prog.district.pct|string ~ '% complete · ' ~ prog.district.rooms_inspected ~ ' of ' ~ prog.district.rooms_total ~ ' rooms') if prog.district.pct is not none else 'No active audit data' %}
+            {% set project_detail = (project_metrics.task_completion_pct|string ~ '% average · ' ~ project_metrics.active_task_count ~ ' tasks across active projects') if project_metrics.task_completion_pct is not none else 'No tasks in active projects' %}
+            {% set work_order_detail = (project_metrics.work_order_health_pct|string ~ '% on time · ' ~ wo.overdue ~ ' overdue of ' ~ wo.total_open ~ ' open') if project_metrics.work_order_health_pct is not none else 'No open work orders' %}
+            {% set health_detail = (project_metrics.health_component_count ~ ' of 3 health measures available') if project_metrics.district_health_pct is not none else 'No health data available' %}
+            {{ gauge_card('district_health_gauge', 'Overall district health', 'Equal-weight score across available measures', project_metrics.district_health_pct, health_detail) }}
+            {{ gauge_card('audit_completion_gauge', 'Facilities audit completion', 'Completed room inspections in the selected cycle', prog.district.pct, audit_detail) }}
+            {{ gauge_card('project_progress_gauge', 'Active project progress', 'Average task completion across active projects', project_metrics.task_completion_pct, project_detail) }}
+          </div>
+          <p class="dashboard-gauge-method mb-0">
+            Overall health averages audit completion, active-project task completion, and the share of open work orders not overdue. Measures without data are excluded.
+            {% if project_metrics.work_order_health_pct is not none %}Current work-order health: {{ project_metrics.work_order_health_pct }}% on time.{% endif %}
+          </p>
+        </div>
+        <div class="dashboard-signal-strip" role="status">
+          <span class="dashboard-signal-icon"><i class="material-symbols-rounded" aria-hidden="true">{% if wo.overdue or wo.critical or (data.sla.available and data.sla.breach_count) %}priority_high{% else %}check_circle{% endif %}</i></span>
+          <div>
+            <strong>{% if wo.overdue or wo.critical or (data.sla.available and data.sla.breach_count) %}Needs attention{% else %}Operations are on track{% endif %}</strong>
+            <span>
+              {% if wo.overdue %}{{ wo.overdue }} overdue work order{{ '' if wo.overdue == 1 else 's' }}{% else %}No overdue work orders{% endif %}
+              {% if wo.critical %} · {{ wo.critical }} critical{% endif %}
+              {% if data.sla.available and data.sla.breach_count %} · {{ data.sla.breach_count }} SLA breach{{ '' if data.sla.breach_count == 1 else 'es' }}{% endif %}
+              {% if wo.waiting_approval %} · {{ wo.waiting_approval }} awaiting approval{% endif %}
+            </span>
+          </div>
+          <a href="{{ url_for('routes.work_orders', status_filter='open') }}">Review work orders <i class="material-symbols-rounded" aria-hidden="true">arrow_forward</i></a>
         </div>
         {% if not cyc %}
-        <p class="text-xs text-danger mb-3">No inspection cycle yet &mdash; <a href="{{ url_for('routes.add_inspection_cycle') }}">create one</a> to start tracking the summer walkthrough.</p>
+        <p class="alert alert-info text-sm mt-3 mb-3" role="status">No inspection cycle is active. <a href="{{ url_for('routes.add_inspection_cycle') }}">Create an inspection cycle</a> to start tracking facility audit progress.</p>
         {% endif %}
 
-        <div class="row mb-2">
+        <h2 class="dashboard-section-heading mt-4 mb-1">Facilities audit</h2>
+        <p class="dashboard-section-subtitle mb-2">{% if cyc %}{{ cyc.name }}{% else %}District completion and issue status{% endif %}</p>
+        <div class="row dashboard-audit-kpis mb-2">
           {{ kpi_card('Schools Completed', prog.completed_count, 'verified', url_for('routes.facilities')) }}
           {{ kpi_card('Schools In Progress', prog.in_progress_count, 'autorenew') }}
           {{ kpi_card('Schools Not Started', prog.not_started_count, 'radio_button_unchecked') }}
           {{ kpi_card('Open Audit Issues', prog.district.issues_open, 'report', None, 'text-warning' if prog.district.issues_open else '') }}
           {{ kpi_card('Critical Audit Issues', prog.district.critical_count, 'emergency', None, 'text-danger' if prog.district.critical_count else '') }}
-          {{ kpi_card('Facilities Audit Completion', pct(prog.district.pct), 'fact_check', url_for('routes.facilities')) }}
         </div>
 
-        <!-- Operational Insights — the plain-English "what's going on" summary comes
-             right after the headline gauge, ahead of the KPI grids, per the spec's
-             visual hierarchy (read this first, drill into numbers after). -->
-        <div class="card mb-4" id="insights">
+        <div class="card dashboard-insights mb-4" id="insights">
+          <div class="card-header d-flex justify-content-between align-items-center gap-2">
+            <div>
+              <h2 class="dashboard-panel-title mb-1"><i class="material-symbols-rounded" aria-hidden="true">lightbulb</i> Operational insights</h2>
+              <p class="dashboard-section-subtitle mb-0">Highlights for {{ f.period_label }}</p>
+            </div>
+            <span class="dashboard-live-label"><span></span> Live</span>
+          </div>
           <div class="card-body px-4 py-3">
-            <h6 class="mb-1"><i class="material-symbols-rounded text-lg align-middle me-1">auto_awesome</i> Operational Insights</h6>
-            <p class="text-xs text-secondary">Rule-based statements generated from the figures below for the current filters &mdash; nothing here is estimated or inferred beyond the query results.</p>
-            {% for i in data.insights %}
-            <div class="alert alert-{{ i.level }} text-sm py-2 mb-2" role="alert">{{ i.text }}</div>
+            {% for i in data.insights[:4] %}
+            <div class="dashboard-insight dashboard-insight-{{ i.level }}">
+              <i class="material-symbols-rounded" aria-hidden="true">{% if i.level == 'danger' %}error{% elif i.level == 'warning' %}warning{% else %}info{% endif %}</i>
+              <p class="mb-0">{{ i.text }}</p>
+            </div>
             {% else %}
-            <p class="text-sm text-secondary mb-0">Not enough data in this period to state anything with confidence.</p>
+            <div class="dashboard-insight dashboard-insight-info">
+              <i class="material-symbols-rounded" aria-hidden="true">check_circle</i>
+              <p class="mb-0">No notable operational exceptions for this period.</p>
+            </div>
             {% endfor %}
           </div>
         </div>
 
-        <!-- Work Orders panel — "current" (point-in-time, ignores the date filter) and
-             "this period" (date-filtered) grouped under one roof instead of two bare,
-             unbounded KPI rows. -->
-        <div class="card mb-4">
-          <div class="card-header d-flex align-items-center gap-2">
-            <i class="material-symbols-rounded text-lg">build</i>
-            <h6 class="mb-0">Work Orders</h6>
+        <div class="dashboard-section-heading-row">
+          <div>
+            <h2 class="dashboard-section-heading mb-1">Work order analytics</h2>
+            <p class="dashboard-section-subtitle mb-0">Volume, urgency, and where work is happening</p>
           </div>
-          <div class="card-body px-4 py-3">
-            <p class="text-xxs mb-2">Current</p>
-            <div class="row">
-              {{ kpi_card('Total Open', wo.total_open, 'build', url_for('routes.work_orders')) }}
-              {{ kpi_card('Overdue', wo.overdue, 'alarm', None, 'text-danger' if wo.overdue else '') }}
-              {{ kpi_card('Unassigned', wo.unassigned, 'person_off', url_for('routes.work_orders', assigned_filter='unassigned')) }}
-              {{ kpi_card('Emergency / Critical', wo.emergency ~ ' / ' ~ wo.critical, 'emergency', None, 'text-danger' if (wo.emergency or wo.critical) else '') }}
-              {{ kpi_card('In Progress', wo.in_progress, 'progress_activity', url_for('routes.work_orders', status_filter='In Progress')) }}
-              {{ kpi_card('Waiting', wo.waiting, 'hourglass_top') }}
-              {{ kpi_card('Backlog (open > 30 days)', wo.backlog, 'inventory') }}
-            </div>
-            <p class="text-xxs mb-2 mt-2">{{ f.period_label }}</p>
-            <div class="row mb-0">
-              {{ kpi_card('Opened', wo.created_in_period, 'add_circle') }}
-              {{ kpi_card('Completed', wo.completed, 'task_alt') }}
-              {{ kpi_card('Completion Rate', pct(wo.completion_rate), 'percent') }}
-              {{ kpi_card('SLA Compliance (due date)', pct(wo.sla_compliance), 'verified') }}
-              {{ kpi_card('Avg Response', days(wo.avg_response_days), 'timer') }}
-              {{ kpi_card('Avg Resolution', days(wo.avg_resolution_days), 'schedule') }}
-              {{ kpi_card('Repeat Work', pct(wo.repeat_work_pct), 'repeat') }}
-              {{ kpi_card('Labor Hours', m.labor_hours, 'engineering') }}
-            </div>
-          </div>
+          <a href="{{ url_for('routes.reports_index') }}" class="dashboard-text-link">All reports <i class="material-symbols-rounded" aria-hidden="true">arrow_forward</i></a>
         </div>
-
-        <!-- Facilities, Maintenance & Cost panel -->
-        <div class="card mb-4">
-          <div class="card-header d-flex align-items-center gap-2">
-            <i class="material-symbols-rounded text-lg">domain</i>
-            <h6 class="mb-0">Facilities, Maintenance &amp; Cost</h6>
-          </div>
-          <div class="card-body px-4 py-3">
-            <div class="row mb-0">
-              {{ kpi_card('Facilities / Rooms / Assets', fac.total_facilities ~ ' / ' ~ fac.total_rooms ~ ' / ' ~ fac.total_assets, 'domain', url_for('routes.facilities')) }}
-              {{ kpi_card('Assets Poor / Critical', fac.assets_poor_critical, 'warning', url_for('routes.capital_replacement'), 'text-danger' if fac.assets_poor_critical else '') }}
-              {{ kpi_card('Assets Past Expected Life', fac.assets_past_expected_life, 'history') }}
-              {{ kpi_card('PM Due / Overdue', m.pm_due ~ ' / ' ~ m.pm_overdue, 'event_repeat', url_for('routes.pm_dashboard'), 'text-danger' if m.pm_overdue else '') }}
-              {{ kpi_card('Inspections Due / Overdue', m.inspections_due ~ ' / ' ~ m.inspections_overdue, 'checklist', url_for('routes.inspection_dashboard'), 'text-danger' if m.inspections_overdue else '') }}
-              {{ kpi_card('Maintenance Cost (' ~ f.period_label ~ ')', money(cost.actual_total), 'payments', url_for('routes.cost_rollups')) }}
-              {{ kpi_card('Estimated vs Actual', money(cost.estimated_total) ~ ' / ' ~ money(cost.actual_total), 'balance') }}
-              {{ kpi_card('Preventive vs Corrective', pct(m.preventive_pct) ~ ' PM', 'autorenew') }}
-              {{ kpi_card('Assets Requiring Attention', fac.assets_requiring_attention, 'priority_high') }}
-              {{ kpi_card('Cost per Work Order', money(cost.cost_per_work_order), 'receipt_long') }}
-              {{ kpi_card('Labor / Material / Vendor', money(cost.labor_cost) ~ ' / ' ~ money(cost.material_cost) ~ ' / ' ~ money(cost.vendor_cost), 'stacked_bar_chart') }}
-              {{ kpi_card('Recurring Issues', data.recurring|length, 'repeat', None, 'text-warning' if data.recurring else '') }}
-              {% if data.sla.available %}
-              {{ kpi_card('SLA Breaches', data.sla.breach_count, 'gpp_bad', None, 'text-danger' if data.sla.breach_count else '') }}
-              {{ kpi_card('SLA Warnings', data.sla.warning_count, 'warning', None, 'text-warning' if data.sla.warning_count else '') }}
-              {% endif %}
-            </div>
-          </div>
+        <div class="row dashboard-charts">
+          {{ chart_box('by_status', 'Work orders by status', 'Opened ' ~ f.period_label, 'bar', 'col-xl-4 col-md-6') }}
+          {{ chart_box('by_priority', 'Work orders by priority', 'Opened ' ~ f.period_label, 'bar', 'col-xl-4 col-md-6') }}
+          {{ chart_box('by_facility', 'Work orders by facility', 'Top 10 · ' ~ f.period_label, 'bar', 'col-xl-4 col-md-6') }}
         </div>
-
-        <!-- Charts -->
-        <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2">Trends &amp; Breakdown</h6>
-        <div class="row">
-          {{ chart_box('by_status', 'Work Orders by Status', 'Opened ' ~ f.period_label) }}
-          {{ chart_box('by_priority', 'Work Orders by Priority', 'Opened ' ~ f.period_label) }}
-          {{ chart_box('by_facility', 'Work Orders by Facility', 'Opened ' ~ f.period_label ~ ' (top 10)') }}
-          {{ chart_box('by_category', 'Work Orders by Category', 'Opened ' ~ f.period_label ~ ' (top 10)') }}
-          {{ chart_box('by_technician', 'Work Orders by Technician', 'Assigned, opened ' ~ f.period_label ~ ' (top 10)') }}
-          {{ chart_box('by_month', 'Work Orders by Month', 'Opened per month') }}
-          {{ chart_box('cost_over_time', 'Cost Over Time', 'Actual cost by month', 'line') }}
-          {{ chart_box('trends', 'Response & Completion Trends', 'Average days, by month opened', 'line') }}
-          {{ chart_box('pm_vs_corrective', 'Preventive vs Corrective', 'By work order source', 'doughnut') }}
-          {{ chart_box('condition_distribution', 'Asset Condition', 'Current condition of active assets', 'doughnut') }}
-        </div>
+        <details class="dashboard-analysis mb-4">
+          <summary>Explore more analytics <span>Categories, workload, trends, and cost</span></summary>
+          <div class="row dashboard-charts mt-3">
+            {{ chart_box('by_category', 'By category', 'Opened ' ~ f.period_label) }}
+            {{ chart_box('by_technician', 'Technician workload', 'Assigned, opened ' ~ f.period_label) }}
+            {{ chart_box('by_month', 'Monthly work orders', 'Opened per month') }}
+            {{ chart_box('cost_over_time', 'Cost over time', 'Actual cost by month', 'line') }}
+            {{ chart_box('trends', 'Response & Completion Trends', 'Average days, by month opened', 'line') }}
+            {{ chart_box('pm_vs_corrective', 'Preventive vs corrective', 'By work order source', 'doughnut') }}
+            {{ chart_box('condition_distribution', 'Asset condition', 'Current active assets', 'doughnut') }}
+          </div>
+        </details>
+        <details class="dashboard-analysis dashboard-performance mb-4">
+          <summary>More performance metrics <span>Work order, maintenance, and cost measures</span></summary>
+          <div class="row mt-3">
+            {{ kpi_card('Unassigned Work Orders', wo.unassigned, 'person_off', url_for('routes.work_orders', assigned_filter='unassigned')) }}
+            {{ kpi_card('Emergency / Critical', wo.emergency ~ ' / ' ~ wo.critical, 'emergency', None, 'text-danger' if (wo.emergency or wo.critical) else '') }}
+            {{ kpi_card('In Progress', wo.in_progress, 'progress_activity', url_for('routes.work_orders', status_filter='In Progress')) }}
+            {{ kpi_card('Waiting', wo.waiting, 'hourglass_top') }}
+            {{ kpi_card('Backlog (open > 30 days)', wo.backlog, 'inventory') }}
+            {{ kpi_card('Completion Rate', pct(wo.completion_rate), 'percent') }}
+            {{ kpi_card('SLA Compliance', pct(wo.sla_compliance), 'verified') }}
+            {{ kpi_card('Avg Response / Resolution', days(wo.avg_response_days) ~ ' / ' ~ days(wo.avg_resolution_days), 'schedule') }}
+            {{ kpi_card('Repeat Work', pct(wo.repeat_work_pct), 'repeat') }}
+            {{ kpi_card('Labor Hours', m.labor_hours, 'engineering') }}
+            {{ kpi_card('Facilities / Rooms / Assets', fac.total_facilities ~ ' / ' ~ fac.total_rooms ~ ' / ' ~ fac.total_assets, 'domain', url_for('routes.facilities')) }}
+            {{ kpi_card('Assets Poor / Critical', fac.assets_poor_critical, 'warning', url_for('routes.capital_replacement'), 'text-danger' if fac.assets_poor_critical else '') }}
+            {{ kpi_card('Assets Past Expected Life', fac.assets_past_expected_life, 'history') }}
+            {{ kpi_card('PM Due / Overdue', m.pm_due ~ ' / ' ~ m.pm_overdue, 'event_repeat', url_for('routes.pm_dashboard'), 'text-danger' if m.pm_overdue else '') }}
+            {{ kpi_card('Inspections Due / Overdue', m.inspections_due ~ ' / ' ~ m.inspections_overdue, 'checklist', url_for('routes.inspection_dashboard'), 'text-danger' if m.inspections_overdue else '') }}
+            {{ kpi_card('Maintenance Cost', money(cost.actual_total), 'payments', url_for('routes.cost_rollups')) }}
+            {{ kpi_card('Estimated Cost', money(cost.estimated_total), 'balance') }}
+            {{ kpi_card('Preventive Work', pct(m.preventive_pct), 'autorenew') }}
+            {{ kpi_card('Assets Requiring Attention', fac.assets_requiring_attention, 'priority_high') }}
+            {{ kpi_card('Cost per Work Order', money(cost.cost_per_work_order), 'receipt_long') }}
+            {{ kpi_card('Labor / Material / Vendor', money(cost.labor_cost) ~ ' / ' ~ money(cost.material_cost) ~ ' / ' ~ money(cost.vendor_cost), 'stacked_bar_chart') }}
+            {{ kpi_card('Recurring Issues', data.recurring|length, 'repeat', None, 'text-warning' if data.recurring else '') }}
+            {% if data.sla.available %}
+            {{ kpi_card('SLA Breaches / Warnings', data.sla.breach_count ~ ' / ' ~ data.sla.warning_count, 'gpp_bad', None, 'text-danger' if data.sla.breach_count else '') }}
+            {% endif %}
+          </div>
+        </details>
 
         <h6 class="text-uppercase text-xs font-weight-bolder text-secondary mb-2 mt-2">Details</h6>
 

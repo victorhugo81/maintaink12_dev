@@ -317,9 +317,22 @@ class ProjectTaskForm(FlaskForm):
     name = StringField('Task Name:', validators=[DataRequired(), Length(max=200)])
     description = StringField('Description:', validators=[Optional(), Length(max=255)])
     assigned_to_id = SelectField('Assign To:', coerce=int, choices=[], validators=[Optional()])
+    start_date = DateField('Start Date:', validators=[Optional()])
     due_date = DateField('Due Date:', validators=[Optional()])
+    percent_complete = IntegerField('% Complete:', validators=[Optional(), NumberRange(min=0, max=100)], default=0)
+    is_milestone = BooleanField('Milestone')
+    # Only rendered/applied on the edit page — add_project_task() leaves the
+    # model's 'Not Started' default alone, matching today's behavior exactly.
+    status = SelectField('Status:', choices=[], validators=[Optional()])
     sort_order = IntegerField('Sort Order:', validators=[Optional()], default=0)
     submit = SubmitField('Add Task')
+
+
+class ProjectTaskDependencyForm(FlaskForm):
+    predecessor_id = SelectField('Predecessor (must finish first):', coerce=int, choices=[], validators=[DataRequired()])
+    successor_id = SelectField('Successor (starts after):', coerce=int, choices=[], validators=[DataRequired()])
+    lag_days = IntegerField('Lag (days):', validators=[Optional(), NumberRange(min=0)], default=0)
+    submit = SubmitField('Add Dependency')
 
 
 class ProjectCostForm(FlaskForm):

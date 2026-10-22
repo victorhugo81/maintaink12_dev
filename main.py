@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timedelta, timezone
 from flask import Flask, g
 from flask_wtf.csrf import CSRFProtect
 from flask_migrate import Migrate
@@ -143,6 +144,23 @@ def create_app(config_name=None):
     @app.before_request
     def set_csp_nonce():
         g.csp_nonce = _secrets.token_urlsafe(16)
+
+    # Top-navbar notification bell: nav.html is included by every page
+    # (76 templates extend base.html), so this must be computed once per
+    # request here rather than threaded through every render_template()
+    # call — the same "available everywhere" mechanism g.csp_nonce uses.
+    @app.context_processor
+    def inject_nav_notifications():
+        from flask_login import current_user
+        if not current_user.is_authenticated:
+            return {}
+        from application import notifications as notifications_module
+        rows = notifications_module.recent_notifications_for(current_user, limit=10)
+        # NotificationLog.sent_at is naive UTC (models._utcnow() strips tzinfo),
+        # so the cutoff must be naive too — comparing naive to aware raises.
+        recent_cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
+        recent_count = sum(1 for r in rows if r['sent_at'] >= recent_cutoff)
+        return {'nav_notifications': rows, 'nav_notification_count': recent_count}
 
     # Security headers applied to every response
     @app.after_request

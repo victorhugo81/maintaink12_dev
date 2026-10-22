@@ -250,6 +250,20 @@ class TestInsights:
         assert analytics.build_insights(data, 'today') == []
 
 
+class TestDistrictHealthScore:
+    def test_equal_weights_all_available_health_measures(self):
+        result = analytics.district_health_score(80, 60, 4, 2)
+        assert result == {'score': 63, 'work_order_pct': 50.0, 'component_count': 3}
+
+    def test_unavailable_measures_are_excluded(self):
+        assert analytics.district_health_score(None, 60, 0, 0) == {
+            'score': 60, 'work_order_pct': None, 'component_count': 1,
+        }
+        assert analytics.district_health_score(None, None, 0, 0) == {
+            'score': None, 'work_order_pct': None, 'component_count': 0,
+        }
+
+
 # ---------------------------------------------------------------------------
 # KPIs against seeded data
 # ---------------------------------------------------------------------------
@@ -455,6 +469,9 @@ class TestDashboardRoutes:
     def test_admin_default_is_manager(self, admin_client):
         r = admin_client.get('/')
         assert r.status_code == 200 and b'M&amp;O Manager' in r.data
+        assert b'district_health_gauge' in r.data
+        assert b'audit_completion_gauge' in r.data
+        assert b'project_progress_gauge' in r.data
         r = admin_client.get('/?view=manager&preset=year')
         assert r.status_code == 200 and b'M&amp;O Manager' in r.data and b'Response &amp; Completion' in r.data
         r = admin_client.get('/?view=technician')

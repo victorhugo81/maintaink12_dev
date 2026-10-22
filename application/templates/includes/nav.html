@@ -24,7 +24,7 @@
           </a>
         </li>
         <li class="nav-item nav-cat-list">
-          <h6 class="ps-3 ms-2 text-uppercase text-xxs font-weight-bolder">Maintenance</h6>
+          <h6 class="ps-3 ms-2 text-uppercase text-xxs font-weight-bolder">Operations</h6>
         </li>
         <li class="nav-item">
           <a class="nav-link{% if request.endpoint in ['routes.work_orders', 'routes.add_work_order', 'routes.edit_work_order'] %} active{% endif %}" href="{{ url_for('routes.work_orders') }}">
@@ -51,6 +51,27 @@
             <span class="nav-link-text ms-1">Facilities Audit</span>
           </a>
         </li>
+        <li class="nav-item nav-cat-list">
+          <h6 class="ps-3 ms-2 text-uppercase text-xxs font-weight-bolder">Planning &amp; Reports</h6>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link{% if request.endpoint in ['routes.projects', 'routes.add_project', 'routes.edit_project'] %} active{% endif %}" href="{{ url_for('routes.projects') }}">
+            <i class="material-symbols-rounded">construction</i>
+            <span class="nav-link-text ms-1">Projects</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link{% if request.endpoint == 'routes.capital_replacement' %} active{% endif %}" href="{{ url_for('routes.capital_replacement') }}">
+            <i class="material-symbols-rounded">warning</i>
+            <span class="nav-link-text ms-1">Capital Replacement</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link{% if request.endpoint == 'routes.technician_workload' %} active{% endif %}" href="{{ url_for('routes.technician_workload') }}">
+            <i class="material-symbols-rounded">engineering</i>
+            <span class="nav-link-text ms-1">Technician Workload</span>
+          </a>
+        </li>
         <li class="nav-item">
           <a class="nav-link{% if request.endpoint == 'routes.vendor_performance' %} active{% endif %}" href="{{ url_for('routes.vendor_performance') }}">
             <i class="material-symbols-rounded">local_shipping</i>
@@ -61,24 +82,6 @@
           <a class="nav-link{% if request.endpoint == 'routes.cost_rollups' %} active{% endif %}" href="{{ url_for('routes.cost_rollups') }}">
             <i class="material-symbols-rounded">payments</i>
             <span class="nav-link-text ms-1">Cost Rollups</span>
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link{% if request.endpoint == 'routes.technician_workload' %} active{% endif %}" href="{{ url_for('routes.technician_workload') }}">
-            <i class="material-symbols-rounded">engineering</i>
-            <span class="nav-link-text ms-1">Technician Workload</span>
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link{% if request.endpoint in ['routes.projects', 'routes.add_project', 'routes.edit_project'] %} active{% endif %}" href="{{ url_for('routes.projects') }}">
-            <i class="material-symbols-rounded">construction</i>
-            <span class="nav-link-text ms-1">Capital Projects</span>
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link{% if request.endpoint == 'routes.capital_replacement' %} active{% endif %}" href="{{ url_for('routes.capital_replacement') }}">
-            <i class="material-symbols-rounded">warning</i>
-            <span class="nav-link-text ms-1">Capital Replacement</span>
           </a>
         </li>
         <li class="nav-item">
@@ -248,11 +251,33 @@
                wired up in material-dashboard.js — this used to be a second,
                hand-maintained copy of every nav link that had to be updated
                in lockstep with the list above; now there's one list. -->
-            <div class="ms-md-auto pe-md-3 d-flex align-items-center">
+            <div class="pe-md-3 d-flex align-items-center">
               <button class="mobile-menu-toggle d-xl-none" id="iconNavbarSidenav" type="button" aria-label="Open navigation menu">
                 <i class="material-symbols-rounded">menu</i>
               </button>
             </div>
+            <nav class="topbar-breadcrumb" aria-label="Breadcrumb">
+              <ol class="breadcrumb breadcrumb-links mb-0">
+                {% if current_page_name != 'Dashboard' %}
+                <li class="breadcrumb-item"><a href="{{ url_for('routes.index') }}">Dashboard</a></li>
+                {% endif %}
+                <li class="breadcrumb-item active" aria-current="page">{{ current_page_name }}</li>
+              </ol>
+            </nav>
+
+          <!-- Deliberately NOT a Bootstrap .input-group: material-dashboard.js
+               injects inline onfocus/onfocusout attributes (CSP-blocked —
+               see application/CLAUDE.md) on every .form-control the moment
+               ANY .input-group exists anywhere on the page, and this form
+               lives in nav.html, included by all 76 templates — using
+               .input-group here would turn that from a page-specific quirk
+               into a site-wide console error. -->
+          <form class="navbar-search-form d-none d-sm-flex flex-grow-1 mx-3" method="GET" action="{{ url_for('routes.search') }}" role="search">
+            <div class="navbar-search-wrap">
+              <i class="material-symbols-rounded text-sm">search</i>
+              <input type="search" class="navbar-search-input" name="q" placeholder="Search work orders, facilities, assets..." aria-label="Search">
+            </div>
+          </form>
 
           
 
@@ -272,10 +297,60 @@
 
 
 
-          <ul class="navbar-nav d-flex align-items-center justify-content-end">
-            <li class="d-flex flex-column align-items-end">
-              <a class="user-welcome" href="{{ url_for('routes.profile') }}">Hello, {{ current_user.first_name }}!</a>
-              <p class="site-name-nav mb-0">{{ current_user.site.site_name }}</p>
+          <ul class="navbar-nav d-flex align-items-center justify-content-end gap-2">
+            <li class="nav-item dropdown">
+              <button class="btn btn-primary btn-sm d-flex align-items-center gap-1 mb-0"
+                      type="button" id="navQuickCreate" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="material-symbols-rounded" aria-hidden="true">add</i>
+                <span class="d-none d-md-inline">Create</span>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navQuickCreate">
+                <li><a class="dropdown-item" href="{{ url_for('routes.request_work_order') }}"><i class="material-symbols-rounded text-sm align-middle me-1" aria-hidden="true">build</i> New Work Order</a></li>
+                {% if current_user.is_admin %}
+                <li><a class="dropdown-item" href="{{ url_for('routes.add_project') }}"><i class="material-symbols-rounded text-sm align-middle me-1" aria-hidden="true">construction</i> New Project</a></li>
+                {% endif %}
+              </ul>
+            </li>
+            <!-- Notifications bell: recent NotificationLog entries for this
+                 user, injected into every page's context by main.py's
+                 inject_nav_notifications() context processor. The badge is a
+                 7-day recency count, not true unread-tracking — NotificationLog
+                 has no read flag (see application/notifications.py). -->
+            <li class="nav-item dropdown">
+              <a class="nav-link text-dark position-relative" href="#" id="navNotificationsToggle" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="material-symbols-rounded">notifications</i>
+                {% if nav_notification_count %}
+                <span class="badge bg-danger rounded-pill position-absolute top-0 end-0" style="font-size: 0.6rem;">{{ nav_notification_count }}</span>
+                {% endif %}
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navNotificationsToggle" style="min-width: 320px; max-height: 70vh; overflow-y: auto;">
+                <li><h6 class="dropdown-header">Recent Notifications</h6></li>
+                {% for n in nav_notifications %}
+                <li><a class="dropdown-item" href="{{ url_for(n.endpoint, **n.params) }}">
+                  <span class="d-block text-sm">{{ n.label }}</span>
+                  <span class="d-block text-xs text-secondary">{{ n.sent_at | localtime }}</span>
+                </a></li>
+                {% else %}
+                <li><span class="dropdown-item-text text-sm text-secondary">Nothing recent.</span></li>
+                {% endfor %}
+              </ul>
+            </li>
+            <!-- Profile dropdown: consolidates the "Hello, X!" link and the
+                 sidebar-footer Log Out button into one menu; both originals
+                 stay in place too (additive, not a removal). -->
+            <li class="nav-item dropdown">
+              <a class="nav-link d-flex align-items-center text-dark" href="#" id="navProfileToggle" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <span class="d-flex flex-column align-items-end me-1">
+                  <span class="user-welcome">Hello, {{ current_user.first_name }}!</span>
+                  <span class="site-name-nav mb-0">{{ current_user.site.site_name }}</span>
+                </span>
+                <i class="material-symbols-rounded">arrow_drop_down</i>
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navProfileToggle">
+                <li><a class="dropdown-item" href="{{ url_for('routes.profile') }}"><i class="material-symbols-rounded text-sm align-middle me-1">badge</i> Profile</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="{{ url_for('routes.logout') }}"><i class="material-symbols-rounded text-sm align-middle me-1">logout</i> Log Out</a></li>
+              </ul>
             </li>
           </ul>
         </div>

@@ -25,7 +25,7 @@ from sqlalchemy import event, inspect
 from sqlalchemy.orm import Session
 
 TRACKED = ('WorkOrder', 'Asset', 'Facility', 'Room', 'User', 'Role', 'CostRecord', 'WorkOrderLabor',
-           'WorkOrderMaterial', 'Project', 'ProjectCost', 'Vendor', 'SLARule', 'AssetConditionHistory')
+           'WorkOrderMaterial', 'Project', 'ProjectCost', 'ProjectTask', 'Vendor', 'SLARule', 'AssetConditionHistory')
 
 IGNORED_FIELDS = frozenset(('id', 'created_at', 'updated_at', 'wo_number', 'last_generated_at'))
 MASKED_FIELDS = frozenset(('password', 'email_enc', 'email_hash', 'failed_login_attempts', 'locked_until'))

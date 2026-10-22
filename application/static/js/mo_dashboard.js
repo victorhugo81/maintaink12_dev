@@ -6,29 +6,30 @@
   var data = window.MO_DASHBOARD || {};
   var charts = data.charts || {};
   var primary = getComputedStyle(document.documentElement).getPropertyValue('--bs-main-color-primary').trim() || '#F3794C';
-  var palette = [primary, '#f5a623', '#d0021b', '#7ed321', '#4a90e2', '#9013fe', '#50e3c2', '#b8e986', '#8b572a', '#417505', '#9b9b9b'];
+  var palette = [primary, '#0F766E', '#7C3AED', '#DC2626', '#0891B2', '#4F46E5', '#16A34A', '#64748B', '#A855F7', '#334155', '#94A3B8'];
 
   var axisOpts = {
     y: { beginAtZero: true, grid: { color: '#e5e5e5', borderDash: [4, 4], drawTicks: false }, ticks: { color: '#737373', padding: 8, font: { size: 11 } } },
     x: { grid: { display: false }, ticks: { color: '#737373', padding: 8, font: { size: 11 }, autoSkip: true, maxRotation: 45 } }
   };
 
-  // Gauge color thresholds match the facility progress bars in
-  // dashboard.html (pct_tone macro) and the spec's suggested palette:
-  // 90-100 success, 75-89 info, 50-74 warning, 25-49 accent, 0-24 danger.
+  // Keep gauge thresholds consistent across district health and progress.
   function gaugeColor(val) {
-    if (val >= 90) { return '#15803D'; }
-    if (val >= 75) { return '#1D4ED8'; }
-    if (val >= 50) { return '#92400E'; }
-    if (val >= 25) { return '#E8967A'; }
+    if (val >= 80) { return '#15803D'; }
+    if (val >= 65) { return '#2563EB'; }
+    if (val >= 45) { return '#D97706'; }
     return '#B91C1C';
   }
 
   function buildGauge(canvas, spec) {
-    var val = (spec.datasets[0] && spec.datasets[0].data[0]) || 0;
+    var rawValue = spec.datasets[0] && spec.datasets[0].data[0];
+    var hasValue = rawValue !== null && rawValue !== undefined && Number.isFinite(Number(rawValue));
+    var val = hasValue ? Math.max(0, Math.min(100, Number(rawValue))) : 0;
+    var displayValue = hasValue ? Math.round(val) + '%' : 'N/A';
+    var remainingColor = '#E2E8F0';
     new Chart(canvas.getContext('2d'), {
       type: 'doughnut',
-      data: { datasets: [{ data: [val, 100 - val], backgroundColor: [gaugeColor(val), '#E5E7EB'], borderWidth: 0 }] },
+      data: { datasets: [{ data: [val, 100 - val], backgroundColor: [hasValue ? gaugeColor(val) : remainingColor, remainingColor], borderWidth: 0 }] },
       options: {
         responsive: true, maintainAspectRatio: false,
         circumference: 270, rotation: 225, cutout: '78%',
@@ -40,10 +41,10 @@
           var ctx = chart.ctx, w = chart.width, h = chart.height;
           ctx.save();
           ctx.font = '700 ' + Math.round(h * 0.17) + 'px Inter, sans-serif';
-          ctx.fillStyle = '#17212B';
+          ctx.fillStyle = '#0F172A';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(val + '%', w / 2, h / 2 + h * 0.06);
+          ctx.fillText(displayValue, w / 2, h / 2 + h * 0.06);
           ctx.restore();
         }
       }]

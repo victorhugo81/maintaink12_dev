@@ -209,6 +209,73 @@ def _notify_sla_item(event_type, item, today):
     return _dispatch(event_type, entity_type, wo.id, recipients, bucket, subject, body)
 
 
+# ---------------------------------------------------------------------------
+# Top-navbar bell (reads NotificationLog, writes nothing)
+# ---------------------------------------------------------------------------
+
+# NotificationLog stores no subject/body (see _dispatch) — the bell re-derives
+# a human label from the LIVE entity at entity_id, same shaping idea as
+# search.py's global_search() rows ({'label', 'endpoint', 'params'}). A row
+# whose entity has since been deleted is skipped rather than shown broken.
+def _shape_notification_row(row):
+    from main import db
+    et = row.entity_type
+    if et == 'maintenance_schedule':
+        from application.models import MaintenanceSchedule
+        obj = db.session.get(MaintenanceSchedule, row.entity_id)
+        if not obj:
+            return None
+        return {'label': f'PM due: {obj.asset.asset_tag}', 'endpoint': 'routes.edit_maintenance_plan',
+                'params': {'plan_id': obj.maintenance_plan_id}, 'sent_at': row.sent_at}
+    if et == 'inspection':
+        from application.models import Inspection
+        obj = db.session.get(Inspection, row.entity_id)
+        if not obj:
+            return None
+        return {'label': f'Inspection: {obj.target_label}', 'endpoint': 'routes.edit_inspection',
+                'params': {'inspection_id': obj.id}, 'sent_at': row.sent_at}
+    if et == 'vendor':
+        from application.models import Vendor
+        obj = db.session.get(Vendor, row.entity_id)
+        if not obj:
+            return None
+        return {'label': f'Vendor contract: {obj.name}', 'endpoint': 'routes.edit_vendor',
+                'params': {'vendor_id': obj.id}, 'sent_at': row.sent_at}
+    if et == 'asset':
+        from application.models import Asset
+        obj = db.session.get(Asset, row.entity_id)
+        if not obj:
+            return None
+        return {'label': f'Warranty: {obj.asset_tag}', 'endpoint': 'routes.edit_asset',
+                'params': {'asset_id': obj.id}, 'sent_at': row.sent_at}
+    if et.startswith('work_order'):
+        from application.models import WorkOrder
+        obj = db.session.get(WorkOrder, row.entity_id)
+        if not obj:
+            return None
+        return {'label': f'SLA: {obj.wo_number}', 'endpoint': 'routes.edit_work_order',
+                'params': {'work_order_id': obj.id}, 'sent_at': row.sent_at}
+    return None
+
+
+def recent_notifications_for(user, limit=10):
+    """Newest-first [{label, endpoint, params, sent_at}, ...] for the
+    top-navbar bell — this user's own NotificationLog rows only. Scans a bit
+    deeper than `limit` to absorb rows whose entity has since been deleted
+    (_shape_notification_row returns None for those) without under-filling."""
+    from application.models import NotificationLog
+    candidates = (NotificationLog.query.filter_by(user_id=user.id)
+                  .order_by(NotificationLog.sent_at.desc()).limit(limit * 3).all())
+    rows = []
+    for candidate in candidates:
+        shaped = _shape_notification_row(candidate)
+        if shaped:
+            rows.append(shaped)
+        if len(rows) >= limit:
+            break
+    return rows
+
+
 def run_notification_sweep(today=None, now=None):
     """
     The one daily job. Returns {event_type: count_notified} regardless of
